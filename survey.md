@@ -5,7 +5,9 @@
 
 ## 1. 프로젝트 맥락
 - 아키텍처 방법론은 무엇으로 선택할 것인가?: **FSD(Feature-Sliced Design)** 를 채택한다. 제약 기반 생성/검증/부분 재계산처럼 복잡도가 높은 도메인을 장기적으로 유지보수하기 위해 레이어 규칙과 단방향 의존을 적용한다.
-- 앱/렌더링 방식은 무엇으로 갈 것인가?: **React + Vite + CSR** 방식으로 시작한다.
+- 앱/렌더링 방식은 무엇으로 갈 것인가?: **TanStack Start** 기반으로 시작하며, 라우트 단위에서 SSR/CSR을 혼합해 사용한다.
+- 초기 프로젝트 템플릿은 무엇으로 고정할 것인가?: `pnpm dlx shadcn@latest create --preset "https://ui.shadcn.com/init?base=base&style=nova&baseColor=neutral&theme=neutral&iconLibrary=hugeicons&font=geist&menuAccent=subtle&menuColor=default&radius=default&template=start&rtl=false" --template start` 명령으로 생성한 **고정 프리셋(Nova/Neutral + TanStack Start)** 을 기준으로 한다.
+- UI/스타일링 원칙은 무엇인가?: **Tailwind CSS + 시멘틱 토큰 + 공통 UI 재사용**을 기본 원칙으로 고정한다.
 - 핵심 비즈니스 가치는 무엇인가?: 자동 생성 정확도(필수 제약 100% 준수), 부분 수정 안정성(잠금 보존), 학기 중 교체 안전성(유효 후보만 노출)을 최우선 가치로 둔다.
 
 ## 2. 도메인 분석

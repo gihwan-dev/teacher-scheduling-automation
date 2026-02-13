@@ -4,6 +4,13 @@
 - `SPEC.md`
 - `survey.md`
 
+## 기술 스택 기준
+- 프로젝트 생성은 아래 명령을 기준으로 고정한다.
+  `pnpm dlx shadcn@latest create --preset "https://ui.shadcn.com/init?base=base&style=nova&baseColor=neutral&theme=neutral&iconLibrary=hugeicons&font=geist&menuAccent=subtle&menuColor=default&radius=default&template=start&rtl=false" --template start`
+- 앱 프레임워크는 **TanStack Start**를 사용한다.
+- 스타일링은 **Tailwind CSS**만 사용한다.
+- UI 구현은 **시멘틱 토큰 + 공통 UI 컴포넌트(shared/ui) 우선** 원칙을 따른다.
+
 ## 1. 목적
 - 제약 충족 기반 시간표 생성/수정/교체를 안정적으로 제공하는 구조를 수립한다.
 - 필수 제약 100% 준수, 잠금 보존 부분 재계산, 유효 후보 중심 교체 탐색을 제품의 핵심 품질로 고정한다.
@@ -146,8 +153,11 @@ flowchart LR
 ## 7. 단계별 구현 로드맵
 
 ### Phase 1. 기반 구축 (아키텍처/인프라)
+- TanStack Start + shadcn 프리셋 기반 초기 프로젝트 생성
 - FSD 디렉토리/레이어 가드 설정
 - Query/Router/Zustand 기본 프로바이더 구성
+- Tailwind CSS 시멘틱 토큰 맵(색상/텍스트/보더/상태) 정의
+- `shared/ui` 공통 UI 컴포넌트 베이스라인 구축(버튼/입력/다이얼로그/테이블)
 - 도메인 타입 및 공통 검증 리포트 포맷 정의
 - 권한 모델(조회/수정/확정/정책변경) 골격 반영
 
