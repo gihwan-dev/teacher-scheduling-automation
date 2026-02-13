@@ -3,229 +3,228 @@
 ## 참조 문서
 - `SPEC.md`
 - `survey.md`
+- `AGENTS.md`
 
-## 기술 스택 기준
-- 프로젝트 생성은 아래 명령을 기준으로 고정한다.
-  `pnpm dlx shadcn@latest create --preset "https://ui.shadcn.com/init?base=base&style=nova&baseColor=neutral&theme=neutral&iconLibrary=hugeicons&font=geist&menuAccent=subtle&menuColor=default&radius=default&template=start&rtl=false" --template start`
-- 앱 프레임워크는 **TanStack Start**를 사용한다.
-- 스타일링은 **Tailwind CSS**만 사용한다.
-- URL 상태 관리는 **TanStack Router(search + hash)** 를 표준으로 사용한다.
-- URL 데이터 압축은 **lz-string**(`compressToEncodedURIComponent`)을 사용한다.
-- 브라우저 영속 저장은 **IndexedDB(Dexie)** 를 기본으로 사용하고, `localStorage`는 경량 설정값에 한정한다.
-- 전역 클라이언트 상태는 **Zustand**를 최소 범위로 사용한다.
-- 서버 DB/서버 API는 1차 릴리스에서 사용하지 않는다.
+## 기술 스택 확정표
 
-## 1. 목적
-- 제약 충족 기반 시간표 생성/수정/교체를 브라우저 단독으로 안정적으로 제공한다.
-- 필수 제약 100% 준수, 잠금 보존 부분 재계산, 유효 후보 중심 교체 탐색을 핵심 품질로 고정한다.
-- 시간표를 URL로 공유해 교사가 동일한 결과를 조회할 수 있도록 한다.
-- 학기 중 정책 변경과 기능 확장을 기존 코드 대규모 수정 없이 수용할 수 있도록 FSD + SOLID 원칙으로 설계한다.
+| 항목 | 선택 | 선정 이유 | 대안 | 도입 시점 |
+|---|---|---|---|---|
+| 프레임워크 | TanStack Start | TanStack Router와 결합이 자연스럽고 Local-First CSR 시작에 적합 | Next.js App Router | Phase 1 |
+| 라우팅 | TanStack Router (search + hash) | 공유 URL 상태와 화면 상태를 타입 안정적으로 관리 가능 | React Router + 수동 파싱 | Phase 1 |
+| UI 라이브러리 | shadcn/ui + `shared/ui` 재사용 | AGENTS 공통 UI 우선 원칙 준수, 변형 관리 용이 | Headless UI + 자체 스타일 | Phase 1 |
+| 스타일링 | Tailwind CSS + 시멘틱 토큰(`background`, `foreground`, `primary`, `muted`, `border`) | AGENTS 스타일 규칙 준수, 토큰 중심 확장성 확보 | CSS Modules | Phase 1 |
+| 상태관리 | Zustand(최소 전역) + 컴포넌트 로컬 상태 | Undo/Redo 포인터, 현재 작업 컨텍스트 등 최소 전역만 유지 | TanStack Store | Phase 1 |
+| 데이터 저장소 | IndexedDB(Dexie) + `localStorage`(경량 설정 한정) | 스냅샷/정책/이력 대용량 영속화와 브라우저 호환성 확보 | localStorage 단독 | Phase 1 |
+| 폼/검증 | Zod 스키마 기반 입력 검증 + `entities/*/lib` 도메인 검증기 | 정책 입력(F2)과 공유 URL 복원 시 스키마 검증 통합 가능 | Yup, 수동 런타임 체크 | Phase 2 |
+| 테스트 | Vitest + RTL + Browser Mode(E2E 성격 핵심 시나리오) | survey 결정사항과 일치, 검증/상태전이 회귀 방지에 적합 | Playwright 단독 | Phase 1 |
+| URL 압축/직렬화 | `lz-string` (`compressToEncodedURIComponent`) | 공유 URL 길이 절감, URL-safe 직렬화 | pako + base64url | Phase 1 |
 
-## 2. 아키텍처 개요
+## 아키텍처 개요 (FSD)
 
-### 2.1 레이어 전략 (FSD)
-- `app`: 라우팅, URL hydrate/bootstrap, 전역 스토어 프로바이더, 에러 바운더리
-- `pages`: 화면 단위 진입점(기초 생성, 편집/재계산, 교체 탐색, 정책 관리)
-- `widgets`: 복합 UI(시간표 그리드, 교체 후보 패널, 변경 이력 타임라인, 공유 패널)
-- `features`: 사용자 액션 단위 유스케이스(생성, 잠금, 재계산, 교체 확정, URL 공유, 되돌리기/앞으로 가기)
-- `entities`: 도메인 모델/검증 규칙/리포지토리 인터페이스(시간표 셀, 제약 정책, 변경 이벤트)
-- `shared`: 공통 인프라(URL codec, 로컬 저장소 어댑터, 유틸, 공통 UI, 타입 기초)
+### 레이어 역할
+- `app`: 부트스트랩, 라우터, 전역 Provider, 에러 경계, 초기 hydrate
+- `pages`: 라우트 진입 화면, 위젯 조합, 페이지 단위 권한 가드
+- `widgets`: 시간표 그리드/교체 패널/이력 타임라인/공유 패널 같은 복합 UI
+- `features`: 생성, 편집, 잠금, 재계산, 교체 확정, URL 공유, Undo/Redo 같은 사용자 액션 유스케이스
+- `entities`: 시간표/정책/검증/이력 등 도메인 모델과 규칙
+- `shared`: URL codec, persistence adapter, 공통 UI, 공통 타입/유틸
 
-### 2.2 슬라이스 전략
-- `timetable`: 시간표 구조/셀 상태/스냅샷
+### 슬라이스 전략
+- `timetable`: 셀 모델, 스냅샷, 상태 전이
 - `teacher-policy`: 교사 선호/회피/일일 시수 정책
 - `constraint-policy`: 학생/교사 연강 및 일일 제한 정책
-- `locking`: 셀 잠금 상태 관리
+- `locking`: 잠금 상태
 - `replacement`: 교체 후보 탐색/정렬/확정
-- `change-history`: 상태 전이 및 시각화 이벤트
-- `share-state`: URL 직렬화/압축/복원 규칙
+- `change-history`: 이벤트 로그와 시각화용 상태
+- `share-state`: 공유 가능한 URL 상태 계약
 
-### 2.3 핵심 아키텍처 결정
-- **서버 DB 제거**: 중앙 저장소 없이 브라우저 내부 저장만 사용한다.
-- **브라우저 DB 선택**: 웹 호환성과 구현 안정성을 위해 SQLite 대신 IndexedDB를 기본 채택한다.
-- **URL 중심 상태 관리**: 공유 가능한 핵심 상태는 URL에 저장하고, 장기 보관/자동저장은 IndexedDB에 저장한다.
-- **API 전략 단순화**: 네트워크 API 대신 `repository/usecase` 인터페이스로 내부 경계를 유지한다.
+### Import 규칙 (허용/금지)
+- 허용: `app -> pages/widgets/features/entities/shared`
+- 허용: `pages -> widgets/features/entities/shared`
+- 허용: `widgets -> features/entities/shared`
+- 허용: `features -> entities/shared`
+- 허용: `entities -> shared`
+- 금지: 하위 레이어에서 상위 레이어 import
+- 금지: 동일 레이어 슬라이스 직접 내부 참조(`index.ts` public API 경유)
+- 금지: `shared`에서 `entities/features/widgets/pages/app` import
 
-### 2.4 설계 원칙 적용
-- SRP: 기능별 유스케이스를 `features` 단위로 분리하고 UI는 표현 책임만 가진다.
-- OCP: 제약 검증 규칙과 후보 정렬 규칙을 전략 인터페이스로 열어 신규 정책을 확장으로 추가한다.
-- DIP: `features`는 구체 저장 구현(IndexedDB/URL codec)이 아닌 `entities/*/repository` 인터페이스에 의존한다.
-- 높은 응집도: 정책/검증/상태 전이는 각 슬라이스에 코로케이션한다.
-- 낮은 결합도: 슬라이스 간 직접 참조를 금지하고 `pages/widgets`에서만 합성한다.
+## 요구사항 매핑 표 (SPEC -> 구현)
 
-## 3. 요구사항 매핑 (SPEC → 구현 항목)
+| 요구사항 | 대상 레이어 | 핵심 유스케이스 | 완료 기준 | 테스트 포인트 |
+|---|---|---|---|---|
+| F1 기초 시간표 자동 생성 | `features/generate-timetable`, `entities/timetable`, `entities/constraint-policy` | 필수 제약 우선 충족 + 선호 점수 기반 배치 | 필수 제약 위반 0건, 생성 실패 시 원인/완화안 표시 | 제약 위반 0건 검증 unit, 생성 실패 사유 노출 integration |
+| F2 교사 배치 조건 관리 | `features/manage-teacher-policy`, `entities/teacher-policy` | 회피/선호/연강 허용 범위 저장 및 검증 | 상충 정책 저장 차단, 수정 가이드 제공 | 정책 스키마 unit, 상충 입력 차단 UI test |
+| F3 수동 수정 및 잠금 | `features/edit-slot`, `features/toggle-lock`, `entities/locking` | 셀 편집/이동, 즉시 충돌 검사, 잠금 반영 | 충돌 시 거부 사유 노출, 잠금 태그 동기화 | 셀 수정/잠금 keyboard browser test |
+| F4 부분 재계산 | `features/recompute-unlocked`, `entities/timetable` | 잠금 유지 + 비잠금 범위 재배치 | 잠금 셀 불변, 실패 시 최선안/원인 제공 | 잠금 불변 property test, 실패 메시지 integration |
+| F5 교체 후보 탐색 | `features/find-replacement-candidates`, `entities/replacement`, `entities/constraint-policy` | 후보 필터/정렬/확정 | 유효 후보만 노출, 후보 0개 시 완화 시뮬레이션 제공 | 후보 정렬 규칙 unit, 후보 0개 UX integration |
+| F6 연강/일일 제한 검증 | `features/validate-constraints`, `entities/constraint-policy` | 생성/수정/교체 전후 검증 | 위반 위치/유형/심각도 표준 출력 | 위반 리포트 snapshot test |
+| F7 변경 이력 시각화 | `features/track-change-history`, `entities/change-history`, `widgets/history-timeline` | 이벤트 기록과 상태 전이 반영 | `BASE -> TEMP_MODIFIED -> CONFIRMED_MODIFIED`, `LOCKED` 일관성 | 상태 전이 unit, 타임라인 렌더 browser test |
+| F8 되돌리기/앞으로 가기 | `features/undo-redo`, `entities/change-history` | 커맨드 스택 기반 복원/재적용 | 복원 시 검증 재실행 및 UI 동기화 | undo/redo 연속 동작 integration |
+| F9 다중 교체 탐색 | `features/find-multi-replacements`, `entities/replacement` | 복수 슬롯 연계 후보 탐색 | 시간 상한 내 상위 후보 제시 | 탐색 시간 상한 benchmark test |
+| 공유 URL 조회 | `features/share-by-url`, `features/load-from-url`, `entities/share-state` | 상태 직렬화/압축/복원 | 다른 기기에서도 동일 시간표 조회 가능 | URL round-trip unit, 링크 공유 integration |
 
-| 요구사항 | 구현 대상(FSD) | 핵심 유스케이스 | 완료 기준 |
-|---|---|---|---|
-| F1 기초 시간표 자동 생성 | `features/generate-timetable`, `entities/timetable`, `entities/constraint-policy` | 필수 제약 우선 충족 + 선호 점수 최적화 생성 | 필수 제약 위반 0건, 생성 결과/사유 리포트 제공 |
-| F2 교사 배치 조건 관리 | `features/manage-teacher-policy`, `entities/teacher-policy` | 회피/선호/연강 허용치 저장 및 유효성 검증 | 상충 조건 저장 차단 + 수정 가이드 제공 |
-| F3 수동 수정 및 잠금 | `features/edit-slot`, `features/toggle-lock`, `entities/locking` | 셀 편집/이동, 즉시 충돌 검사, 잠금 상태 반영 | 충돌 시 거부 사유 노출, 상태 태그 동기화 |
-| F4 부분 재계산 | `features/recompute-unlocked`, `entities/timetable` | 잠금 고정 후 비잠금 범위 재배치 | 잠금 셀 불변 보장, 실패 시 최선안/원인 제공 |
-| F5 학기 중 교체 후보 탐색 | `features/find-replacement-candidates`, `entities/replacement`, `entities/constraint-policy` | 교체 대상 기준 후보 검증/정렬/확정 | 유효 후보만 노출, 후보 없음 시 완화 시뮬레이션 제공 |
-| F6 연강/일일 제한 검증 | `features/validate-constraints`, `entities/constraint-policy` | 생성/수정/교체 전후 정책 검증 | 위반 위치/유형/심각도 표준 출력 |
-| F7 변경 이력 시각화 | `features/track-change-history`, `entities/change-history`, `widgets/history-timeline` | 이벤트 기록, 상태 전이, 색상+텍스트+아이콘 표시 | BASE/TEMP/CONFIRMED/LOCKED 상태 일관성 보장 |
-| F8 되돌리기/앞으로 가기 | `features/undo-redo`, `entities/change-history` | 로컬 커맨드 스택 기반 편집 복원 | 복원 시 검증 재실행 및 UI 동기화 |
-| F9 다중 교체 탐색 | `features/find-multi-replacements`, `entities/replacement` | 다중 슬롯 연계 탐색(1:1:N) | 탐색 시간 상한 내 후보 제시(고급 기능 단계) |
-| 공유 URL 조회 | `features/share-by-url`, `features/load-from-url`, `entities/share-state` | 상태 직렬화/압축/복원 | 공유 링크로 동일 시간표 조회 가능 |
+## 라우팅/상태/데이터 계약
 
-## 4. 디렉토리 구조 제안
+### 라우트 목록
+
+| Path | 페이지 목적 | 권한 |
+|---|---|---|
+| `/` | 최근 작업 복원/초기 진입 | Viewer 이상 |
+| `/generate` | 기초 시간표 생성(F1) | Editor 이상 |
+| `/edit` | 수동 편집/잠금/부분 재계산(F3/F4/F6) | Editor 이상 |
+| `/replacement` | 교체 후보 탐색/확정(F5/F9) | Editor 이상 |
+| `/policy` | 교사/제약 정책 관리(F2/F6) | PolicyAdmin |
+| `/history` | 변경 이력 조회/확정(F7/F8) | Viewer 이상, 확정 액션은 Approver |
+| `/share` | 공유 링크 생성/복제 | Viewer 이상 |
+
+### URL(search/hash) 스키마
+- Search 파라미터
+- `view`: `grade | class | teacher`
+- `grade`: `1 | 2 | 3`
+- `class`: 반 번호
+- `teacher`: 교사 식별자
+- `week`: 주차 기준 키(월요일 00:00 기준)
+- `panel`: `violations | candidates | history`
+- Hash(payload, lz-string 압축 대상)
+- `v`: 스키마 버전
+- `grid`: 시간표 배치 데이터
+- `locks`: 잠금 셀 집합
+- `policy`: 교사/제약 정책 스냅샷
+- `meta`: 생성 시드, 생성 시각
+
+### 전역 상태/로컬 상태 경계
+- 전역(Zustand)
+- 현재 스냅샷 포인터, Undo/Redo 스택 포인터, 현재 역할(`viewer/editor/approver/policyAdmin`), 작업 컨텍스트
+- 로컬(컴포넌트)
+- 셀 편집 모드, 패널 열림 상태, 드래그 선택 상태
+- URL 제외 상태
+- 임시 UI 플래그, 마우스 오버 상태, 토스트 표시 상태
+
+### 저장소 전략
+- IndexedDB: 스냅샷, 정책, 변경 이력, Undo/Redo 백업
+- localStorage: 테마, 최근 선택 필터, 키보드 사용자 설정
+- URL: 공유에 필요한 최소 상태(`grid`, `locks`, `policy`, `meta`)만 포함
+
+### 권한 모델 (SPEC 보안 요구 대응)
+- 역할은 `Viewer`, `Editor`, `Approver`, `PolicyAdmin`으로 분리한다.
+- 서버 인증이 없는 MVP에서는 로컬 역할 프로필 기반으로 기능을 분리한다.
+- 공유 URL 진입 사용자는 항상 `Viewer`로 시작한다.
+- `Approver` 권한 없이 확정(`CONFIRMED_MODIFIED`) 액션은 차단한다.
+- `PolicyAdmin`이 아니면 정책 저장(F2) 액션은 차단한다.
+
+## 핵심 UI 구현 전략
+
+### 구현 방식
+- 외부 대형 그리드 라이브러리 대신 `widgets/timetable-grid` 커스텀 구현을 사용한다.
+- 기본 입력/버튼/다이얼로그는 `shared/ui` 컴포넌트를 조합한다.
+- 반복되는 스타일 값은 토큰으로 승격하고 컴포넌트에 raw 값 하드코딩을 금지한다.
+
+### 셀 상태 모델
+- 기본 상태: `BASE`, `TEMP_MODIFIED`, `CONFIRMED_MODIFIED`, `LOCKED`
+- 파생 상태: `VIOLATION`(검증 결과 오버레이), `CANDIDATE`(교체 후보 프리뷰)
+- 상태 표현 규칙: 색상 + 아이콘 + 텍스트 배지를 동시에 제공한다.
+
+### 키보드 조작 계약
+- `Arrow`: 셀 이동
+- `Enter`: 편집 시작/확정
+- `Esc`: 편집 취소
+- `Space`: 셀 선택 토글
+- `Ctrl/Cmd+L`: 잠금 토글
+- `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`: Undo/Redo
+
+### 성능 전략
+- 첫 단계는 메모이제이션 + 선택적 렌더링으로 대응한다.
+- 표시 셀이 1200개를 넘으면 가상화(`@tanstack/react-virtual`)를 활성화한다.
+- 교체 후보 계산(F5/F9)은 Web Worker로 비동기 처리해 메인 스레드 블로킹을 방지한다.
+
+### 접근성 기준
+- 그리드는 `role="grid"`, 행/열 헤더는 `rowheader`/`columnheader`를 적용한다.
+- 셀의 ARIA 라벨에 학년/반/요일/교시/교사/과목/잠금 여부를 포함한다.
+- 색상만으로 상태를 전달하지 않고 아이콘/텍스트를 항상 병행한다.
+
+## 디렉토리 구조 + 파일 책임
 
 ```text
 src/
   app/
-    providers/
-    router/
-    bootstrap/
-    styles/
+    providers/store-provider.tsx
+    router/index.tsx
+    bootstrap/hydrate.ts
   pages/
-    timetable-generate-page/
-    timetable-edit-page/
-    replacement-page/
-    policy-admin-page/
+    generate/index.tsx
+    edit/index.tsx
+    replacement/index.tsx
+    policy/index.tsx
+    history/index.tsx
   widgets/
-    timetable-grid/
-    candidate-list-panel/
-    constraint-violation-panel/
-    history-timeline/
-    share-link-panel/
+    timetable-grid/ui/timetable-grid.tsx
+    candidate-list/ui/candidate-list.tsx
+    history-timeline/ui/history-timeline.tsx
+    share-link-panel/ui/share-link-panel.tsx
   features/
-    generate-timetable/
-    manage-teacher-policy/
-    edit-slot/
-    toggle-lock/
-    recompute-unlocked/
-    find-replacement-candidates/
-    validate-constraints/
-    track-change-history/
-    undo-redo/
-    find-multi-replacements/
-    share-by-url/
-    load-from-url/
+    generate-timetable/model/usecase.ts
+    edit-slot/model/usecase.ts
+    recompute-unlocked/model/usecase.ts
+    find-replacement-candidates/model/usecase.ts
+    undo-redo/model/usecase.ts
+    share-by-url/model/usecase.ts
+    load-from-url/model/usecase.ts
   entities/
-    timetable/
-      model/
-      lib/
-    teacher-policy/
-      model/
-      lib/
-    constraint-policy/
-      model/
-      lib/
-    locking/
-      model/
-      lib/
-    replacement/
-      model/
-      lib/
-    change-history/
-      model/
-      lib/
-    share-state/
-      model/
-      lib/
+    timetable/model/types.ts
+    timetable/lib/transition.ts
+    constraint-policy/lib/validator.ts
+    teacher-policy/lib/policy-schema.ts
+    replacement/lib/ranker.ts
+    change-history/lib/event-log.ts
+    share-state/lib/share-schema.ts
   shared/
-    url/
-      schema/
-      codec/
-    persistence/
-      indexeddb/
-      local-storage/
-      snapshot/
-    config/
-    lib/
-    model/
     ui/
+    url/codec.ts
+    persistence/indexeddb/repository.ts
+    persistence/local-storage/settings.ts
+    model/role.ts
 ```
 
-## 5. 핵심 컴포넌트/모듈 책임
-- `entities/timetable/model`: 시간표 셀, 스냅샷, 상태(BASE/TEMP/CONFIRMED/LOCKED) 타입 정의
-- `entities/constraint-policy/lib`: 연강/일일 제한 검증기, 위반 리포트 표준화
-- `entities/replacement/lib`: 후보 필터 및 정렬(위반 최소 > 기존안 유사도 > 공강 최소화)
-- `entities/share-state/lib`: URL 직렬화 대상 필드 정의(공유 상태 vs 로컬 전용 상태 분리)
-- `shared/url/codec`: 상태 JSON ↔ 압축 문자열 변환, 무결성 검사, 복원 실패 처리
-- `shared/persistence/indexeddb`: 자동저장 스냅샷/정책/이력 저장과 복원
-- `features/load-from-url`: 앱 진입 시 URL 상태 복원 후 도메인 검증 실행
-- `features/share-by-url`: 현재 상태를 표준 URL로 생성/복사
-- `widgets/timetable-grid`: 그리드 편집 인터랙션, 접근성 라벨, 키보드 이동/확정
+- `shared/ui`는 페이지/피처에서 재사용 가능한 기본 UI만 제공한다.
+- 페이지/피처에서 동일 패턴 UI가 반복되면 `shared/ui`로 승격한다.
+- 각 슬라이스는 `index.ts`를 public API로 사용한다.
 
-## 6. 데이터 흐름
+## 단계별 구현 로드맵
 
-```mermaid
-flowchart LR
-  A["사용자 액션 (생성/수정/교체)"] --> B["features 유스케이스"]
-  B --> C["entities 검증/정책 엔진"]
-  C --> D["상태 스냅샷 생성"]
-  D --> E["URL codec (serialize + compress)"]
-  E --> F["Router search/hash 반영"]
-  D --> G["IndexedDB 자동저장"]
-  C --> H["결과 모델 + 위반 리포트"]
-  H --> I["widgets/pages 렌더링"]
-  F --> J["공유 링크"]
-  J --> K["다른 사용자 진입"]
-  K --> L["URL 복원 + 검증"]
-  L --> I
-```
+| Phase | 우선순위 | 작업 | 산출물 | 완료 기준(DoD) |
+|---|---|---|---|---|
+| Phase 1 기반 구축 | Must | TanStack Start 초기화, FSD 구조, Router/Store Provider, URL codec, Dexie 스키마, 토큰/공통 UI 베이스 | 실행 가능한 앱 셸, 기본 라우트, 저장소 어댑터, 토큰 정의 문서 | `pnpm lint`, `pnpm typecheck` 통과 + URL round-trip unit test 통과 |
+| Phase 2 핵심 기능 | Must | F1/F2/F3/F4/F5/F6 + 공유 URL 구현 | 생성/편집/재계산/교체/공유 기능 동작, 정책 관리 화면 | 핵심 시나리오 integration 통과, 필수 제약 위반 0건 검증 테스트 통과 |
+| Phase 3 운영 안정화 | Should | F7/F8 구현, 이력 타임라인/확정 플로우, 역할별 액션 제한 강화 | 이력 시각화, Undo/Redo, 확정 액션 가드 | 상태 전이 테스트 통과, Browser keyboard 시나리오 통과 |
+| Phase 4 고급 탐색 | Could | F9 다중 교체 탐색, 탐색 시간 상한/휴리스틱 튜닝 | 다중 교체 후보 화면 및 랭킹 결과 | 지정 데이터셋에서 시간 상한(예: 2초) 내 상위 후보 반환 |
 
-- 공유 가능한 핵심 상태는 URL에 저장한다.
-- URL 길이 대응을 위해 대용량 스냅샷은 `location.hash`에 저장하고, 필터/뷰 옵션은 search 파라미터로 관리한다.
-- Undo/Redo 스택, 임시 UI 플래그 등은 URL이 아닌 로컬 상태(Zustand + IndexedDB)에 저장한다.
-- URL 복원 실패(깨진 링크/수동 수정) 시 최근 로컬 스냅샷으로 폴백하고 오류 안내를 표시한다.
+## 테스트/품질 게이트
 
-## 7. DB/API 전략 (확정)
-- 서버 DB: 사용하지 않는다.
-- 브라우저 DB: IndexedDB(Dexie)를 사용한다.
-- 로컬 저장 정책:
-  - 시간표 스냅샷/정책/변경 이력: IndexedDB
-  - 사용자 설정(테마/최근 선택): localStorage
-- 네트워크 API: 1차 릴리스에서 사용하지 않는다.
-- 권한 모델(MVP): 서버 인증이 없으므로 강제 RBAC는 적용하지 않는다.
-- 공유 링크 정책 확정: **옵션 1(조회 전용만 허용)** 으로 고정한다.
-- 편집 정책: 링크 수신자는 기본 편집 불가이며, 필요 시 "내 작업으로 복제" 후 로컬 편집만 허용한다.
-- 내부 인터페이스:
-  - `TimetableRepository`는 `LocalSnapshotRepository` 구현체에 바인딩한다.
-  - 향후 중앙 저장소가 필요해지면 `RemoteRepository` 구현을 추가한다.
+### 테스트 범위
+- 단위(Unit)
+- 제약 검증기, 후보 정렬기, 상태 전이, URL codec, 정책 스키마
+- 통합(Integration)
+- 생성 -> 수정 -> 잠금 -> 부분 재계산 -> 교체 확정 -> URL 공유 복원
+- 브라우저(Browser)
+- 키보드 편집, 접근성 라벨, 역할별 액션 가드, 이력 타임라인 상호작용
 
-## 8. 단계별 구현 로드맵
+### 품질 게이트
+- 정적 검사: ESLint, TypeScript
+- 아키텍처 검사: FSD import 규칙 위반 검사
+- 회귀 검사: `BASE/TEMP_MODIFIED/CONFIRMED_MODIFIED/LOCKED` 상태 전이 스냅샷 테스트
+- CI 실패 기준: 핵심 Must 시나리오 중 1개라도 실패 시 머지 차단
 
-### Phase 1. 기반 구축 (아키텍처/인프라)
-- TanStack Start + shadcn 프리셋 기반 초기 프로젝트 생성
-- FSD 디렉토리/레이어 가드 설정
-- Router/Zustand 기본 프로바이더 구성
-- URL 스키마 정의(공유 상태/로컬 상태 경계)
-- `lz-string` 기반 URL codec 유틸 구현
-- IndexedDB(Dexie) 스토어 설계(스냅샷/정책/이력)
-- Tailwind CSS 시멘틱 토큰 맵(색상/텍스트/보더/상태) 정의
-- `shared/ui` 공통 UI 컴포넌트 베이스라인 구축
+## 리스크 및 대응
 
-### Phase 2. 핵심 기능(Must) 구현
-- F1/F2/F6: 생성 + 교사 정책 + 제한 검증 파이프라인 완성
-- F3/F4: 수동 수정/잠금/부분 재계산 완성
-- F5: 교체 후보 탐색/정렬/확정 플로우 완성
-- 공유 URL 생성/복원 기능 완성
-- 회귀 위험 영역(검증/상태 전이/정렬/URL codec) 우선 테스트 작성
+| 리스크 | 감지 방법 | 대응 전략 |
+|---|---|---|
+| URL 길이 초과로 공유 실패 | 링크 생성 시 길이 임계치(브라우저 호환 기준) 자동 검사 | 공유 대상 필드 최소화 + 압축 재시도 + 초과 시 링크 생성 차단 및 축약 안내(이력/뷰옵션 제외) |
+| 링크 변조/손상 | URL 복원 시 `v` 스키마/필수 키/Zod 검증 실패 로그 | 복원 중단 후 오류 안내, 최근 로컬 정상 스냅샷 제안 |
+| 역할 오적용으로 잘못된 확정 | 확정/정책저장 액션 실행 시 역할 가드 로그 기록 | Approver/PolicyAdmin 가드 강제, 미권한 액션 즉시 차단 |
+| IndexedDB 데이터 손상 | 앱 시작 시 스냅샷 무결성 검사 실패 카운트 | 마지막 정상 스냅샷 롤백 + JSON 내보내기/가져오기 복구 경로 제공 |
+| 잠금 과다로 재계산 실패 | 재계산 실패 시 제약 충돌 리포트에 잠금 원인 비율 표시 | 최소 해제 필요 셀 추천 기능 제공 |
+| F9 탐색 비용 급증 | 후보 탐색 실행 시간/중단율 메트릭 수집 | 시간 상한 + 빔서치 + 조기 중단 정책 적용 |
 
-### Phase 3. 운영 고도화(Should/Could)
-- F7/F8: 변경 이력 시각화 + undo/redo
-- F9: 다중 교체 탐색(탐색 비용 제어 포함)
-- 오프라인 안정성 향상(충돌 복원 UX, 스냅샷 버전 마이그레이션)
-
-## 9. 테스트/품질 계획
-- 단위 테스트: 제약 검증기, 후보 정렬기, 상태 전이 로직
-- 단위 테스트: URL codec round-trip(serialize/deserialize), 길이 임계치, 깨진 URL 복구 처리
-- 통합 테스트: 생성→수정→재계산→교체 확정→URL 공유 복원 시나리오
-- 브라우저 모드 테스트: 시간표 그리드 편집/키보드 조작/접근성 표기
-- 품질 게이트: ESLint, TypeScript, FSD 의존 규칙 검증, 핵심 경로 회귀 테스트
-
-## 10. 확장 전략
-- 정책 확장: 새 제약(예: 블록타임, 실험실 우선 배치)은 `constraint-policy` 전략 추가로 확장
-- 정렬 확장: 교체 후보 랭킹 기준 추가 시 `replacement` 정렬 전략 플러그인만 교체
-- 저장소 확장: `Repository` 인터페이스 유지로 향후 원격 API/DB 연동 비용 최소화
-- 채널 확장: 향후 모바일/리포트 채널은 `widgets/pages`만 확장하고 도메인 계층은 재사용
-
-## 11. 리스크 및 대응
-- URL 길이 초과: 직렬화 필드 최소화 + 압축 + hash 저장 + 임계치 초과 시 로컬 스냅샷 링크로 폴백
-- 링크 변조/손상: 스키마 버전과 유효성 검사 실패 시 안전 복구 경로 제공
-- 링크 유출: 공유 URL 기본 조회 전용 + 편집 동작 비활성화로 오조작 위험 완화
-- 로컬 디바이스 분실/브라우저 데이터 삭제: 수동 내보내기/가져오기(JSON) 기능 제공
-- 과도한 잠금으로 재계산 불가: 최소 해제 셀 제안 알고리즘을 기본 제공
-- 탐색 비용 급증(F9): 시간 상한 + 빔서치/휴리스틱 탐색으로 계산량 통제
+## 오픈 이슈
+- 서버 인증 없는 MVP의 권한 분리는 기능적 분리까지 제공하며, 보안 강제는 서버 도입 시 보완이 필요하다.
+- URL 길이 임계치(브라우저별)를 QA 단계에서 확정해 링크 생성 정책의 수치를 고정해야 한다.
