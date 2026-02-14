@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { timetableCellSchema, timetableSnapshotSchema } from '../schema'
+import { cellStatusSchema, timetableCellSchema, timetableSnapshotSchema } from '../schema'
 
 describe('timetableCellSchema', () => {
   const validCell = {
@@ -10,10 +10,30 @@ describe('timetableCellSchema', () => {
     day: 'MON' as const,
     period: 1,
     isFixed: false,
+    status: 'BASE' as const,
   }
 
   it('유효한 셀을 통과시킨다', () => {
     expect(timetableCellSchema.safeParse(validCell).success).toBe(true)
+  })
+
+  it('status가 없으면 기본값 BASE가 적용된다', () => {
+    const { status: _, ...cellWithoutStatus } = validCell
+    const result = timetableCellSchema.safeParse(cellWithoutStatus)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.status).toBe('BASE')
+    }
+  })
+
+  it('유효한 status 값을 통과시킨다', () => {
+    for (const status of ['BASE', 'TEMP_MODIFIED', 'CONFIRMED_MODIFIED', 'LOCKED'] as const) {
+      expect(timetableCellSchema.safeParse({ ...validCell, status }).success).toBe(true)
+    }
+  })
+
+  it('잘못된 status 값을 거부한다', () => {
+    expect(timetableCellSchema.safeParse({ ...validCell, status: 'INVALID' }).success).toBe(false)
   })
 
   it('teacherId가 빈 문자열이면 실패한다', () => {
@@ -41,6 +61,20 @@ describe('timetableCellSchema', () => {
   })
 })
 
+describe('cellStatusSchema', () => {
+  it('유효한 status를 통과시킨다', () => {
+    expect(cellStatusSchema.safeParse('BASE').success).toBe(true)
+    expect(cellStatusSchema.safeParse('TEMP_MODIFIED').success).toBe(true)
+    expect(cellStatusSchema.safeParse('CONFIRMED_MODIFIED').success).toBe(true)
+    expect(cellStatusSchema.safeParse('LOCKED').success).toBe(true)
+  })
+
+  it('잘못된 status를 거부한다', () => {
+    expect(cellStatusSchema.safeParse('INVALID').success).toBe(false)
+    expect(cellStatusSchema.safeParse('').success).toBe(false)
+  })
+})
+
 describe('timetableSnapshotSchema', () => {
   const validSnapshot = {
     id: 'snapshot-1',
@@ -54,6 +88,7 @@ describe('timetableSnapshotSchema', () => {
         day: 'MON' as const,
         period: 1,
         isFixed: false,
+        status: 'BASE' as const,
       },
     ],
     score: 85.5,

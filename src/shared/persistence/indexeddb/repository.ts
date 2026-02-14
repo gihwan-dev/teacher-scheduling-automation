@@ -112,6 +112,14 @@ export async function loadLatestTimetableSnapshot(): Promise<TimetableSnapshot |
   return db.timetableSnapshots.orderBy('createdAt').last()
 }
 
+export async function loadTimetableSnapshotById(id: string): Promise<TimetableSnapshot | undefined> {
+  return db.timetableSnapshots.get(id)
+}
+
+export async function updateTimetableSnapshot(snapshot: TimetableSnapshot): Promise<void> {
+  await db.timetableSnapshots.put(snapshot)
+}
+
 // ConstraintPolicy
 export async function saveConstraintPolicy(policy: ConstraintPolicy): Promise<void> {
   await db.constraintPolicies.put(policy)

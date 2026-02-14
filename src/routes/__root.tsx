@@ -84,6 +84,13 @@ function RootComponent() {
           >
             생성
           </Link>
+          <Link
+            to="/edit"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            activeProps={{ className: 'text-foreground font-medium' }}
+          >
+            편집
+          </Link>
         </nav>
       </header>
       <main>

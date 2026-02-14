@@ -3,6 +3,8 @@ import { DAYS_OF_WEEK, MAX_PERIODS_PER_DAY } from '@/shared/lib/constants'
 
 const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
 
+export const cellStatusSchema = z.enum(['BASE', 'TEMP_MODIFIED', 'CONFIRMED_MODIFIED', 'LOCKED'])
+
 export const timetableCellSchema = z.object({
   teacherId: z.string().min(1),
   subjectId: z.string().min(1),
@@ -11,9 +13,8 @@ export const timetableCellSchema = z.object({
   day: dayOfWeekSchema,
   period: z.number().int().min(1).max(MAX_PERIODS_PER_DAY),
   isFixed: z.boolean(),
+  status: cellStatusSchema.default('BASE'),
 })
-
-export const cellStatusSchema = z.enum(['BASE', 'TEMP_MODIFIED', 'CONFIRMED_MODIFIED', 'LOCKED'])
 
 export const timetableSnapshotSchema = z.object({
   id: z.string().min(1),

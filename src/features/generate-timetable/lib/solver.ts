@@ -28,37 +28,18 @@ const MAX_HILL_CLIMBING_ITERATIONS = 1000
 const BACKTRACK_DEPTH_LIMIT = 3
 
 /**
- * 시간표 자동 생성 메인 함수
- *
- * 3단계 알고리즘:
- * 1. 전처리: 입력 검증 → 고정 이벤트 배치 → 배정 단위 생성
- * 2. 탐욕적 배치 + 제한적 백트래킹
- * 3. Hill-climbing 최적화
+ * 배치 파이프라인: MRV 정렬 → 탐욕 배치 + 백트래킹 → Hill-climbing
+ * partial-solver에서도 재사용 가능하도록 추출
  */
-export function generateTimetable(input: GenerationInput): GenerationResult {
-  const startTime = performance.now()
-  const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = input
-
-  // === 전처리 ===
-  const grid = new TimetableGrid()
-  const { activeDays, periodsPerDay } = schoolConfig
-
-  // 차단 슬롯 구축 (교사 회피 슬롯 포함)
-  let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
-  blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
-
-  // 고정 이벤트 배치
-  const fixedCells = placeFixedEvents(fixedEvents, subjects, grid)
-
-  // 배정 단위 생성 (교사-과목-반 매핑)
-  const subjectMap = new Map(subjects.map((s) => [s.id, s]))
-  const assignments = buildAssignmentUnits(teachers, subjectMap, fixedCells)
-
-  // 총 슬롯 수 계산
-  const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce((s, c) => s + c, 0)
-  const totalSlots = totalClasses * activeDays.length * periodsPerDay
-
-  // === 탐욕적 배치 (MRV 휴리스틱) ===
+export function runPlacementPipeline(
+  grid: TimetableGrid,
+  assignments: Array<AssignmentUnit>,
+  activeDays: Array<DayOfWeek>,
+  periodsPerDay: number,
+  constraintPolicy: ConstraintPolicy,
+  blockedSlots: Set<string>,
+  teacherPolicies?: Array<TeacherPolicy>,
+): { unplaced: Array<UnplacedAssignment> } {
   sortByMRV(assignments, grid, activeDays, periodsPerDay, constraintPolicy, blockedSlots, teacherPolicies)
 
   const unplaced: Array<UnplacedAssignment> = []
@@ -76,7 +57,6 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
       )
 
       if (candidates.length === 0) {
-        // 백트래킹 시도
         const backtrackSuccess = tryBacktrack(
           grid,
           unit,
@@ -109,7 +89,6 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
         continue
       }
 
-      // 후보 슬롯 점수 매기기
       for (const candidate of candidates) {
         candidate.score = scoreSlot(
           grid,
@@ -123,7 +102,6 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
         )
       }
 
-      // 최고 점수 슬롯 선택
       candidates.sort((a, b) => b.score - a.score)
       const best = candidates[0]
 
@@ -135,14 +113,74 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
         day: best.day,
         period: best.period,
         isFixed: false,
+        status: 'BASE',
       }
       grid.placeCell(cell)
       unit.remainingHours--
     }
   }
 
-  // === Hill-climbing 최적화 ===
   hillClimb(grid, constraintPolicy, activeDays, periodsPerDay, blockedSlots, teacherPolicies)
+
+  return { unplaced }
+}
+
+/**
+ * 잠긴 셀의 시수를 차감한 배정 단위 생성
+ */
+export function buildAssignmentUnitsFromCells(
+  teachers: Array<{
+    id: string
+    subjectIds: Array<string>
+    classAssignments: Array<{ grade: number; classNumber: number; hoursPerWeek: number }>
+  }>,
+  subjectMap: Map<string, { id: string }>,
+  prePlacedCells: Array<TimetableCell>,
+): Array<AssignmentUnit> {
+  return buildAssignmentUnits(teachers, subjectMap, prePlacedCells)
+}
+
+/**
+ * 시간표 자동 생성 메인 함수
+ *
+ * 3단계 알고리즘:
+ * 1. 전처리: 입력 검증 → 고정 이벤트 배치 → 배정 단위 생성
+ * 2. 탐욕적 배치 + 제한적 백트래킹
+ * 3. Hill-climbing 최적화
+ */
+export function generateTimetable(input: GenerationInput): GenerationResult {
+  const startTime = performance.now()
+  const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = input
+
+  // === 전처리 ===
+  const grid = new TimetableGrid()
+  const { activeDays, periodsPerDay } = schoolConfig
+
+  // 차단 슬롯 구축 (교사 회피 슬롯 포함)
+  let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
+  blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
+
+  // 고정 이벤트 배치
+  const fixedCells = placeFixedEvents(fixedEvents, subjects, grid)
+
+  // 배정 단위 생성 (교사-과목-반 매핑)
+  const subjectMap = new Map(subjects.map((s) => [s.id, s]))
+  const assignments = buildAssignmentUnits(teachers, subjectMap, fixedCells)
+
+  // 총 슬롯 수 계산
+  const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce((s, c) => s + c, 0)
+  const totalSlots = totalClasses * activeDays.length * periodsPerDay
+
+  // === 배치 파이프라인 ===
+  const { unplaced } = runPlacementPipeline(
+    grid,
+    assignments,
+    activeDays,
+    periodsPerDay,
+    constraintPolicy,
+    blockedSlots,
+    teacherPolicies,
+  )
 
   // === 결과 빌드 ===
   const endTime = performance.now()
@@ -207,6 +245,7 @@ function placeFixedEvents(
         day: event.day,
         period: event.period,
         isFixed: true,
+        status: 'BASE',
       }
       grid.placeCell(cell)
       fixedCells.push(cell)
@@ -354,6 +393,7 @@ function tryBacktrack(
             day,
             period,
             isFixed: false,
+            status: 'BASE',
           }
           grid.placeCell(newCell)
           unit.remainingHours--
@@ -397,6 +437,7 @@ function tryBacktrack(
               day: bestCandidate.day,
               period: bestCandidate.period,
               isFixed: false,
+              status: 'BASE',
             }
             grid.placeCell(displacedCell)
             return true

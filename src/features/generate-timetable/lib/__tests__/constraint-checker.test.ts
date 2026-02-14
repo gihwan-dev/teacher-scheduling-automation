@@ -44,6 +44,7 @@ function makeCell(overrides: Partial<TimetableCell> = {}): TimetableCell {
     day: 'MON',
     period: 1,
     isFixed: false,
+    status: 'BASE',
     ...overrides,
   }
 }

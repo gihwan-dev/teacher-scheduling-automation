@@ -26,11 +26,11 @@
   - 검증: 전체 회피 등 상충 입력 시 저장 실패 및 수정 가이드 노출, 정상 입력은 생성/재계산에 반영된다.
 
 ## Phase 4. [PARALLEL:PG-2] 핵심 기능 개발 - 수동 편집/잠금/부분 재계산 (F3, F4, F6)
-- [ ] **교시 단위 편집과 잠금 기반 재계산 구현**
+- [x] **교시 단위 편집과 잠금 기반 재계산 구현**
   - 목표: 셀 편집/이동/잠금 후 비잠금 영역만 재계산한다.
   - 검증: 잠금 셀은 변경되지 않고, 충돌 편집은 즉시 거부되며 사유가 표시된다.
 
-- [ ] **키보드 중심 편집 플로우 완성**
+- [x] **키보드 중심 편집 플로우 완성**
   - 목표: 이동/편집/잠금/확정/취소/되돌리기 단축키가 일관되게 동작한다.
   - 검증: 키보드만으로 선택 -> 수정 -> 잠금 -> 재계산 시나리오를 완료할 수 있다.
 
@@ -95,3 +95,17 @@
 - 신규 파일 12개, 수정 파일 7개
 - 테스트: 11 파일 94 테스트 전체 통과 (기존 79 + 신규 15)
 - 검증: typecheck, lint, test:unit 모두 통과
+
+**[2026-02-14] Phase 4 세션 요약**:
+- 완료: Phase 4 전체 구현 — 수동 편집/잠금/부분 재계산 + 키보드 편집 (F3, F4, F6)
+- 구현 내용:
+  - Layer 1: TimetableCell에 `status` 필드 추가, CellKey/EditAction/EditValidationResult 타입, DB v4 마이그레이션, repository 확장
+  - Layer 2: solver에서 `runPlacementPipeline` + `buildAssignmentUnitsFromCells` 추출, generate-timetable index에 Grid/constraint-checker export 추가, edit-validator(isCellEditable/validateCellEdit/validateCellMove), cell-key 유틸(makeCellKey/parseCellKey/buildCellMap)
+  - Layer 3: `recompute-timetable` feature — 잠긴/고정 셀 보존 + 미잠금 재배치 partial-solver
+  - Layer 4: `edit-timetable-cell` Zustand store — 로드/포커스/선택/편집(CRUD)/잠금/undo·redo/재계산/저장
+  - Layer 5: use-grid-keyboard(Arrow/Enter/Esc/Space/Ctrl+L/Ctrl+Z/Delete), EditableTimetableGrid(상태별 시각화), CellEditorInline, EditToolbar, EditValidationPanel, KeyboardShortcutsPanel
+  - Layer 6: `/edit` 라우트 + EditPage 조립 + 네비게이션 링크 추가
+- 신규 파일 16개, 수정 파일 8개, 테스트 파일 5개(신규 4 + 기존 수정 1)
+- 테스트: 14 파일 129 테스트 전체 통과 (기존 99 + 신규 30)
+- 검증: typecheck, lint, test:unit 모두 통과
+- 핵심 설계 결정: status를 TimetableCell에 직접 추가, isFixed와 LOCKED 독립 개념, Command 패턴 Undo/Redo, 재계산 시 undo 스택 초기화, Roving tabindex 접근성 패턴

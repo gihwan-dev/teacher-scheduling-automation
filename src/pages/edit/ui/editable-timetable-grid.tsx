@@ -1,0 +1,187 @@
+import { useRef } from 'react'
+import { CellEditorInline } from './cell-editor-inline'
+import type { TimetableCell } from '@/entities/timetable'
+import type { Teacher } from '@/entities/teacher'
+import type { Subject } from '@/entities/subject'
+import type { SchoolConfig } from '@/entities/school'
+import { DAY_LABELS } from '@/shared/lib/constants'
+import { makeCellKey, useEditStore } from '@/features/edit-timetable-cell'
+import { useGridKeyboard } from '@/features/edit-timetable-cell/lib/use-grid-keyboard'
+import { cn } from '@/lib/utils'
+
+interface EditableTimetableGridProps {
+  schoolConfig: SchoolConfig
+  teachers: Array<Teacher>
+  subjects: Array<Subject>
+}
+
+export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: EditableTimetableGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  useGridKeyboard(containerRef)
+
+  const {
+    cellMap,
+    focusedCell,
+    selectedCells,
+    isEditing,
+    editingCellKey,
+    viewGrade,
+    viewClassNumber,
+    setFocusedCell,
+    startEdit,
+  } = useEditStore()
+
+  const { activeDays, periodsPerDay } = schoolConfig
+  const teacherMap = new Map(teachers.map((t) => [t.id, t]))
+  const subjectMap = new Map(subjects.map((s) => [s.id, s]))
+
+  return (
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      role="grid"
+      aria-label={`${viewGrade}학년 ${viewClassNumber}반 시간표`}
+      aria-activedescendant={focusedCell ?? undefined}
+      className="rounded-lg border overflow-hidden focus:outline-none"
+    >
+      {/* 헤더 행 */}
+      <div role="row" className="grid border-b bg-muted/50" style={{ gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)` }}>
+        <div role="columnheader" className="p-2 text-center text-xs font-medium text-muted-foreground">
+          교시
+        </div>
+        {activeDays.map((day) => (
+          <div key={day} role="columnheader" className="p-2 text-center text-xs font-medium text-muted-foreground border-l">
+            {DAY_LABELS[day]}
+          </div>
+        ))}
+      </div>
+
+      {/* 데이터 행 */}
+      {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((period) => (
+        <div key={period} role="row" className="grid border-b last:border-b-0" style={{ gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)` }}>
+          <div role="rowheader" className="p-2 text-center text-xs font-medium text-muted-foreground flex items-center justify-center">
+            {period}
+          </div>
+          {activeDays.map((day) => {
+            const key = makeCellKey(viewGrade, viewClassNumber, day, period)
+            const cell = cellMap.get(key)
+            const isFocused = focusedCell === key
+            const isSelected = selectedCells.has(key)
+            const isEditingThis = isEditing && editingCellKey === key
+
+            return (
+              <div
+                key={day}
+                id={key}
+                role="gridcell"
+                aria-selected={isSelected}
+                aria-label={getCellAriaLabel(cell, teacherMap, subjectMap)}
+                className={cn(
+                  'border-l min-h-16 p-1 cursor-pointer transition-colors',
+                  getCellStatusClasses(cell),
+                  isFocused && 'ring-2 ring-primary ring-inset',
+                  isSelected && !isFocused && 'ring-1 ring-secondary ring-inset',
+                )}
+                onClick={() => setFocusedCell(key)}
+                onDoubleClick={() => startEdit(key)}
+              >
+                {isEditingThis ? (
+                  <CellEditorInline
+                    teachers={teachers}
+                    subjects={subjects}
+                  />
+                ) : cell ? (
+                  <CellContent
+                    cell={cell}
+                    teacherMap={teacherMap}
+                    subjectMap={subjectMap}
+                  />
+                ) : (
+                  <span className="text-muted-foreground text-xs flex h-full items-center justify-center">-</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function getCellStatusClasses(cell: TimetableCell | undefined): string {
+  if (!cell) return 'bg-background hover:bg-muted/30'
+  if (cell.isFixed) return 'bg-muted/50 border-dashed'
+  switch (cell.status) {
+    case 'LOCKED':
+      return 'bg-muted'
+    case 'TEMP_MODIFIED':
+      return 'bg-secondary/30'
+    case 'CONFIRMED_MODIFIED':
+      return 'bg-primary/10'
+    default:
+      return 'bg-background hover:bg-muted/30'
+  }
+}
+
+function getCellAriaLabel(
+  cell: TimetableCell | undefined,
+  teacherMap: Map<string, Teacher>,
+  subjectMap: Map<string, Subject>,
+): string {
+  if (!cell) return '빈 셀'
+  const subject = subjectMap.get(cell.subjectId)?.name ?? cell.subjectId
+  const teacher = teacherMap.get(cell.teacherId)?.name ?? cell.teacherId
+  const statusLabel = getStatusLabel(cell)
+  return `${subject} ${teacher}${statusLabel ? ` ${statusLabel}` : ''}`
+}
+
+function getStatusLabel(cell: TimetableCell): string {
+  if (cell.isFixed) return '고정'
+  switch (cell.status) {
+    case 'LOCKED':
+      return '잠김'
+    case 'TEMP_MODIFIED':
+      return '임시 수정됨'
+    case 'CONFIRMED_MODIFIED':
+      return '확정됨'
+    default:
+      return ''
+  }
+}
+
+function CellContent({
+  cell,
+  teacherMap,
+  subjectMap,
+}: {
+  cell: TimetableCell
+  teacherMap: Map<string, Teacher>
+  subjectMap: Map<string, Subject>
+}) {
+  const subject = subjectMap.get(cell.subjectId)
+  const teacher = teacherMap.get(cell.teacherId)
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-0.5">
+      <div className="text-xs font-medium leading-tight">{subject?.abbreviation ?? cell.subjectId}</div>
+      <div className="text-muted-foreground text-[10px] leading-tight">{teacher?.name ?? cell.teacherId}</div>
+      <StatusIndicator cell={cell} />
+    </div>
+  )
+}
+
+function StatusIndicator({ cell }: { cell: TimetableCell }) {
+  if (cell.isFixed) {
+    return <span className="text-[9px] text-muted-foreground" aria-hidden="true">📌</span>
+  }
+  switch (cell.status) {
+    case 'LOCKED':
+      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">🔒</span>
+    case 'TEMP_MODIFIED':
+      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">✏️</span>
+    case 'CONFIRMED_MODIFIED':
+      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">✓</span>
+    default:
+      return null
+  }
+}

@@ -5,4 +5,15 @@ export type {
   RelaxationSuggestion,
   AssignmentUnit,
 } from './model/types'
-export { generateTimetable } from './lib/solver'
+export {
+  generateTimetable,
+  runPlacementPipeline,
+  buildAssignmentUnitsFromCells,
+} from './lib/solver'
+export { TimetableGrid } from './lib/grid'
+export {
+  isPlacementValid,
+  findCandidateSlots,
+  buildBlockedSlots,
+  expandGradeBlockedSlots,
+} from './lib/constraint-checker'

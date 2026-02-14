@@ -57,6 +57,18 @@ class SchedulingDatabase extends Dexie {
       constraintPolicies: 'id, updatedAt',
       teacherPolicies: 'id, teacherId, updatedAt',
     })
+    this.version(4).upgrade(async (tx) => {
+      await tx
+        .table('timetableSnapshots')
+        .toCollection()
+        .modify((snapshot: { cells: Array<{ status?: string }> }) => {
+          for (const cell of snapshot.cells) {
+            if (!cell.status) {
+              cell.status = 'BASE'
+            }
+          }
+        })
+    })
   }
 }
 
