@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShareRouteImport } from './routes/share'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ReplacementRouteImport } from './routes/replacement'
 import { Route as PolicyRouteImport } from './routes/policy'
@@ -16,6 +17,11 @@ import { Route as GenerateRouteImport } from './routes/generate'
 import { Route as EditRouteImport } from './routes/edit'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ShareRoute = ShareRouteImport.update({
+  id: '/share',
+  path: '/share',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/policy': typeof PolicyRoute
   '/replacement': typeof ReplacementRoute
   '/setup': typeof SetupRoute
+  '/share': typeof ShareRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/policy': typeof PolicyRoute
   '/replacement': typeof ReplacementRoute
   '/setup': typeof SetupRoute
+  '/share': typeof ShareRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,12 +79,27 @@ export interface FileRoutesById {
   '/policy': typeof PolicyRoute
   '/replacement': typeof ReplacementRoute
   '/setup': typeof SetupRoute
+  '/share': typeof ShareRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/edit' | '/generate' | '/policy' | '/replacement' | '/setup'
+  fullPaths:
+    | '/'
+    | '/edit'
+    | '/generate'
+    | '/policy'
+    | '/replacement'
+    | '/setup'
+    | '/share'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/edit' | '/generate' | '/policy' | '/replacement' | '/setup'
+  to:
+    | '/'
+    | '/edit'
+    | '/generate'
+    | '/policy'
+    | '/replacement'
+    | '/setup'
+    | '/share'
   id:
     | '__root__'
     | '/'
@@ -85,6 +108,7 @@ export interface FileRouteTypes {
     | '/policy'
     | '/replacement'
     | '/setup'
+    | '/share'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,10 +118,18 @@ export interface RootRouteChildren {
   PolicyRoute: typeof PolicyRoute
   ReplacementRoute: typeof ReplacementRoute
   SetupRoute: typeof SetupRoute
+  ShareRoute: typeof ShareRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/share': {
+      id: '/share'
+      path: '/share'
+      fullPath: '/share'
+      preLoaderRoute: typeof ShareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
@@ -150,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   PolicyRoute: PolicyRoute,
   ReplacementRoute: ReplacementRoute,
   SetupRoute: SetupRoute,
+  ShareRoute: ShareRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

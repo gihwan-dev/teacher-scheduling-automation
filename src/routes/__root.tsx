@@ -4,6 +4,13 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
 
+if (import.meta.env.DEV) {
+  import('@/shared/lib/seed-data').then(({ seedSampleData }) => {
+     
+    ;(window as any).__seedData = seedSampleData
+  })
+}
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -97,6 +104,13 @@ function RootComponent() {
             activeProps={{ className: 'text-foreground font-medium' }}
           >
             교체
+          </Link>
+          <Link
+            to="/share"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            activeProps={{ className: 'text-foreground font-medium' }}
+          >
+            공유
           </Link>
         </nav>
       </header>

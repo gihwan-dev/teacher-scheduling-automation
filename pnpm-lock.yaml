@@ -50,6 +50,9 @@ importers:
       dexie:
         specifier: ^4.3.0
         version: 4.3.0
+      lz-string:
+        specifier: ^1.5.0
+        version: 1.5.0
       nitro:
         specifier: latest
         version: 3.0.1-alpha.2(lru-cache@11.2.6)(rollup@4.57.1)(vite@7.3.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
