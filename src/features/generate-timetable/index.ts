@@ -17,3 +17,5 @@ export {
   buildBlockedSlots,
   expandGradeBlockedSlots,
 } from './lib/constraint-checker'
+export { scoreSlot, computeTotalScore } from './lib/scorer'
+export { suggestRelaxations, diagnoseFailure } from './lib/failure-analyzer'

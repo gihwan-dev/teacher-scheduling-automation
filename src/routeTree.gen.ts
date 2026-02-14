@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as ReplacementRouteImport } from './routes/replacement'
 import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as GenerateRouteImport } from './routes/generate'
 import { Route as EditRouteImport } from './routes/edit'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReplacementRoute = ReplacementRouteImport.update({
+  id: '/replacement',
+  path: '/replacement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PolicyRoute = PolicyRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/edit': typeof EditRoute
   '/generate': typeof GenerateRoute
   '/policy': typeof PolicyRoute
+  '/replacement': typeof ReplacementRoute
   '/setup': typeof SetupRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/edit': typeof EditRoute
   '/generate': typeof GenerateRoute
   '/policy': typeof PolicyRoute
+  '/replacement': typeof ReplacementRoute
   '/setup': typeof SetupRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,22 @@ export interface FileRoutesById {
   '/edit': typeof EditRoute
   '/generate': typeof GenerateRoute
   '/policy': typeof PolicyRoute
+  '/replacement': typeof ReplacementRoute
   '/setup': typeof SetupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/edit' | '/generate' | '/policy' | '/setup'
+  fullPaths: '/' | '/edit' | '/generate' | '/policy' | '/replacement' | '/setup'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/edit' | '/generate' | '/policy' | '/setup'
-  id: '__root__' | '/' | '/edit' | '/generate' | '/policy' | '/setup'
+  to: '/' | '/edit' | '/generate' | '/policy' | '/replacement' | '/setup'
+  id:
+    | '__root__'
+    | '/'
+    | '/edit'
+    | '/generate'
+    | '/policy'
+    | '/replacement'
+    | '/setup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +92,7 @@ export interface RootRouteChildren {
   EditRoute: typeof EditRoute
   GenerateRoute: typeof GenerateRoute
   PolicyRoute: typeof PolicyRoute
+  ReplacementRoute: typeof ReplacementRoute
   SetupRoute: typeof SetupRoute
 }
 
@@ -86,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/replacement': {
+      id: '/replacement'
+      path: '/replacement'
+      fullPath: '/replacement'
+      preLoaderRoute: typeof ReplacementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/policy': {
@@ -124,6 +148,7 @@ const rootRouteChildren: RootRouteChildren = {
   EditRoute: EditRoute,
   GenerateRoute: GenerateRoute,
   PolicyRoute: PolicyRoute,
+  ReplacementRoute: ReplacementRoute,
   SetupRoute: SetupRoute,
 }
 export const routeTree = rootRouteImport

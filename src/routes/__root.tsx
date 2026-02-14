@@ -91,6 +91,13 @@ function RootComponent() {
           >
             편집
           </Link>
+          <Link
+            to="/replacement"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            activeProps={{ className: 'text-foreground font-medium' }}
+          >
+            교체
+          </Link>
         </nav>
       </header>
       <main>

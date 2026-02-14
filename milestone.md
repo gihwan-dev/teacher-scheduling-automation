@@ -35,7 +35,7 @@
   - 검증: 키보드만으로 선택 -> 수정 -> 잠금 -> 재계산 시나리오를 완료할 수 있다.
 
 ## Phase 5. [PARALLEL:PG-2] 핵심 기능 개발 - 학기 중 교체 후보 탐색 (F5)
-- [ ] **교체 후보 탐색 및 확정 기능 구현**
+- [x] **교체 후보 탐색 및 확정 기능 구현**
   - 목표: 교체 대상 셀 선택 시 충돌/연강/일일 제한/고정 조건을 만족하는 후보만 제시한다.
   - 검증: 후보 0건이면 제약 완화 시뮬레이션이 제공되고, 후보 확정 시 시간표가 일관되게 갱신된다.
 
@@ -109,3 +109,17 @@
 - 테스트: 14 파일 129 테스트 전체 통과 (기존 99 + 신규 30)
 - 검증: typecheck, lint, test:unit 모두 통과
 - 핵심 설계 결정: status를 TimetableCell에 직접 추가, isFixed와 LOCKED 독립 개념, Command 패턴 Undo/Redo, 재계산 시 undo 스택 초기화, Roving tabindex 접근성 패턴
+
+**[2026-02-14] Phase 5 세션 요약**:
+- 완료: Phase 5 전체 구현 — 교체 후보 탐색 및 확정 (F5)
+- 구현 내용:
+  - Layer 1: ReplacementCandidate, CandidateRanking, ReplacementSearchConfig 등 타입 정의, generate-timetable에 scorer/failure-analyzer export 추가
+  - Layer 2: replacement-finder (SWAP/MOVE 후보 탐색, isPlacementValid 기반 검증, 재귀 방지 완화 시뮬레이션), candidate-ranker (위반 최소 → 유사도 → 점수 변화 → 공강 최소화 가중 랭킹)
+  - Layer 3: find-replacement Zustand store (loadSnapshot, selectTargetCell, search, selectCandidate, confirmReplacement)
+  - Layer 4: /replacement 페이지 UI — ReplacementGrid(셀 선택/후보 하이라이트), CandidateListPanel(순위/Badge/AlertDialog 확정), ReplacementPreview(before/after 테이블), RelaxationPanel(완화 제안)
+  - Layer 5: `/replacement` 라우트 + 네비게이션 "교체" 링크 추가
+- 재사용: TimetableGrid, isPlacementValid, buildBlockedSlots, expandGradeBlockedSlots, computeTotalScore, validateTimetable, isCellEditable, makeCellKey, buildCellMap
+- 신규 파일 12개, 수정 파일 2개 (generate-timetable/index.ts, __root.tsx)
+- 테스트: 16 파일 143 테스트 전체 통과 (기존 129 + 신규 14)
+- 검증: typecheck, lint, test:unit 모두 통과
+- 핵심 설계 결정: 완화 시뮬레이션 재귀 방지를 위한 _skipRelaxation 플래그, SWAP은 양쪽 배치 검증 후 grid 원복, base-ui AlertDialog에 render prop 패턴 사용
