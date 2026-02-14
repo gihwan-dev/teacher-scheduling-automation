@@ -1,4 +1,4 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Link, Outlet, Scripts, createRootRoute  } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
@@ -15,7 +15,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: '시간표 자동화',
       },
     ],
     links: [
@@ -27,11 +27,12 @@ export const Route = createRootRoute({
   }),
 
   shellComponent: RootDocument,
+  component: RootComponent,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="ko">
       <head>
         <HeadContent />
       </head>
@@ -51,5 +52,29 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
+  )
+}
+
+function RootComponent() {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b">
+        <nav className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-3">
+          <Link to="/" className="text-sm font-bold">
+            시간표 자동화
+          </Link>
+          <Link
+            to="/setup"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            activeProps={{ className: 'text-foreground font-medium' }}
+          >
+            설정
+          </Link>
+        </nav>
+      </header>
+      <main>
+        <Outlet />
+      </main>
+    </div>
   )
 }
