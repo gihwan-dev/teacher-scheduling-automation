@@ -3,6 +3,8 @@ import { ReplacementGrid } from './replacement-grid'
 import { CandidateListPanel } from './candidate-list-panel'
 import { ReplacementPreview } from './replacement-preview'
 import { RelaxationPanel } from './relaxation-panel'
+import { MultiCandidateListPanel } from './multi-candidate-list-panel'
+import { MultiReplacementPreview } from './multi-replacement-preview'
 import { useReplacementStore } from '@/features/find-replacement'
 import {
   Select,
@@ -13,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 export function ReplacementPage() {
   const {
@@ -25,9 +28,13 @@ export function ReplacementPage() {
     viewClassNumber,
     isLoading,
     isSearching,
+    isMultiMode,
+    multiTargetCellKeys,
     loadSnapshot,
     setViewTarget,
     search,
+    searchMulti,
+    toggleMultiMode,
   } = useReplacementStore()
 
   useEffect(() => {
@@ -72,13 +79,19 @@ export function ReplacementPage() {
 
   const classCount = schoolConfig.classCountByGrade[viewGrade] ?? 0
 
+  const canSearch = isMultiMode
+    ? multiTargetCellKeys.length >= 2
+    : !!targetCellKey
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       {/* 헤더 */}
       <div>
         <h1 className="text-2xl font-bold">교체 후보 탐색</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          교체할 셀을 선택한 후 탐색 버튼을 눌러 안전한 교체 후보를 확인하세요.
+          {isMultiMode
+            ? '교체할 셀을 2~3개 선택한 후 탐색 버튼을 눌러 호환되는 교체 조합을 확인하세요.'
+            : '교체할 셀을 선택한 후 탐색 버튼을 눌러 안전한 교체 후보를 확인하세요.'}
         </p>
       </div>
 
@@ -114,9 +127,23 @@ export function ReplacementPage() {
             ))}
           </SelectContent>
         </Select>
+
         <Button
-          onClick={search}
-          disabled={!targetCellKey || isSearching}
+          variant={isMultiMode ? 'default' : 'outline'}
+          size="sm"
+          onClick={toggleMultiMode}
+        >
+          {isMultiMode ? '다중 모드' : '단일 모드'}
+          {isMultiMode && multiTargetCellKeys.length > 0 && (
+            <Badge variant="secondary" className="ml-1.5">
+              {multiTargetCellKeys.length}
+            </Badge>
+          )}
+        </Button>
+
+        <Button
+          onClick={isMultiMode ? searchMulti : search}
+          disabled={!canSearch || isSearching}
         >
           {isSearching ? '탐색 중...' : '탐색'}
         </Button>
@@ -129,17 +156,28 @@ export function ReplacementPage() {
           teachers={teachers}
           subjects={subjects}
         />
-        <CandidateListPanel
-          teachers={teachers}
-          subjects={subjects}
-        />
+        {isMultiMode ? (
+          <MultiCandidateListPanel
+            teachers={teachers}
+            subjects={subjects}
+          />
+        ) : (
+          <CandidateListPanel
+            teachers={teachers}
+            subjects={subjects}
+          />
+        )}
       </div>
 
       {/* 미리보기 */}
-      <ReplacementPreview teachers={teachers} subjects={subjects} />
+      {isMultiMode ? (
+        <MultiReplacementPreview teachers={teachers} subjects={subjects} />
+      ) : (
+        <ReplacementPreview teachers={teachers} subjects={subjects} />
+      )}
 
-      {/* 완화 제안 */}
-      <RelaxationPanel />
+      {/* 완화 제안 (단일 모드 전용) */}
+      {!isMultiMode && <RelaxationPanel />}
     </div>
   )
 }

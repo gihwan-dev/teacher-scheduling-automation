@@ -46,3 +46,32 @@ export interface RelaxationSuggestion {
   priority: 'high' | 'medium' | 'low'
   candidatesFound: number
 }
+
+// --- 다중 교체 (F9) ---
+
+export interface MultiReplacementCandidate {
+  id: string
+  sources: Array<{
+    sourceKey: CellKey
+    candidate: ReplacementCandidate
+  }>
+  combinedRanking: CombinedRanking
+}
+
+export interface CombinedRanking {
+  aggregateScore: number
+  totalViolationCount: number
+  combinedScoreDelta: number
+  isFullyCompatible: boolean
+}
+
+export interface MultiReplacementSearchResult {
+  candidates: Array<MultiReplacementCandidate>
+  stats: {
+    totalCombinationsExamined: number
+    validCombinations: number
+    searchTimeMs: number
+    timedOut: boolean
+  }
+  perSourceResults: Array<{ sourceKey: CellKey; result: ReplacementSearchResult }>
+}

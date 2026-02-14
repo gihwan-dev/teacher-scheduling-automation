@@ -1,5 +1,6 @@
 export { useReplacementStore } from './model/store'
 export { findReplacementCandidates } from './lib/replacement-finder'
+export { findMultiReplacementCandidates } from './lib/multi-replacement-finder'
 export { rankCandidate } from './lib/candidate-ranker'
 export type {
   ReplacementCandidate,
@@ -8,4 +9,7 @@ export type {
   ReplacementType,
   CandidateRanking,
   RelaxationSuggestion,
+  MultiReplacementCandidate,
+  MultiReplacementSearchResult,
+  CombinedRanking,
 } from './model/types'

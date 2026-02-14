@@ -26,10 +26,10 @@ export function SharePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold">{isRestoreMode ? '시간표 복원' : '시간표 공유'}</h1>
+        <h1 className="text-2xl font-bold">{isRestoreMode ? '공유 시간표 보기' : '시간표 공유'}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isRestoreMode
-            ? '공유 링크에서 시간표 데이터를 확인하고 가져올 수 있습니다.'
+            ? '공유된 시간표를 확인하고, 필요 시 내 시간표로 가져올 수 있습니다.'
             : '현재 시간표 상태를 URL로 공유할 수 있습니다.'}
         </p>
       </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import { findReplacementCandidates } from '../lib/replacement-finder'
+import { findMultiReplacementCandidates } from '../lib/multi-replacement-finder'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
@@ -9,6 +10,8 @@ import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { CellKey, TimetableCell, TimetableSnapshot } from '@/entities/timetable'
 import type {
+  MultiReplacementCandidate,
+  MultiReplacementSearchResult,
   ReplacementCandidate,
   ReplacementSearchConfig,
   ReplacementSearchResult,
@@ -37,11 +40,17 @@ interface ReplacementState {
   constraintPolicy: ConstraintPolicy | null
   teacherPolicies: Array<TeacherPolicy>
 
-  // 교체 탐색 상태
+  // 단일 교체 탐색 상태
   targetCellKey: CellKey | null
   searchConfig: ReplacementSearchConfig
   searchResult: ReplacementSearchResult | null
   selectedCandidate: ReplacementCandidate | null
+
+  // 다중 교체 상태
+  isMultiMode: boolean
+  multiTargetCellKeys: Array<CellKey>
+  multiSearchResult: MultiReplacementSearchResult | null
+  selectedMultiCandidate: MultiReplacementCandidate | null
 
   // 뷰 컨텍스트
   viewGrade: number
@@ -59,6 +68,14 @@ interface ReplacementState {
   selectCandidate: (candidate: ReplacementCandidate | null) => void
   confirmReplacement: () => Promise<void>
   updateSearchConfig: (config: Partial<ReplacementSearchConfig>) => void
+
+  // 다중 모드 액션
+  toggleMultiMode: () => void
+  addMultiTarget: (key: CellKey) => void
+  removeMultiTarget: (key: CellKey) => void
+  searchMulti: () => void
+  selectMultiCandidate: (candidate: MultiReplacementCandidate | null) => void
+  confirmMultiReplacement: () => Promise<void>
 }
 
 export const useReplacementStore = create<ReplacementState>((set, get) => ({
@@ -79,6 +96,10 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   },
   searchResult: null,
   selectedCandidate: null,
+  isMultiMode: false,
+  multiTargetCellKeys: [],
+  multiSearchResult: null,
+  selectedMultiCandidate: null,
   viewGrade: 1,
   viewClassNumber: 1,
   isLoading: false,
@@ -117,6 +138,9 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
+      multiTargetCellKeys: [],
+      multiSearchResult: null,
+      selectedMultiCandidate: null,
     })
   },
 
@@ -127,6 +151,9 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
+      multiTargetCellKeys: [],
+      multiSearchResult: null,
+      selectedMultiCandidate: null,
     })
   },
 
@@ -238,5 +265,131 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
     set((state) => ({
       searchConfig: { ...state.searchConfig, ...config },
     }))
+  },
+
+  // --- 다중 모드 ---
+
+  toggleMultiMode: () => {
+    const { isMultiMode } = get()
+    set({
+      isMultiMode: !isMultiMode,
+      // 모드 전환 시 양쪽 선택 상태 초기화
+      targetCellKey: null,
+      searchResult: null,
+      selectedCandidate: null,
+      multiTargetCellKeys: [],
+      multiSearchResult: null,
+      selectedMultiCandidate: null,
+    })
+  },
+
+  addMultiTarget: (key) => {
+    const { cellMap, multiTargetCellKeys } = get()
+    const cell = cellMap.get(key)
+    if (!cell || !isCellEditable(cell)) return
+    if (multiTargetCellKeys.includes(key)) return
+    if (multiTargetCellKeys.length >= 3) return // 최대 3셀
+
+    set({
+      multiTargetCellKeys: [...multiTargetCellKeys, key],
+      multiSearchResult: null,
+      selectedMultiCandidate: null,
+    })
+  },
+
+  removeMultiTarget: (key) => {
+    const { multiTargetCellKeys } = get()
+    set({
+      multiTargetCellKeys: multiTargetCellKeys.filter((k) => k !== key),
+      multiSearchResult: null,
+      selectedMultiCandidate: null,
+    })
+  },
+
+  searchMulti: () => {
+    const { multiTargetCellKeys, cells, searchConfig, schoolConfig, constraintPolicy, teacherPolicies, fixedEvents } = get()
+    if (multiTargetCellKeys.length < 2 || !schoolConfig || !constraintPolicy) return
+
+    set({ isSearching: true })
+
+    const result = findMultiReplacementCandidates(
+      multiTargetCellKeys,
+      cells,
+      searchConfig,
+      {
+        schoolConfig,
+        constraintPolicy,
+        teacherPolicies,
+        fixedEvents,
+      },
+    )
+
+    set({
+      multiSearchResult: result,
+      selectedMultiCandidate: null,
+      isSearching: false,
+    })
+  },
+
+  selectMultiCandidate: (candidate) => {
+    set({ selectedMultiCandidate: candidate })
+  },
+
+  confirmMultiReplacement: async () => {
+    const { selectedMultiCandidate, cells, snapshot } = get()
+    if (!selectedMultiCandidate || !snapshot) return
+
+    let newCells = [...cells]
+
+    for (const { candidate } of selectedMultiCandidate.sources) {
+      if (candidate.type === 'SWAP') {
+        const { sourceCell, targetCell, resultSourceCell, resultTargetCell } = candidate
+        newCells = newCells.map((c) => {
+          if (
+            c.grade === sourceCell.grade && c.classNumber === sourceCell.classNumber &&
+            c.day === sourceCell.day && c.period === sourceCell.period
+          ) {
+            return resultSourceCell!
+          }
+          if (
+            targetCell &&
+            c.grade === targetCell.grade && c.classNumber === targetCell.classNumber &&
+            c.day === targetCell.day && c.period === targetCell.period
+          ) {
+            return resultTargetCell
+          }
+          return c
+        })
+      } else {
+        const { sourceCell, resultTargetCell } = candidate
+        newCells = newCells
+          .filter(
+            (c) =>
+              !(
+                c.grade === sourceCell.grade &&
+                c.classNumber === sourceCell.classNumber &&
+                c.day === sourceCell.day &&
+                c.period === sourceCell.period
+              ),
+          )
+          .concat(resultTargetCell)
+      }
+    }
+
+    const updated: TimetableSnapshot = {
+      ...snapshot,
+      cells: newCells,
+    }
+
+    await updateTimetableSnapshot(updated)
+
+    set({
+      snapshot: updated,
+      cells: newCells,
+      cellMap: buildCellMap(newCells),
+      multiTargetCellKeys: [],
+      multiSearchResult: null,
+      selectedMultiCandidate: null,
+    })
   },
 }))
