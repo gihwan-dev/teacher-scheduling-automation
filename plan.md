@@ -23,7 +23,7 @@
 
 ### 레이어 역할
 - `app`: 부트스트랩, 라우터, 전역 Provider, 에러 경계, 초기 hydrate
-- `pages`: 라우트 진입 화면, 위젯 조합, 페이지 단위 권한 가드
+- `pages`: 라우트 진입 화면, 위젯 조합
 - `widgets`: 시간표 그리드/교체 패널/이력 타임라인/공유 패널 같은 복합 UI
 - `features`: 생성, 편집, 잠금, 재계산, 교체 확정, URL 공유, Undo/Redo 같은 사용자 액션 유스케이스
 - `entities`: 시간표/정책/검증/이력 등 도메인 모델과 규칙
@@ -67,15 +67,15 @@
 
 ### 라우트 목록
 
-| Path | 페이지 목적 | 권한 |
-|---|---|---|
-| `/` | 최근 작업 복원/초기 진입 | Viewer 이상 |
-| `/generate` | 기초 시간표 생성(F1) | Editor 이상 |
-| `/edit` | 수동 편집/잠금/부분 재계산(F3/F4/F6) | Editor 이상 |
-| `/replacement` | 교체 후보 탐색/확정(F5/F9) | Editor 이상 |
-| `/policy` | 교사/제약 정책 관리(F2/F6) | PolicyAdmin |
-| `/history` | 변경 이력 조회/확정(F7/F8) | Viewer 이상, 확정 액션은 Approver |
-| `/share` | 공유 링크 생성/복제 | Viewer 이상 |
+| Path | 페이지 목적 |
+|---|---|
+| `/` | 최근 작업 복원/초기 진입 |
+| `/generate` | 기초 시간표 생성(F1) |
+| `/edit` | 수동 편집/잠금/부분 재계산(F3/F4/F6) |
+| `/replacement` | 교체 후보 탐색/확정(F5/F9) |
+| `/policy` | 교사/제약 정책 관리(F2/F6) |
+| `/history` | 변경 이력 조회/확정(F7/F8) |
+| `/share` | 공유 링크 생성/복제 |
 
 ### URL(search/hash) 스키마
 - Search 파라미터
@@ -94,7 +94,7 @@
 
 ### 전역 상태/로컬 상태 경계
 - 전역(Zustand)
-- 현재 스냅샷 포인터, Undo/Redo 스택 포인터, 현재 역할(`viewer/editor/approver/policyAdmin`), 작업 컨텍스트
+- 현재 스냅샷 포인터, Undo/Redo 스택 포인터, 작업 컨텍스트
 - 로컬(컴포넌트)
 - 셀 편집 모드, 패널 열림 상태, 드래그 선택 상태
 - URL 제외 상태
@@ -104,13 +104,6 @@
 - IndexedDB: 스냅샷, 정책, 변경 이력, Undo/Redo 백업
 - localStorage: 테마, 최근 선택 필터, 키보드 사용자 설정
 - URL: 공유에 필요한 최소 상태(`grid`, `locks`, `policy`, `meta`)만 포함
-
-### 권한 모델 (SPEC 보안 요구 대응)
-- 역할은 `Viewer`, `Editor`, `Approver`, `PolicyAdmin`으로 분리한다.
-- 서버 인증이 없는 MVP에서는 로컬 역할 프로필 기반으로 기능을 분리한다.
-- 공유 URL 진입 사용자는 항상 `Viewer`로 시작한다.
-- `Approver` 권한 없이 확정(`CONFIRMED_MODIFIED`) 액션은 차단한다.
-- `PolicyAdmin`이 아니면 정책 저장(F2) 액션은 차단한다.
 
 ## 핵심 UI 구현 전략
 
@@ -182,7 +175,6 @@ src/
     url/codec.ts
     persistence/indexeddb/repository.ts
     persistence/local-storage/settings.ts
-    model/role.ts
 ```
 
 - `shared/ui`는 페이지/피처에서 재사용 가능한 기본 UI만 제공한다.
@@ -195,7 +187,7 @@ src/
 |---|---|---|---|---|
 | Phase 1 기반 구축 | Must | TanStack Start 초기화, FSD 구조, Router/Store Provider, URL codec, Dexie 스키마, 토큰/공통 UI 베이스 | 실행 가능한 앱 셸, 기본 라우트, 저장소 어댑터, 토큰 정의 문서 | `pnpm lint`, `pnpm typecheck` 통과 + URL round-trip unit test 통과 |
 | Phase 2 핵심 기능 | Must | F1/F2/F3/F4/F5/F6 + 공유 URL 구현 | 생성/편집/재계산/교체/공유 기능 동작, 정책 관리 화면 | 핵심 시나리오 integration 통과, 필수 제약 위반 0건 검증 테스트 통과 |
-| Phase 3 운영 안정화 | Should | F7/F8 구현, 이력 타임라인/확정 플로우, 역할별 액션 제한 강화 | 이력 시각화, Undo/Redo, 확정 액션 가드 | 상태 전이 테스트 통과, Browser keyboard 시나리오 통과 |
+| Phase 3 운영 안정화 | Should | F7/F8 구현, 이력 타임라인/확정 플로우 | 이력 시각화, Undo/Redo | 상태 전이 테스트 통과, Browser keyboard 시나리오 통과 |
 | Phase 4 고급 탐색 | Could | F9 다중 교체 탐색, 탐색 시간 상한/휴리스틱 튜닝 | 다중 교체 후보 화면 및 랭킹 결과 | 지정 데이터셋에서 시간 상한(예: 2초) 내 상위 후보 반환 |
 
 ## 테스트/품질 게이트
@@ -206,7 +198,7 @@ src/
 - 통합(Integration)
 - 생성 -> 수정 -> 잠금 -> 부분 재계산 -> 교체 확정 -> URL 공유 복원
 - 브라우저(Browser)
-- 키보드 편집, 접근성 라벨, 역할별 액션 가드, 이력 타임라인 상호작용
+- 키보드 편집, 접근성 라벨, 이력 타임라인 상호작용
 
 ### 품질 게이트
 - 정적 검사: ESLint, TypeScript
@@ -220,11 +212,9 @@ src/
 |---|---|---|
 | URL 길이 초과로 공유 실패 | 링크 생성 시 길이 임계치(브라우저 호환 기준) 자동 검사 | 공유 대상 필드 최소화 + 압축 재시도 + 초과 시 링크 생성 차단 및 축약 안내(이력/뷰옵션 제외) |
 | 링크 변조/손상 | URL 복원 시 `v` 스키마/필수 키/Zod 검증 실패 로그 | 복원 중단 후 오류 안내, 최근 로컬 정상 스냅샷 제안 |
-| 역할 오적용으로 잘못된 확정 | 확정/정책저장 액션 실행 시 역할 가드 로그 기록 | Approver/PolicyAdmin 가드 강제, 미권한 액션 즉시 차단 |
 | IndexedDB 데이터 손상 | 앱 시작 시 스냅샷 무결성 검사 실패 카운트 | 마지막 정상 스냅샷 롤백 + JSON 내보내기/가져오기 복구 경로 제공 |
 | 잠금 과다로 재계산 실패 | 재계산 실패 시 제약 충돌 리포트에 잠금 원인 비율 표시 | 최소 해제 필요 셀 추천 기능 제공 |
 | F9 탐색 비용 급증 | 후보 탐색 실행 시간/중단율 메트릭 수집 | 시간 상한 + 빔서치 + 조기 중단 정책 적용 |
 
 ## 오픈 이슈
-- 서버 인증 없는 MVP의 권한 분리는 기능적 분리까지 제공하며, 보안 강제는 서버 도입 시 보완이 필요하다.
 - URL 길이 임계치(브라우저별)를 QA 단계에서 확정해 링크 생성 정책의 수치를 고정해야 한다.
