@@ -71,6 +71,13 @@ function RootComponent() {
             설정
           </Link>
           <Link
+            to="/policy"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            activeProps={{ className: 'text-foreground font-medium' }}
+          >
+            교사 조건
+          </Link>
+          <Link
             to="/generate"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             activeProps={{ className: 'text-foreground font-medium' }}

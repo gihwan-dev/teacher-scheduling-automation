@@ -6,6 +6,7 @@ import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { TimetableSnapshot } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
 
 // SchoolConfig
 export async function saveSchoolConfig(config: SchoolConfig): Promise<void> {
@@ -118,4 +119,16 @@ export async function saveConstraintPolicy(policy: ConstraintPolicy): Promise<vo
 
 export async function loadConstraintPolicy(): Promise<ConstraintPolicy | undefined> {
   return db.constraintPolicies.orderBy('updatedAt').last()
+}
+
+// TeacherPolicies
+export async function saveTeacherPolicies(policies: Array<TeacherPolicy>): Promise<void> {
+  await db.transaction('rw', db.teacherPolicies, async () => {
+    await db.teacherPolicies.clear()
+    await db.teacherPolicies.bulkPut(policies)
+  })
+}
+
+export async function loadTeacherPolicies(): Promise<Array<TeacherPolicy>> {
+  return db.teacherPolicies.toArray()
 }

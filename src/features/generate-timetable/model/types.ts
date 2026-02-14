@@ -3,6 +3,7 @@ import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { ConstraintPolicy, ConstraintViolation } from '@/entities/constraint-policy'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableSnapshot } from '@/entities/timetable'
 
 export interface GenerationInput {
@@ -11,6 +12,7 @@ export interface GenerationInput {
   subjects: Array<Subject>
   fixedEvents: Array<FixedEvent>
   constraintPolicy: ConstraintPolicy
+  teacherPolicies?: Array<TeacherPolicy>
   options?: { maxRetries?: number; seed?: number }
 }
 

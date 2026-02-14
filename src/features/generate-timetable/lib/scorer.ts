@@ -1,14 +1,16 @@
 import type { DayOfWeek } from '@/shared/lib/types'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { AssignmentUnit } from '../model/types'
 import type { TimetableGrid } from './grid'
 
 // 선호 제약 가중치
 const WEIGHTS = {
-  daySpread: 0.4, // 과목 요일 균등 분배
-  teacherConsecutive: 0.25, // 교사 연속 수업 최소화
-  studentConsecutive: 0.25, // 학생 동일과목 연강 최소화
-  teacherDailyBalance: 0.1, // 교사 일별 시수 균형
+  daySpread: 0.35,
+  teacherConsecutive: 0.2,
+  studentConsecutive: 0.2,
+  teacherDailyBalance: 0.1,
+  timePreference: 0.15,
 }
 
 /**
@@ -21,6 +23,8 @@ export function scoreSlot(
   period: number,
   policy: ConstraintPolicy,
   activeDays: Array<DayOfWeek>,
+  teacherPolicies?: Array<TeacherPolicy>,
+  periodsPerDay?: number,
 ): number {
   let score = 0
 
@@ -30,10 +34,11 @@ export function scoreSlot(
   const daySpreadScore = existingOnDay === 0 ? 100 : Math.max(0, 100 - existingOnDay * 50)
   score += WEIGHTS.daySpread * daySpreadScore
 
-  // 2. 교사 연속 수업 최소화
+  // 2. 교사 연속 수업 최소화 (per-teacher override)
   const teacherPeriods = grid.getTeacherDayPeriods(unit.teacherId, day)
   const wouldBeConsecutive = countConsecutiveIfAdded(teacherPeriods, period)
-  const maxAllowed = policy.teacherMaxConsecutiveHours
+  const tp = teacherPolicies?.find((p) => p.teacherId === unit.teacherId)
+  const maxAllowed = tp?.maxConsecutiveHoursOverride ?? policy.teacherMaxConsecutiveHours
   const teacherConsecScore =
     wouldBeConsecutive <= maxAllowed - 1
       ? 100
@@ -49,14 +54,13 @@ export function scoreSlot(
     day,
     unit.subjectId,
   )
-  // 배치 후 연강이 될 가능성 체크
   const adjacentSameSubject = hasAdjacentSameSubject(grid, unit, day, period)
   const studentConsecScore = adjacentSameSubject
     ? Math.max(0, 100 - (currentStudentConsec + 1) * 40)
     : 100
   score += WEIGHTS.studentConsecutive * studentConsecScore
 
-  // 4. 교사 일별 시수 균형 (모든 요일에 고르게 배분)
+  // 4. 교사 일별 시수 균형
   const hours: Array<number> = []
   for (const d of activeDays) {
     const h = grid.getTeacherDayHours(unit.teacherId, d)
@@ -66,6 +70,19 @@ export function scoreSlot(
   const variance = hours.reduce((s, h) => s + (h - avg) ** 2, 0) / hours.length
   const balanceScore = Math.max(0, 100 - variance * 25)
   score += WEIGHTS.teacherDailyBalance * balanceScore
+
+  // 5. 선호 시간대 점수
+  const preference = tp?.timePreference ?? 'NONE'
+  const midpoint = periodsPerDay ? Math.ceil(periodsPerDay / 2) : 3
+  let prefScore: number
+  if (preference === 'MORNING') {
+    prefScore = period <= midpoint ? 100 : 20
+  } else if (preference === 'AFTERNOON') {
+    prefScore = period > midpoint ? 100 : 20
+  } else {
+    prefScore = 50
+  }
+  score += WEIGHTS.timePreference * prefScore
 
   return Math.round(score * 100) / 100
 }
@@ -77,7 +94,8 @@ export function computeTotalScore(
   grid: TimetableGrid,
   policy: ConstraintPolicy,
   activeDays: Array<DayOfWeek>,
-  _periodsPerDay: number,
+  periodsPerDay: number,
+  teacherPolicies?: Array<TeacherPolicy>,
 ): number {
   const cells = grid.getAllCells()
   if (cells.length === 0) return 0
@@ -86,6 +104,7 @@ export function computeTotalScore(
   let teacherConsecTotal = 0
   let studentConsecTotal = 0
   let teacherBalanceTotal = 0
+  let timePrefTotal = 0
 
   // 과목 요일 분산: 반별로 각 과목의 요일 분포 균등 측정
   const classSubjectDayCounts = new Map<string, Map<string, number>>()
@@ -130,15 +149,17 @@ export function computeTotalScore(
   }
   daySpreadTotal = spreadCount > 0 ? daySpreadTotal / spreadCount : 100
 
-  // 교사 연속 수업 점수
+  // 교사 연속 수업 점수 (per-teacher override 반영)
   const teacherIds = new Set(cells.map((c) => c.teacherId))
   let teacherConsecCount = 0
   for (const teacherId of teacherIds) {
+    const tp = teacherPolicies?.find((p) => p.teacherId === teacherId)
+    const maxConsec = tp?.maxConsecutiveHoursOverride ?? policy.teacherMaxConsecutiveHours
     for (const day of activeDays) {
       const consec = grid.getTeacherConsecutiveCount(teacherId, day)
-      const ratio = consec <= policy.teacherMaxConsecutiveHours
+      const ratio = consec <= maxConsec
         ? 100
-        : Math.max(0, 100 - (consec - policy.teacherMaxConsecutiveHours) * 30)
+        : Math.max(0, 100 - (consec - maxConsec) * 30)
       teacherConsecTotal += ratio
       teacherConsecCount++
     }
@@ -180,11 +201,34 @@ export function computeTotalScore(
   }
   teacherBalanceTotal = balanceCount > 0 ? teacherBalanceTotal / balanceCount : 100
 
+  // 선호 시간대 점수
+  const midpoint = Math.ceil(periodsPerDay / 2)
+  let prefCount = 0
+  for (const teacherId of teacherIds) {
+    const tp = teacherPolicies?.find((p) => p.teacherId === teacherId)
+    const pref = tp?.timePreference ?? 'NONE'
+    const teacherCells = cells.filter((c) => c.teacherId === teacherId)
+    for (const cell of teacherCells) {
+      let prefScore: number
+      if (pref === 'MORNING') {
+        prefScore = cell.period <= midpoint ? 100 : 20
+      } else if (pref === 'AFTERNOON') {
+        prefScore = cell.period > midpoint ? 100 : 20
+      } else {
+        prefScore = 50
+      }
+      timePrefTotal += prefScore
+      prefCount++
+    }
+  }
+  timePrefTotal = prefCount > 0 ? timePrefTotal / prefCount : 50
+
   const totalScore =
     WEIGHTS.daySpread * daySpreadTotal +
     WEIGHTS.teacherConsecutive * teacherConsecTotal +
     WEIGHTS.studentConsecutive * studentConsecTotal +
-    WEIGHTS.teacherDailyBalance * teacherBalanceTotal
+    WEIGHTS.teacherDailyBalance * teacherBalanceTotal +
+    WEIGHTS.timePreference * timePrefTotal
 
   return Math.round(totalScore * 100) / 100
 }

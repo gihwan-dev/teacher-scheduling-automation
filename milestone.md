@@ -21,7 +21,7 @@
   - 검증: 샘플 학교 데이터 기준 필수 제약 위반 0건, 실패 케이스에서 원인 안내 확인.
 
 ## Phase 3. [PARALLEL:PG-1] 핵심 기능 개발 - 교사 배치 조건 관리 (F2)
-- [ ] **교사 선호/회피/연강 조건 관리 기능 구현**
+- [x] **교사 선호/회피/연강 조건 관리 기능 구현**
   - 목표: 교사별 조건을 입력·수정·저장하고 상충 조건은 저장 전에 차단한다.
   - 검증: 전체 회피 등 상충 입력 시 저장 실패 및 수정 가이드 노출, 정상 입력은 생성/재계산에 반영된다.
 
@@ -81,4 +81,17 @@
   - IndexedDB v2 (timetableSnapshots, constraintPolicies 테이블 추가), Zustand store
   - `/generate` 페이지 UI: 설정 요약, 제약 설정 폼, 결과 패널, 학년/반 선택 시간표 그리드
 - 테스트: 10 파일 79 테스트 전체 통과, 3학년 5반 규모(15교사) 생성 성공 확인
+- 검증: typecheck, lint, test:unit 모두 통과
+
+**[2026-02-14] Phase 3 세션 요약**:
+- 완료: Phase 3 전체 구현 — 교사 선호/회피/연강 조건 관리 (F2)
+- 구현 내용:
+  - `entities/teacher-policy`: TeacherPolicy, AvoidanceSlot, TimePreference 모델 + Zod 스키마 + validator(5가지 검증 규칙) + 테스트 15건
+  - `features/manage-teacher-policy`: Zustand 스토어 (토글 회피, 선호 시간대, override 설정, 검증 연동, DB 저장)
+  - IndexedDB v3 (teacherPolicies 테이블 추가), repository save/load 함수
+  - `/policy` 페이지 UI: 교사 목록 사이드바(정책/오류 Badge) + 회피 그리드(요일×교시 매트릭스) + 선호 시간대 Select + 연강/일일 시수 override Input + 검증 결과 패널
+  - 생성 엔진 통합: buildBlockedSlots에 교사 회피 슬롯 추가, isPlacementValid/findCandidateSlots에 per-teacher daily override, scorer에 timePreference 점수(15%) + per-teacher consecutive override, solver 전체 함수에 teacherPolicies 전달
+  - 네비게이션: "설정"과 "생성" 사이에 "교사 조건" 링크 추가
+- 신규 파일 12개, 수정 파일 7개
+- 테스트: 11 파일 94 테스트 전체 통과 (기존 79 + 신규 15)
 - 검증: typecheck, lint, test:unit 모두 통과

@@ -1,6 +1,7 @@
 import type { DayOfWeek } from '@/shared/lib/types'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { AssignmentUnit } from '../model/types'
 import type { TimetableGrid } from './grid'
 
@@ -20,12 +21,13 @@ export function findCandidateSlots(
   periodsPerDay: number,
   policy: ConstraintPolicy,
   blockedSlots: Set<string>,
+  teacherPolicies?: Array<TeacherPolicy>,
 ): Array<SlotCandidate> {
   const candidates: Array<SlotCandidate> = []
 
   for (const day of activeDays) {
     for (let period = 1; period <= periodsPerDay; period++) {
-      if (isPlacementValid(grid, unit, day, period, policy, blockedSlots)) {
+      if (isPlacementValid(grid, unit, day, period, policy, blockedSlots, teacherPolicies)) {
         candidates.push({ day, period, score: 0 })
       }
     }
@@ -44,6 +46,7 @@ export function isPlacementValid(
   period: number,
   policy: ConstraintPolicy,
   blockedSlots: Set<string>,
+  teacherPolicies?: Array<TeacherPolicy>,
 ): boolean {
   // 1. 교사 충돌 금지: 동일 시간 2개 반 불가
   if (grid.isTeacherBusy(unit.teacherId, day, period)) {
@@ -55,15 +58,17 @@ export function isPlacementValid(
     return false
   }
 
-  // 3. 차단된 슬롯 (출장, 학교 행사 등)
+  // 3. 차단된 슬롯 (출장, 학교 행사, 교사 회피 등)
   const teacherBlockKey = `teacher-${unit.teacherId}-${day}-${period}`
   const classBlockKey = `class-${unit.grade}-${unit.classNumber}-${day}-${period}`
   if (blockedSlots.has(teacherBlockKey) || blockedSlots.has(classBlockKey)) {
     return false
   }
 
-  // 4. 교사 일일 최대 시수 제한 (Hard로 처리)
-  if (grid.getTeacherDayHours(unit.teacherId, day) >= policy.teacherMaxDailyHours) {
+  // 4. 교사 일일 최대 시수 제한 (per-teacher override 우선)
+  const tp = teacherPolicies?.find((p) => p.teacherId === unit.teacherId)
+  const maxDaily = tp?.maxDailyHoursOverride ?? policy.teacherMaxDailyHours
+  if (grid.getTeacherDayHours(unit.teacherId, day) >= maxDaily) {
     return false
   }
 
@@ -73,22 +78,30 @@ export function isPlacementValid(
 /**
  * 고정 이벤트와 출장/행사에서 차단 슬롯 세트 생성
  */
-export function buildBlockedSlots(fixedEvents: Array<FixedEvent>): Set<string> {
+export function buildBlockedSlots(
+  fixedEvents: Array<FixedEvent>,
+  teacherPolicies?: Array<TeacherPolicy>,
+): Set<string> {
   const blocked = new Set<string>()
 
   for (const event of fixedEvents) {
     if (event.type === 'BUSINESS_TRIP' && event.teacherId) {
-      // 출장: 해당 교사의 해당 시간 차단
       blocked.add(`teacher-${event.teacherId}-${event.day}-${event.period}`)
     }
     if (event.type === 'SCHOOL_EVENT' && event.grade !== null && event.classNumber !== null) {
-      // 학교 행사: 해당 반의 해당 시간 차단
       blocked.add(`class-${event.grade}-${event.classNumber}-${event.day}-${event.period}`)
     }
     if (event.type === 'SCHOOL_EVENT' && event.grade !== null && event.classNumber === null) {
-      // 학년 전체 행사: 해당 학년의 모든 반 차단은 solver에서 처리
-      // 여기서는 grade-level marker로 저장
       blocked.add(`grade-${event.grade}-${event.day}-${event.period}`)
+    }
+  }
+
+  // 교사별 회피 슬롯을 차단에 추가
+  if (teacherPolicies) {
+    for (const policy of teacherPolicies) {
+      for (const slot of policy.avoidanceSlots) {
+        blocked.add(`teacher-${policy.teacherId}-${slot.day}-${slot.period}`)
+      }
     }
   }
 

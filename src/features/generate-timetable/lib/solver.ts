@@ -10,6 +10,7 @@ import { TimetableGrid } from './grid'
 import { computeTotalScore, scoreSlot } from './scorer'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableCell } from '@/entities/timetable'
 import type { DayOfWeek } from '@/shared/lib/types'
 
@@ -36,14 +37,14 @@ const BACKTRACK_DEPTH_LIMIT = 3
  */
 export function generateTimetable(input: GenerationInput): GenerationResult {
   const startTime = performance.now()
-  const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy } = input
+  const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = input
 
   // === 전처리 ===
   const grid = new TimetableGrid()
   const { activeDays, periodsPerDay } = schoolConfig
 
-  // 차단 슬롯 구축
-  let blockedSlots = buildBlockedSlots(fixedEvents)
+  // 차단 슬롯 구축 (교사 회피 슬롯 포함)
+  let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
   blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
 
   // 고정 이벤트 배치
@@ -58,7 +59,7 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
   const totalSlots = totalClasses * activeDays.length * periodsPerDay
 
   // === 탐욕적 배치 (MRV 휴리스틱) ===
-  sortByMRV(assignments, grid, activeDays, periodsPerDay, constraintPolicy, blockedSlots)
+  sortByMRV(assignments, grid, activeDays, periodsPerDay, constraintPolicy, blockedSlots, teacherPolicies)
 
   const unplaced: Array<UnplacedAssignment> = []
 
@@ -71,6 +72,7 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
         periodsPerDay,
         constraintPolicy,
         blockedSlots,
+        teacherPolicies,
       )
 
       if (candidates.length === 0) {
@@ -84,6 +86,7 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
           blockedSlots,
           assignments,
           0,
+          teacherPolicies,
         )
         if (!backtrackSuccess) {
           unplaced.push({
@@ -115,6 +118,8 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
           candidate.period,
           constraintPolicy,
           activeDays,
+          teacherPolicies,
+          periodsPerDay,
         )
       }
 
@@ -137,13 +142,13 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
   }
 
   // === Hill-climbing 최적화 ===
-  hillClimb(grid, constraintPolicy, activeDays, periodsPerDay, blockedSlots)
+  hillClimb(grid, constraintPolicy, activeDays, periodsPerDay, blockedSlots, teacherPolicies)
 
   // === 결과 빌드 ===
   const endTime = performance.now()
   const generationTimeMs = Math.round(endTime - startTime)
   const cells = grid.getAllCells()
-  const score = computeTotalScore(grid, constraintPolicy, activeDays, periodsPerDay)
+  const score = computeTotalScore(grid, constraintPolicy, activeDays, periodsPerDay, teacherPolicies)
   const violations = validateTimetable(cells, constraintPolicy)
   const suggestions = suggestRelaxations(unplaced, constraintPolicy)
 
@@ -270,6 +275,7 @@ function sortByMRV(
   periodsPerDay: number,
   policy: ConstraintPolicy,
   blockedSlots: Set<string>,
+  teacherPolicies?: Array<TeacherPolicy>,
 ): void {
   const candidateCounts = new Map<AssignmentUnit, number>()
 
@@ -281,6 +287,7 @@ function sortByMRV(
       periodsPerDay,
       policy,
       blockedSlots,
+      teacherPolicies,
     )
     candidateCounts.set(unit, candidates.length)
   }
@@ -307,6 +314,7 @@ function tryBacktrack(
   blockedSlots: Set<string>,
   _allUnits: Array<AssignmentUnit>,
   depth: number,
+  teacherPolicies?: Array<TeacherPolicy>,
 ): boolean {
   if (depth >= BACKTRACK_DEPTH_LIMIT) return false
 
@@ -336,7 +344,7 @@ function tryBacktrack(
         // 점유 셀을 제거하고 이 unit을 배치할 수 있는지 확인
         grid.removeCell(occupyingCell)
 
-        if (isPlacementValid(grid, unit, day, period, policy, blockedSlots)) {
+        if (isPlacementValid(grid, unit, day, period, policy, blockedSlots, teacherPolicies)) {
           // 이 unit 배치
           const newCell: TimetableCell = {
             teacherId: unit.teacherId,
@@ -367,6 +375,7 @@ function tryBacktrack(
             periodsPerDay,
             policy,
             blockedSlots,
+            teacherPolicies,
           )
 
           if (displacedCandidates.length > 0) {
@@ -374,7 +383,7 @@ function tryBacktrack(
             let bestCandidate = displacedCandidates[0]
             let bestScore = -1
             for (const c of displacedCandidates) {
-              const s = scoreSlot(grid, displacedUnit, c.day, c.period, policy, activeDays)
+              const s = scoreSlot(grid, displacedUnit, c.day, c.period, policy, activeDays, teacherPolicies, periodsPerDay)
               if (s > bestScore) {
                 bestScore = s
                 bestCandidate = c
@@ -403,6 +412,7 @@ function tryBacktrack(
             blockedSlots,
             _allUnits,
             depth + 1,
+            teacherPolicies,
           )
           if (success) return true
 
@@ -430,8 +440,9 @@ function hillClimb(
   activeDays: Array<DayOfWeek>,
   periodsPerDay: number,
   blockedSlots: Set<string>,
+  teacherPolicies?: Array<TeacherPolicy>,
 ): void {
-  let currentScore = computeTotalScore(grid, policy, activeDays, periodsPerDay)
+  let currentScore = computeTotalScore(grid, policy, activeDays, periodsPerDay, teacherPolicies)
   let iterations = 0
 
   while (iterations < MAX_HILL_CLIMBING_ITERATIONS) {
@@ -473,8 +484,8 @@ function hillClimb(
           remainingHours: 1,
         }
 
-        const aAtB = isPlacementValid(grid, unitA, cellB.day, cellB.period, policy, blockedSlots)
-        const bAtA = isPlacementValid(grid, unitB, cellA.day, cellA.period, policy, blockedSlots)
+        const aAtB = isPlacementValid(grid, unitA, cellB.day, cellB.period, policy, blockedSlots, teacherPolicies)
+        const bAtA = isPlacementValid(grid, unitB, cellA.day, cellA.period, policy, blockedSlots, teacherPolicies)
 
         if (aAtB && bAtA) {
           const swappedA: TimetableCell = { ...cellA, day: cellB.day, period: cellB.period }
@@ -483,7 +494,7 @@ function hillClimb(
           grid.placeCell(swappedA)
           grid.placeCell(swappedB)
 
-          const newScore = computeTotalScore(grid, policy, activeDays, periodsPerDay)
+          const newScore = computeTotalScore(grid, policy, activeDays, periodsPerDay, teacherPolicies)
           if (newScore > currentScore) {
             currentScore = newScore
             improved = true

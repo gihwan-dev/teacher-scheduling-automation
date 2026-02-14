@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import { generateTimetable } from '../lib/solver'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
 
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
@@ -12,6 +13,7 @@ import type { GenerationResult } from './types'
 import {
   loadAllSetupData,
   loadConstraintPolicy,
+  loadTeacherPolicies,
   saveConstraintPolicy,
   saveTimetableSnapshot,
 } from '@/shared/persistence/indexeddb/repository'
@@ -42,6 +44,7 @@ interface GenerateState {
 
   // Generate state
   constraintPolicy: ConstraintPolicy
+  teacherPolicies: Array<TeacherPolicy>
   result: GenerationResult | null
   isGenerating: boolean
   isLoading: boolean
@@ -60,6 +63,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   subjects: [],
   fixedEvents: [],
   constraintPolicy: createDefaultPolicy(),
+  teacherPolicies: [],
   result: null,
   isGenerating: false,
   isLoading: false,
@@ -72,9 +76,10 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
   loadSetupData: async () => {
     set({ isLoading: true })
-    const [setupData, savedPolicy] = await Promise.all([
+    const [setupData, savedPolicy, teacherPolicies] = await Promise.all([
       loadAllSetupData(),
       loadConstraintPolicy(),
+      loadTeacherPolicies(),
     ])
     set({
       schoolConfig: setupData.schoolConfig ?? null,
@@ -82,13 +87,14 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       subjects: setupData.subjects,
       fixedEvents: setupData.fixedEvents,
       constraintPolicy: savedPolicy ?? createDefaultPolicy(),
+      teacherPolicies,
       isLoading: false,
       setupLoaded: true,
     })
   },
 
   generate: async () => {
-    const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy } = get()
+    const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = get()
     if (!schoolConfig) return
 
     set({ isGenerating: true, result: null })
@@ -102,6 +108,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       subjects,
       fixedEvents,
       constraintPolicy,
+      teacherPolicies,
     })
 
     set({ result, isGenerating: false })
