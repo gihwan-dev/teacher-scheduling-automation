@@ -30,6 +30,10 @@
 - `shared`: URL codec, persistence adapter, 공통 UI, 공통 타입/유틸
 
 ### 슬라이스 전략
+- `school`: 학년/반/요일/교시 구조 모델
+- `teacher`: 교사 기본 정보(이름, 담당 과목, 기준 시수, 반별 배정 시수)
+- `subject`: 과목 정보(이름, 약칭, 계열)
+- `fixed-event`: 고정 수업, 출장/행사 일정
 - `timetable`: 셀 모델, 스냅샷, 상태 전이
 - `teacher-policy`: 교사 선호/회피/일일 시수 정책
 - `constraint-policy`: 학생/교사 연강 및 일일 제한 정책
@@ -52,6 +56,7 @@
 
 | 요구사항 | 대상 레이어 | 핵심 유스케이스 | 완료 기준 | 테스트 포인트 |
 |---|---|---|---|---|
+| F0 학교 운영 데이터 관리 | `features/manage-school-setup`, `entities/school`, `entities/teacher`, `entities/subject` | 학교 구조/교사/과목/시수/고정 수업 UI 입력 및 검증·영속화 | 데이터 저장/복원 round-trip, 시수 정합성 검증 | 시수 합계 unit, 데이터 무결성 integration, 입력 폼 browser test |
 | F1 기초 시간표 자동 생성 | `features/generate-timetable`, `entities/timetable`, `entities/constraint-policy` | 필수 제약 우선 충족 + 선호 점수 기반 배치 | 필수 제약 위반 0건, 생성 실패 시 원인/완화안 표시 | 제약 위반 0건 검증 unit, 생성 실패 사유 노출 integration |
 | F2 교사 배치 조건 관리 | `features/manage-teacher-policy`, `entities/teacher-policy` | 회피/선호/연강 허용 범위 저장 및 검증 | 상충 정책 저장 차단, 수정 가이드 제공 | 정책 스키마 unit, 상충 입력 차단 UI test |
 | F3 수동 수정 및 잠금 | `features/edit-slot`, `features/toggle-lock`, `entities/locking` | 셀 편집/이동, 즉시 충돌 검사, 잠금 반영 | 충돌 시 거부 사유 노출, 잠금 태그 동기화 | 셀 수정/잠금 keyboard browser test |
@@ -70,6 +75,7 @@
 | Path | 페이지 목적 |
 |---|---|
 | `/` | 최근 작업 복원/초기 진입 |
+| `/setup` | 학교 운영 데이터 관리 — 학교 구조/교사/과목/시수/고정 수업(F0) |
 | `/generate` | 기초 시간표 생성(F1) |
 | `/edit` | 수동 편집/잠금/부분 재계산(F3/F4/F6) |
 | `/replacement` | 교체 후보 탐색/확정(F5/F9) |
@@ -144,6 +150,7 @@ src/
     router/index.tsx
     bootstrap/hydrate.ts
   pages/
+    setup/index.tsx
     generate/index.tsx
     edit/index.tsx
     replacement/index.tsx
@@ -155,6 +162,7 @@ src/
     history-timeline/ui/history-timeline.tsx
     share-link-panel/ui/share-link-panel.tsx
   features/
+    manage-school-setup/model/usecase.ts
     generate-timetable/model/usecase.ts
     edit-slot/model/usecase.ts
     recompute-unlocked/model/usecase.ts
@@ -163,6 +171,11 @@ src/
     share-by-url/model/usecase.ts
     load-from-url/model/usecase.ts
   entities/
+    school/model/types.ts
+    school/lib/validator.ts
+    teacher/model/types.ts
+    subject/model/types.ts
+    fixed-event/model/types.ts
     timetable/model/types.ts
     timetable/lib/transition.ts
     constraint-policy/lib/validator.ts
@@ -185,7 +198,7 @@ src/
 
 | Phase | 우선순위 | 작업 | 산출물 | 완료 기준(DoD) |
 |---|---|---|---|---|
-| Phase 1 기반 구축 | Must | TanStack Start 초기화, FSD 구조, Router/Store Provider, URL codec, Dexie 스키마, 토큰/공통 UI 베이스 | 실행 가능한 앱 셸, 기본 라우트, 저장소 어댑터, 토큰 정의 문서 | `pnpm lint`, `pnpm typecheck` 통과 + URL round-trip unit test 통과 |
+| Phase 1 기반 구축 | Must | TanStack Start 초기화, FSD 구조, Router/Store Provider, URL codec, Dexie 스키마, 토큰/공통 UI 베이스, **학교 운영 데이터 관리(F0) UI 및 저장소** | 실행 가능한 앱 셸, 기본 라우트, 저장소 어댑터, 토큰 정의 문서, **`/setup` 화면에서 데이터 입력·저장·복원 동작** | `pnpm lint`, `pnpm typecheck` 통과 + URL round-trip unit test 통과 + **데이터 저장/복원 round-trip test 통과** |
 | Phase 2 핵심 기능 | Must | F1/F2/F3/F4/F5/F6 + 공유 URL 구현 | 생성/편집/재계산/교체/공유 기능 동작, 정책 관리 화면 | 핵심 시나리오 integration 통과, 필수 제약 위반 0건 검증 테스트 통과 |
 | Phase 3 운영 안정화 | Should | F7/F8 구현, 이력 타임라인/확정 플로우 | 이력 시각화, Undo/Redo | 상태 전이 테스트 통과, Browser keyboard 시나리오 통과 |
 | Phase 4 고급 탐색 | Could | F9 다중 교체 탐색, 탐색 시간 상한/휴리스틱 튜닝 | 다중 교체 후보 화면 및 랭킹 결과 | 지정 데이터셋에서 시간 상한(예: 2초) 내 상위 후보 반환 |
@@ -194,9 +207,9 @@ src/
 
 ### 테스트 범위
 - 단위(Unit)
-- 제약 검증기, 후보 정렬기, 상태 전이, URL codec, 정책 스키마
+- 제약 검증기, 후보 정렬기, 상태 전이, URL codec, 정책 스키마, **시수 정합성 검증기**
 - 통합(Integration)
-- 생성 -> 수정 -> 잠금 -> 부분 재계산 -> 교체 확정 -> URL 공유 복원
+- **데이터 입력 -> 저장 -> 복원** -> 생성 -> 수정 -> 잠금 -> 부분 재계산 -> 교체 확정 -> URL 공유 복원
 - 브라우저(Browser)
 - 키보드 편집, 접근성 라벨, 이력 타임라인 상호작용
 
