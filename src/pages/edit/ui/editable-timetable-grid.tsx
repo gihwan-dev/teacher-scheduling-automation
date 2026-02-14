@@ -4,6 +4,7 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { SchoolConfig } from '@/entities/school'
+import { StatusIndicator, getCellStatusClasses, getStatusLabel } from '@/entities/timetable'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import { makeCellKey, useEditStore } from '@/features/edit-timetable-cell'
 import { useGridKeyboard } from '@/features/edit-timetable-cell/lib/use-grid-keyboard'
@@ -108,21 +109,6 @@ export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: Edit
   )
 }
 
-function getCellStatusClasses(cell: TimetableCell | undefined): string {
-  if (!cell) return 'bg-background hover:bg-muted/30'
-  if (cell.isFixed) return 'bg-muted/50 border-dashed'
-  switch (cell.status) {
-    case 'LOCKED':
-      return 'bg-muted'
-    case 'TEMP_MODIFIED':
-      return 'bg-secondary/30'
-    case 'CONFIRMED_MODIFIED':
-      return 'bg-primary/10'
-    default:
-      return 'bg-background hover:bg-muted/30'
-  }
-}
-
 function getCellAriaLabel(
   cell: TimetableCell | undefined,
   teacherMap: Map<string, Teacher>,
@@ -133,20 +119,6 @@ function getCellAriaLabel(
   const teacher = teacherMap.get(cell.teacherId)?.name ?? cell.teacherId
   const statusLabel = getStatusLabel(cell)
   return `${subject} ${teacher}${statusLabel ? ` ${statusLabel}` : ''}`
-}
-
-function getStatusLabel(cell: TimetableCell): string {
-  if (cell.isFixed) return '고정'
-  switch (cell.status) {
-    case 'LOCKED':
-      return '잠김'
-    case 'TEMP_MODIFIED':
-      return '임시 수정됨'
-    case 'CONFIRMED_MODIFIED':
-      return '확정됨'
-    default:
-      return ''
-  }
 }
 
 function CellContent({
@@ -168,20 +140,4 @@ function CellContent({
       <StatusIndicator cell={cell} />
     </div>
   )
-}
-
-function StatusIndicator({ cell }: { cell: TimetableCell }) {
-  if (cell.isFixed) {
-    return <span className="text-[9px] text-muted-foreground" aria-hidden="true">📌</span>
-  }
-  switch (cell.status) {
-    case 'LOCKED':
-      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">🔒</span>
-    case 'TEMP_MODIFIED':
-      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">✏️</span>
-    case 'CONFIRMED_MODIFIED':
-      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">✓</span>
-    default:
-      return null
-  }
 }

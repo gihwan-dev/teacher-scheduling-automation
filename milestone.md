@@ -45,11 +45,11 @@
   - 검증: 링크 round-trip 후 동일 뷰가 재현되고, 손상된 링크는 안전하게 복원 실패 안내를 제공한다.
 
 ## Phase 7. [SEQUENTIAL] 화면 통합 및 운영 안정화 (F7, F8)
-- [ ] **변경 이력 타임라인 및 상태 시각화 구현**
+- [x] **변경 이력 타임라인 및 상태 시각화 구현**
   - 목표: `BASE -> TEMP_MODIFIED -> CONFIRMED_MODIFIED`와 `LOCKED` 상태를 시간표/교사표/학급표에 일관되게 표시한다.
   - 검증: 동일 이벤트가 모든 뷰에서 동일한 색상/아이콘/텍스트 규칙으로 표시된다.
 
-- [ ] **Undo/Redo와 확정 플로우 통합**
+- [x] **Undo/Redo와 확정 플로우 통합**
   - 목표: 되돌리기/앞으로 가기 후에도 제약 검증 결과와 이력 상태가 동기화된다.
   - 검증: 연속 Undo/Redo 이후 최종 데이터 상태와 이력 포인터가 일치한다.
 
@@ -136,4 +136,19 @@
 - 핵심 설계 결정: UUID 제거 인덱스 기반 컴팩트 인코딩, flags bitfield(3비트: status<<1|isFixed), URL hash fragment(서버 전송 없음), 복원 시 새 UUID 생성
 - 신규 파일 19개, 수정 파일 2개 (package.json, __root.tsx)
 - 테스트: 21 파일 188 테스트 전체 통과 (기존 143 + 신규 45)
+- 검증: typecheck, lint, test:unit 모두 통과
+
+**[2026-02-14] Phase 7 세션 요약**:
+- 완료: Phase 7 전체 구현 — 변경 이력 시각화 + Undo/Redo 확정 플로우 통합 (F7, F8)
+- 구현 내용:
+  - Layer 1: `entities/change-history` — ChangeEvent/WeekTag/ChangeActionType 모델, Zod 스키마, week-utils(ISO 8601 주차 계산), 테스트 20건
+  - Layer 1-B: `entities/timetable/lib/cell-status` — getCellStatusStyle/getCellStatusClasses/getStatusLabel/getStatusIcon 통합 유틸, StatusIndicator/StatusLegend 공유 컴포넌트
+  - Layer 2: IndexedDB v5 (changeEvents 테이블 추가), repository에 saveChangeEvent/loadChangeEvents/updateChangeEvent/deleteChangeEventsBySnapshot 추가
+  - Layer 3: `features/track-change-history` — Zustand 스토어 (loadEvents/appendEvent/markLastUndone/markLastRedone/appendRecomputeEvent/confirmTempModified)
+  - Layer 4: `edit-timetable-cell` 스토어 수정 — confirmEdit가 TEMP_MODIFIED로 설정, confirmChanges() 신규 액션 (TEMP→CONFIRMED 일괄 전환), 모든 편집 액션에 이력 기록, undo/redo 이력 동기화, recompute 이력 기록, loadSnapshot 시 이력 로드
+  - Layer 5: 기존 3개 페이지(edit/generate/replacement) 상태 시각화 통일(공유 cell-status 유틸 사용), edit-toolbar에 "확정" 버튼 추가, edit-page에 StatusLegend 추가, /history 페이지 신규 생성 (필터바 + 주차별 그룹핑 타임라인)
+  - Layer 6: `/history` 라우트 + 네비게이션 "이력" 링크 추가
+- 핵심 설계 결정: confirmEdit()가 TEMP_MODIFIED로 설정 후 별도 confirmChanges()로 CONFIRMED_MODIFIED 전환, ISO 8601 주차 기반 이벤트 그룹핑, ChangeEvent.isUndone soft flag로 감사 추적, cell-status를 CellStatus Record로 타입 안전하게 매핑
+- 신규 파일 17개, 수정 파일 10개
+- 테스트: 23 파일 208 테스트 전체 통과 (기존 188 + 신규 20)
 - 검증: typecheck, lint, test:unit 모두 통과

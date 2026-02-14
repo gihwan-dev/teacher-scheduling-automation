@@ -3,6 +3,7 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { SchoolConfig } from '@/entities/school'
+import { StatusIndicator, StatusLegend, getCellStatusClasses } from '@/entities/timetable'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import {
   Table,
@@ -19,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface TimetableViewProps {
   cells: Array<TimetableCell>
@@ -90,7 +91,8 @@ export function TimetableView({ cells, schoolConfig, teachers, subjects }: Timet
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        <StatusLegend />
         <Table>
           <TableHeader>
             <TableRow>
@@ -109,7 +111,10 @@ export function TimetableView({ cells, schoolConfig, teachers, subjects }: Timet
                 {activeDays.map((day) => {
                   const cell = cellMap.get(`${day}-${period}`)
                   return (
-                    <TableCell key={day} className="text-center">
+                    <TableCell
+                      key={day}
+                      className={cn('text-center', getCellStatusClasses(cell))}
+                    >
                       {cell ? (
                         <CellContent
                           cell={cell}
@@ -147,11 +152,7 @@ function CellContent({
     <div className="space-y-0.5">
       <div className="text-xs font-medium">{subject?.abbreviation ?? cell.subjectId}</div>
       <div className="text-muted-foreground text-[10px]">{teacher?.name ?? cell.teacherId}</div>
-      {cell.isFixed && (
-        <Badge variant="outline" className="text-[9px] px-1 py-0">
-          고정
-        </Badge>
-      )}
+      <StatusIndicator cell={cell} />
     </div>
   )
 }

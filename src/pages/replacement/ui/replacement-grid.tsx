@@ -2,6 +2,7 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TimetableCell } from '@/entities/timetable'
+import { StatusIndicator } from '@/entities/timetable'
 import { makeCellKey } from '@/features/edit-timetable-cell'
 import { useReplacementStore } from '@/features/find-replacement'
 import { DAY_LABELS } from '@/shared/lib/constants'
@@ -123,18 +124,4 @@ function CellContent({
       <StatusIndicator cell={cell} />
     </div>
   )
-}
-
-function StatusIndicator({ cell }: { cell: TimetableCell }) {
-  if (cell.isFixed) return <span className="text-[9px] text-muted-foreground" aria-hidden="true">📌</span>
-  switch (cell.status) {
-    case 'LOCKED':
-      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">🔒</span>
-    case 'TEMP_MODIFIED':
-      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">✏️</span>
-    case 'CONFIRMED_MODIFIED':
-      return <span className="text-[9px] text-muted-foreground" aria-hidden="true">✓</span>
-    default:
-      return null
-  }
 }

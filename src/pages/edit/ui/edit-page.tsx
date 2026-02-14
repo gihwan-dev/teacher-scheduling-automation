@@ -3,6 +3,7 @@ import { EditableTimetableGrid } from './editable-timetable-grid'
 import { EditToolbar } from './edit-toolbar'
 import { EditValidationPanel } from './edit-validation-panel'
 import { KeyboardShortcutsPanel } from './keyboard-shortcuts-panel'
+import { StatusLegend } from '@/entities/timetable'
 import { useEditStore } from '@/features/edit-timetable-cell'
 import {
   Select,
@@ -113,6 +114,9 @@ export function EditPage() {
         </div>
         <KeyboardShortcutsPanel />
       </div>
+
+      {/* 상태 범례 */}
+      <StatusLegend />
 
       {/* 편집 가능 그리드 */}
       <EditableTimetableGrid

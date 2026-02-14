@@ -4,6 +4,7 @@ import { useEditStore } from '@/features/edit-timetable-cell'
 
 export function EditToolbar() {
   const {
+    cells,
     undoStack,
     redoStack,
     isDirty,
@@ -15,7 +16,10 @@ export function EditToolbar() {
     redo,
     lockSelected,
     unlockSelected,
+    confirmChanges,
   } = useEditStore()
+
+  const tempModifiedCount = cells.filter((c) => c.status === 'TEMP_MODIFIED').length
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -25,6 +29,14 @@ export function EditToolbar() {
       <Button onClick={recompute} disabled={isRecomputing} variant="outline" size="sm">
         {isRecomputing ? '재계산 중...' : '재계산'}
       </Button>
+      {tempModifiedCount > 0 && (
+        <Button onClick={confirmChanges} variant="default" size="sm">
+          확정
+          <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+            {tempModifiedCount}
+          </Badge>
+        </Button>
+      )}
       <div className="h-4 w-px bg-border" />
       <Button onClick={undo} disabled={undoStack.length === 0} variant="ghost" size="sm">
         실행취소

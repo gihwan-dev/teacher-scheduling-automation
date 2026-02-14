@@ -12,6 +12,7 @@ import type { CellKey, CellStatus, EditAction, TimetableCell, TimetableSnapshot 
 import { validateTimetable } from '@/entities/constraint-policy'
 import { buildBlockedSlots, expandGradeBlockedSlots } from '@/features/generate-timetable'
 import { recomputeUnlocked } from '@/features/recompute-timetable'
+import { useChangeHistoryStore } from '@/features/track-change-history'
 import {
   loadAllSetupData,
   loadConstraintPolicy,
@@ -79,6 +80,7 @@ interface EditState {
   redo: () => void
   recompute: () => Promise<void>
   saveSnapshot: () => Promise<void>
+  confirmChanges: () => void
 }
 
 export const useEditStore = create<EditState>((set, get) => ({
@@ -143,6 +145,9 @@ export const useEditStore = create<EditState>((set, get) => ({
       undoStack: [],
       redoStack: [],
     })
+
+    // 이력 로드
+    await useChangeHistoryStore.getState().loadEvents(snapshot.id)
   },
 
   setViewTarget: (grade, classNumber) => {
@@ -215,7 +220,7 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   confirmEdit: () => {
-    const { editingCellKey, editDraft, cells, constraintPolicy, teacherPolicies, fixedEvents, schoolConfig } = get()
+    const { editingCellKey, editDraft, cells, constraintPolicy, teacherPolicies, fixedEvents, schoolConfig, snapshot } = get()
     if (!editingCellKey || !editDraft || !constraintPolicy || !schoolConfig) return
 
     // 빈 draft인 경우 편집 취소
@@ -248,7 +253,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     const cellMap = get().cellMap
     const oldCell = cellMap.get(editingCellKey) ?? null
 
-    // 새 셀 생성
+    // 새 셀 생성 (TEMP_MODIFIED: 확정 전까지 임시 상태)
     const newCell: TimetableCell = {
       teacherId: editDraft.teacherId,
       subjectId: editDraft.subjectId,
@@ -257,7 +262,7 @@ export const useEditStore = create<EditState>((set, get) => ({
       day,
       period,
       isFixed: false,
-      status: 'CONFIRMED_MODIFIED',
+      status: 'TEMP_MODIFIED',
     }
 
     // EditAction 생성
@@ -291,6 +296,18 @@ export const useEditStore = create<EditState>((set, get) => ({
       editDraft: null,
       isDirty: true,
     })
+
+    // 이력 기록
+    if (snapshot) {
+      useChangeHistoryStore.getState().appendEvent({
+        snapshotId: snapshot.id,
+        actionType: action.type,
+        cellKey: action.cellKey,
+        before: action.before,
+        after: action.after,
+        timestamp: action.timestamp,
+      })
+    }
   },
 
   cancelEdit: () => {
@@ -298,7 +315,7 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   clearCell: (key) => {
-    const { cells, cellMap, constraintPolicy, undoStack } = get()
+    const { cells, cellMap, constraintPolicy, undoStack, snapshot } = get()
     const cell = cellMap.get(key)
     if (!cell || !isCellEditable(cell)) return
 
@@ -324,10 +341,22 @@ export const useEditStore = create<EditState>((set, get) => ({
       violations,
       isDirty: true,
     })
+
+    // 이력 기록
+    if (snapshot) {
+      useChangeHistoryStore.getState().appendEvent({
+        snapshotId: snapshot.id,
+        actionType: action.type,
+        cellKey: action.cellKey,
+        before: action.before,
+        after: action.after,
+        timestamp: action.timestamp,
+      })
+    }
   },
 
   toggleLock: (key) => {
-    const { cells, cellMap, constraintPolicy, undoStack } = get()
+    const { cells, cellMap, constraintPolicy, undoStack, snapshot } = get()
     const cell = cellMap.get(key)
     if (!cell || cell.isFixed) return
 
@@ -359,10 +388,22 @@ export const useEditStore = create<EditState>((set, get) => ({
       violations,
       isDirty: true,
     })
+
+    // 이력 기록
+    if (snapshot) {
+      useChangeHistoryStore.getState().appendEvent({
+        snapshotId: snapshot.id,
+        actionType: action.type,
+        cellKey: action.cellKey,
+        before: action.before,
+        after: action.after,
+        timestamp: action.timestamp,
+      })
+    }
   },
 
   lockSelected: () => {
-    const { selectedCells, cells, cellMap, constraintPolicy, undoStack } = get()
+    const { selectedCells, cells, cellMap, constraintPolicy, undoStack, snapshot } = get()
     if (selectedCells.size === 0) return
 
     const actions: Array<EditAction> = []
@@ -400,10 +441,25 @@ export const useEditStore = create<EditState>((set, get) => ({
       violations,
       isDirty: true,
     })
+
+    // 이력 기록
+    if (snapshot) {
+      const historyStore = useChangeHistoryStore.getState()
+      for (const action of actions) {
+        historyStore.appendEvent({
+          snapshotId: snapshot.id,
+          actionType: action.type,
+          cellKey: action.cellKey,
+          before: action.before,
+          after: action.after,
+          timestamp: action.timestamp,
+        })
+      }
+    }
   },
 
   unlockSelected: () => {
-    const { selectedCells, cells, cellMap, constraintPolicy, undoStack } = get()
+    const { selectedCells, cells, cellMap, constraintPolicy, undoStack, snapshot } = get()
     if (selectedCells.size === 0) return
 
     const actions: Array<EditAction> = []
@@ -441,10 +497,25 @@ export const useEditStore = create<EditState>((set, get) => ({
       violations,
       isDirty: true,
     })
+
+    // 이력 기록
+    if (snapshot) {
+      const historyStore = useChangeHistoryStore.getState()
+      for (const action of actions) {
+        historyStore.appendEvent({
+          snapshotId: snapshot.id,
+          actionType: action.type,
+          cellKey: action.cellKey,
+          before: action.before,
+          after: action.after,
+          timestamp: action.timestamp,
+        })
+      }
+    }
   },
 
   undo: () => {
-    const { undoStack, cells, constraintPolicy } = get()
+    const { undoStack, cells, constraintPolicy, snapshot } = get()
     if (undoStack.length === 0) return
 
     const action = undoStack[undoStack.length - 1]
@@ -484,10 +555,15 @@ export const useEditStore = create<EditState>((set, get) => ({
       violations,
       isDirty: true,
     })
+
+    // 이력 동기화
+    if (snapshot) {
+      useChangeHistoryStore.getState().markLastUndone(snapshot.id)
+    }
   },
 
   redo: () => {
-    const { redoStack, cells, constraintPolicy } = get()
+    const { redoStack, cells, constraintPolicy, snapshot } = get()
     if (redoStack.length === 0) return
 
     const action = redoStack[redoStack.length - 1]
@@ -526,10 +602,15 @@ export const useEditStore = create<EditState>((set, get) => ({
       violations,
       isDirty: true,
     })
+
+    // 이력 동기화
+    if (snapshot) {
+      useChangeHistoryStore.getState().markLastRedone(snapshot.id)
+    }
   },
 
   recompute: async () => {
-    const { cells, schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = get()
+    const { cells, schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies, snapshot } = get()
     if (!schoolConfig || !constraintPolicy) return
 
     set({ isRecomputing: true })
@@ -554,6 +635,11 @@ export const useEditStore = create<EditState>((set, get) => ({
       isRecomputing: false,
       isDirty: true,
     })
+
+    // 이력 기록
+    if (snapshot) {
+      useChangeHistoryStore.getState().appendRecomputeEvent(snapshot.id)
+    }
   },
 
   saveSnapshot: async () => {
@@ -567,5 +653,54 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     await updateTimetableSnapshot(updated)
     set({ snapshot: updated, isDirty: false })
+  },
+
+  confirmChanges: () => {
+    const { cells, constraintPolicy, undoStack, snapshot } = get()
+
+    // TEMP_MODIFIED 셀을 모두 CONFIRMED_MODIFIED로 전환
+    const tempModifiedKeys: Array<CellKey> = []
+    const newCells = cells.map((c) => {
+      if (c.status === 'TEMP_MODIFIED') {
+        const key = makeCellKey(c.grade, c.classNumber, c.day, c.period)
+        tempModifiedKeys.push(key)
+        return { ...c, status: 'CONFIRMED_MODIFIED' as CellStatus }
+      }
+      return c
+    })
+
+    if (tempModifiedKeys.length === 0) return
+
+    // 일괄 CONFIRM EditAction 생성 (undo 가능)
+    const timestamp = Date.now()
+    const actions: Array<EditAction> = tempModifiedKeys.map((key) => {
+      const { grade, classNumber, day, period } = parseCellKey(key)
+      const oldCell = cells.find(
+        (c) => c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period,
+      )!
+      return {
+        type: 'MOVE' as const, // CONFIRM action uses MOVE type in EditAction union
+        before: oldCell,
+        after: { ...oldCell, status: 'CONFIRMED_MODIFIED' as CellStatus },
+        cellKey: key,
+        timestamp,
+      }
+    })
+
+    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+
+    set({
+      cells: newCells,
+      cellMap: buildCellMap(newCells),
+      undoStack: [...undoStack, ...actions],
+      redoStack: [],
+      violations,
+      isDirty: true,
+    })
+
+    // 이력 기록
+    if (snapshot) {
+      useChangeHistoryStore.getState().confirmTempModified(snapshot.id, tempModifiedKeys)
+    }
   },
 }))

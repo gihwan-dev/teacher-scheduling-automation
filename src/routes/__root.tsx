@@ -106,6 +106,13 @@ function RootComponent() {
             교체
           </Link>
           <Link
+            to="/history"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            activeProps={{ className: 'text-foreground font-medium' }}
+          >
+            이력
+          </Link>
+          <Link
             to="/share"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             activeProps={{ className: 'text-foreground font-medium' }}

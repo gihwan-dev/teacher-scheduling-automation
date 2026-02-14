@@ -7,6 +7,7 @@ import type { FixedEvent } from '@/entities/fixed-event'
 import type { TimetableSnapshot } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { ChangeEvent } from '@/entities/change-history'
 
 export interface SetupSnapshot {
   id: string
@@ -28,6 +29,7 @@ class SchedulingDatabase extends Dexie {
   timetableSnapshots!: EntityTable<TimetableSnapshot, 'id'>
   constraintPolicies!: EntityTable<ConstraintPolicy, 'id'>
   teacherPolicies!: EntityTable<TeacherPolicy, 'id'>
+  changeEvents!: EntityTable<ChangeEvent, 'id'>
 
   constructor() {
     super('SchedulingAutomation')
@@ -68,6 +70,17 @@ class SchedulingDatabase extends Dexie {
             }
           }
         })
+    })
+    this.version(5).stores({
+      schoolConfigs: 'id, updatedAt',
+      subjects: 'id, name',
+      teachers: 'id, name',
+      fixedEvents: 'id, type, teacherId',
+      setupSnapshots: 'id, name, updatedAt',
+      timetableSnapshots: 'id, schoolConfigId, createdAt',
+      constraintPolicies: 'id, updatedAt',
+      teacherPolicies: 'id, teacherId, updatedAt',
+      changeEvents: 'id, snapshotId, weekTag, actionType, timestamp',
     })
   }
 }

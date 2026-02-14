@@ -7,6 +7,7 @@ import type { FixedEvent } from '@/entities/fixed-event'
 import type { TimetableSnapshot } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { ChangeEvent } from '@/entities/change-history'
 
 // SchoolConfig
 export async function saveSchoolConfig(config: SchoolConfig): Promise<void> {
@@ -139,4 +140,25 @@ export async function saveTeacherPolicies(policies: Array<TeacherPolicy>): Promi
 
 export async function loadTeacherPolicies(): Promise<Array<TeacherPolicy>> {
   return db.teacherPolicies.toArray()
+}
+
+// ChangeEvents
+export async function saveChangeEvent(event: ChangeEvent): Promise<void> {
+  await db.changeEvents.put(event)
+}
+
+export async function saveChangeEvents(events: Array<ChangeEvent>): Promise<void> {
+  await db.changeEvents.bulkPut(events)
+}
+
+export async function loadChangeEvents(snapshotId: string): Promise<Array<ChangeEvent>> {
+  return db.changeEvents.where('snapshotId').equals(snapshotId).sortBy('timestamp')
+}
+
+export async function updateChangeEvent(event: ChangeEvent): Promise<void> {
+  await db.changeEvents.put(event)
+}
+
+export async function deleteChangeEventsBySnapshot(snapshotId: string): Promise<void> {
+  await db.changeEvents.where('snapshotId').equals(snapshotId).delete()
 }
