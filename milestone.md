@@ -9,13 +9,13 @@
 - `PG-2`: 편집/재계산(F3/F4), 교체 후보(F5), 공유 URL 기능 병렬 개발
 
 ## Phase 1. [SEQUENTIAL] 운영 기반 및 공통 규칙 확정 (F0)
-- [ ] **학교 운영 데이터 입력 UI 및 저장소 완성**
+- [x] **학교 운영 데이터 입력 UI 및 저장소 완성**
   - 목표: `/setup` 화면에서 학교 구조(학년/반/요일/교시), 교사(이름/담당 과목/기준 시수/반별 배정 시수), 과목, 고정 수업/출장 데이터를 폼/테이블 UI로 입력·수정·삭제·저장할 수 있다.
   - 포함: 시수 합계 정합성 검증, 교사-과목 미배정 경고, 필수 필드 누락 차단.
   - 검증: 샘플 학교 데이터 1세트를 UI로 입력 후 저장하고, 브라우저 재실행 후 동일하게 복원된다.
 
 ## Phase 2. [PARALLEL:PG-1] 핵심 기능 개발 - 기초 자동 생성 (F1, F6)
-- [ ] **기초 시간표 자동 생성 기능 구현**
+- [x] **기초 시간표 자동 생성 기능 구현**
   - 목표: 필수 제약 100% 충족을 보장하면서 선호 제약 점수 기반으로 배치를 생성한다.
   - 포함: 생성 실패 시 원인 제약 목록과 완화 후보를 제시한다.
   - 검증: 샘플 학교 데이터 기준 필수 제약 위반 0건, 실패 케이스에서 원인 안내 확인.
@@ -61,3 +61,24 @@
 - [ ] **릴리스 품질 게이트 통과**
   - 목표: 핵심 시나리오(생성/수정/교체/공유/복원) 테스트와 정적 검사를 모두 통과한다.
   - 검증: `lint`, `typecheck`, 핵심 테스트 성공 및 Must 요구사항(`F1~F6`) 인수 조건 충족 확인.
+
+---
+
+## 참고 노트
+
+**[2026-02-14] 세션 요약**:
+- 완료: Phase 1 전체 구현 (엔터티 4종, IndexedDB 영속 저장소, Zustand 스토어, /setup 탭 UI, 교차 검증, 라우트)
+- 발견된 이슈: base-ui Select의 `onValueChange`가 `T | null` 시그니처로 null 가드 필요, Vitest 종료 시 Dexie/fake-indexeddb 프로세스 hang (기능 무관)
+- 아키텍처 결정: FSD 레이어 구조 (entities → shared/persistence → features → pages → routes), ESLint 규칙에 따라 `Array<T>` 제네릭 형식 사용
+- 다음 페이즈 영향: Phase 2(자동 생성)와 Phase 3(교사 정책)은 이번에 정의한 엔터티/스토어를 그대로 활용 가능
+
+**[2026-02-14] Phase 2 세션 요약**:
+- 완료: Phase 2 전체 구현 — 기초 시간표 자동 생성 (F1, F6)
+- 구현 내용:
+  - `entities/timetable`: TimetableCell, TimetableSnapshot, CellStatus 모델 + Zod 스키마 + 테스트
+  - `entities/constraint-policy`: ConstraintPolicy, ConstraintViolation 모델 + validator (교사충돌/학생연강/교사연강/일일시수) + 테스트
+  - `features/generate-timetable`: Greedy + Backtracking(depth=3) + Hill-climbing 3단계 알고리즘, TimetableGrid(O(1) 인덱스), scorer(4종 가중 점수), failure-analyzer(원인 분류 + 완화 제안)
+  - IndexedDB v2 (timetableSnapshots, constraintPolicies 테이블 추가), Zustand store
+  - `/generate` 페이지 UI: 설정 요약, 제약 설정 폼, 결과 패널, 학년/반 선택 시간표 그리드
+- 테스트: 10 파일 79 테스트 전체 통과, 3학년 5반 규모(15교사) 생성 성공 확인
+- 검증: typecheck, lint, test:unit 모두 통과

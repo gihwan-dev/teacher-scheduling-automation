@@ -1,9 +1,11 @@
-import {  db } from './database'
-import type {SetupSnapshot} from './database';
+import { db } from './database'
+import type { SetupSnapshot } from './database'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
+import type { TimetableSnapshot } from '@/entities/timetable'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
 
 // SchoolConfig
 export async function saveSchoolConfig(config: SchoolConfig): Promise<void> {
@@ -98,4 +100,22 @@ export async function loadAllSetupData(): Promise<{
     loadFixedEvents(),
   ])
   return { schoolConfig, subjects, teachers, fixedEvents }
+}
+
+// TimetableSnapshot
+export async function saveTimetableSnapshot(snapshot: TimetableSnapshot): Promise<void> {
+  await db.timetableSnapshots.put(snapshot)
+}
+
+export async function loadLatestTimetableSnapshot(): Promise<TimetableSnapshot | undefined> {
+  return db.timetableSnapshots.orderBy('createdAt').last()
+}
+
+// ConstraintPolicy
+export async function saveConstraintPolicy(policy: ConstraintPolicy): Promise<void> {
+  await db.constraintPolicies.put(policy)
+}
+
+export async function loadConstraintPolicy(): Promise<ConstraintPolicy | undefined> {
+  return db.constraintPolicies.orderBy('updatedAt').last()
 }
