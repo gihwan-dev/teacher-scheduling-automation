@@ -27,7 +27,17 @@ export function findCandidateSlots(
 
   for (const day of activeDays) {
     for (let period = 1; period <= periodsPerDay; period++) {
-      if (isPlacementValid(grid, unit, day, period, policy, blockedSlots, teacherPolicies)) {
+      if (
+        isPlacementValid(
+          grid,
+          unit,
+          day,
+          period,
+          policy,
+          blockedSlots,
+          teacherPolicies,
+        )
+      ) {
         candidates.push({ day, period, score: 0 })
       }
     }
@@ -88,10 +98,20 @@ export function buildBlockedSlots(
     if (event.type === 'BUSINESS_TRIP' && event.teacherId) {
       blocked.add(`teacher-${event.teacherId}-${event.day}-${event.period}`)
     }
-    if (event.type === 'SCHOOL_EVENT' && event.grade !== null && event.classNumber !== null) {
-      blocked.add(`class-${event.grade}-${event.classNumber}-${event.day}-${event.period}`)
+    if (
+      event.type === 'SCHOOL_EVENT' &&
+      event.grade !== null &&
+      event.classNumber !== null
+    ) {
+      blocked.add(
+        `class-${event.grade}-${event.classNumber}-${event.day}-${event.period}`,
+      )
     }
-    if (event.type === 'SCHOOL_EVENT' && event.grade !== null && event.classNumber === null) {
+    if (
+      event.type === 'SCHOOL_EVENT' &&
+      event.grade !== null &&
+      event.classNumber === null
+    ) {
       blocked.add(`grade-${event.grade}-${event.day}-${event.period}`)
     }
   }

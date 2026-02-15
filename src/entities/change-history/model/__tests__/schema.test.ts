@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { changeActionTypeSchema, changeEventSchema, weekTagSchema } from '../schema'
+import {
+  changeActionTypeSchema,
+  changeEventSchema,
+  weekTagSchema,
+} from '../schema'
 
 describe('weekTagSchema', () => {
   it('유효한 주차 태그를 통과시킨다', () => {
@@ -18,7 +22,15 @@ describe('weekTagSchema', () => {
 
 describe('changeActionTypeSchema', () => {
   it('유효한 액션 타입을 통과시킨다', () => {
-    for (const type of ['EDIT', 'CLEAR', 'LOCK', 'UNLOCK', 'MOVE', 'CONFIRM', 'RECOMPUTE']) {
+    for (const type of [
+      'EDIT',
+      'CLEAR',
+      'LOCK',
+      'UNLOCK',
+      'MOVE',
+      'CONFIRM',
+      'RECOMPUTE',
+    ]) {
       expect(changeActionTypeSchema.safeParse(type).success).toBe(true)
     }
   })
@@ -56,23 +68,36 @@ describe('changeEventSchema', () => {
   })
 
   it('before와 after 모두 null이어도 통과한다 (RECOMPUTE)', () => {
-    const event = { ...validEvent, actionType: 'RECOMPUTE', before: null, after: null }
+    const event = {
+      ...validEvent,
+      actionType: 'RECOMPUTE',
+      before: null,
+      after: null,
+    }
     expect(changeEventSchema.safeParse(event).success).toBe(true)
   })
 
   it('id가 빈 문자열이면 실패한다', () => {
-    expect(changeEventSchema.safeParse({ ...validEvent, id: '' }).success).toBe(false)
+    expect(changeEventSchema.safeParse({ ...validEvent, id: '' }).success).toBe(
+      false,
+    )
   })
 
   it('snapshotId가 빈 문자열이면 실패한다', () => {
-    expect(changeEventSchema.safeParse({ ...validEvent, snapshotId: '' }).success).toBe(false)
+    expect(
+      changeEventSchema.safeParse({ ...validEvent, snapshotId: '' }).success,
+    ).toBe(false)
   })
 
   it('timestamp가 음수이면 실패한다', () => {
-    expect(changeEventSchema.safeParse({ ...validEvent, timestamp: -1 }).success).toBe(false)
+    expect(
+      changeEventSchema.safeParse({ ...validEvent, timestamp: -1 }).success,
+    ).toBe(false)
   })
 
   it('잘못된 weekTag 형식이면 실패한다', () => {
-    expect(changeEventSchema.safeParse({ ...validEvent, weekTag: '2026-7' }).success).toBe(false)
+    expect(
+      changeEventSchema.safeParse({ ...validEvent, weekTag: '2026-7' }).success,
+    ).toBe(false)
   })
 })

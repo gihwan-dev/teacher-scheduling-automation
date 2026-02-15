@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isCellEditable, validateCellEdit, validateCellMove } from '../edit-validator'
+import {
+  isCellEditable,
+  validateCellEdit,
+  validateCellMove,
+} from '../edit-validator'
 import type { TimetableCell } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
@@ -18,7 +22,9 @@ function makeCell(overrides: Partial<TimetableCell> = {}): TimetableCell {
   }
 }
 
-function makePolicy(overrides: Partial<ConstraintPolicy> = {}): ConstraintPolicy {
+function makePolicy(
+  overrides: Partial<ConstraintPolicy> = {},
+): ConstraintPolicy {
   return {
     id: 'policy-1',
     studentMaxConsecutiveSameSubject: 2,
@@ -40,7 +46,9 @@ describe('isCellEditable', () => {
   })
 
   it('CONFIRMED_MODIFIED 셀은 편집 가능하다', () => {
-    expect(isCellEditable(makeCell({ status: 'CONFIRMED_MODIFIED' }))).toBe(true)
+    expect(isCellEditable(makeCell({ status: 'CONFIRMED_MODIFIED' }))).toBe(
+      true,
+    )
   })
 
   it('isFixed 셀은 편집 불가하다', () => {
@@ -58,10 +66,16 @@ describe('validateCellEdit', () => {
   const blockedSlots = new Set<string>()
 
   it('유효한 편집을 허용한다', () => {
-    const cells = [
-      makeCell({ teacherId: 't-1', day: 'MON', period: 1 }),
-    ]
-    const result = validateCellEdit(cells, '1-1-MON-1', 't-2', 'sub-2', policy, teacherPolicies, blockedSlots)
+    const cells = [makeCell({ teacherId: 't-1', day: 'MON', period: 1 })]
+    const result = validateCellEdit(
+      cells,
+      '1-1-MON-1',
+      't-2',
+      'sub-2',
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(true)
     expect(result.violations).toHaveLength(0)
   })
@@ -72,25 +86,47 @@ describe('validateCellEdit', () => {
       makeCell({ teacherId: 't-2', day: 'MON', period: 1, classNumber: 2 }),
     ]
     // 1반 1교시를 t-2로 변경 → t-2는 2반 1교시에 이미 배정됨
-    const result = validateCellEdit(cells, '1-1-MON-1', 't-2', 'sub-1', policy, teacherPolicies, blockedSlots)
+    const result = validateCellEdit(
+      cells,
+      '1-1-MON-1',
+      't-2',
+      'sub-1',
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
-    expect(result.violations.some((v) => v.type === 'TEACHER_CONFLICT')).toBe(true)
+    expect(result.violations.some((v) => v.type === 'TEACHER_CONFLICT')).toBe(
+      true,
+    )
   })
 
   it('잠긴 셀 편집을 거부한다', () => {
-    const cells = [
-      makeCell({ status: 'LOCKED', day: 'MON', period: 1 }),
-    ]
-    const result = validateCellEdit(cells, '1-1-MON-1', 't-2', 'sub-2', policy, teacherPolicies, blockedSlots)
+    const cells = [makeCell({ status: 'LOCKED', day: 'MON', period: 1 })]
+    const result = validateCellEdit(
+      cells,
+      '1-1-MON-1',
+      't-2',
+      'sub-2',
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'NOT_EDITABLE')).toBe(true)
   })
 
   it('고정 셀 편집을 거부한다', () => {
-    const cells = [
-      makeCell({ isFixed: true, day: 'MON', period: 1 }),
-    ]
-    const result = validateCellEdit(cells, '1-1-MON-1', 't-2', 'sub-2', policy, teacherPolicies, blockedSlots)
+    const cells = [makeCell({ isFixed: true, day: 'MON', period: 1 })]
+    const result = validateCellEdit(
+      cells,
+      '1-1-MON-1',
+      't-2',
+      'sub-2',
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'NOT_EDITABLE')).toBe(true)
   })
@@ -104,17 +140,31 @@ describe('validateCellEdit', () => {
       makeCell({ teacherId: 't-2', day: 'MON', period: 3, classNumber: 3 }),
     ]
     // 1반 1교시를 t-2로 변경 → t-2 일일 3시수(2+1)
-    const result = validateCellEdit(cells, '1-1-MON-1', 't-2', 'sub-1', restrictivePolicy, teacherPolicies, blockedSlots)
+    const result = validateCellEdit(
+      cells,
+      '1-1-MON-1',
+      't-2',
+      'sub-1',
+      restrictivePolicy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'DAILY_LIMIT')).toBe(true)
   })
 
   it('차단된 슬롯으로의 편집을 거부한다', () => {
-    const cells = [
-      makeCell({ teacherId: 't-1', day: 'MON', period: 1 }),
-    ]
+    const cells = [makeCell({ teacherId: 't-1', day: 'MON', period: 1 })]
     const blocked = new Set(['teacher-t-2-MON-1'])
-    const result = validateCellEdit(cells, '1-1-MON-1', 't-2', 'sub-1', policy, teacherPolicies, blocked)
+    const result = validateCellEdit(
+      cells,
+      '1-1-MON-1',
+      't-2',
+      'sub-1',
+      policy,
+      teacherPolicies,
+      blocked,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'BLOCKED_SLOT')).toBe(true)
   })
@@ -126,10 +176,16 @@ describe('validateCellMove', () => {
   const blockedSlots = new Set<string>()
 
   it('빈 슬롯으로의 이동을 허용한다', () => {
-    const cells = [
-      makeCell({ teacherId: 't-1', day: 'MON', period: 1 }),
-    ]
-    const result = validateCellMove(cells, '1-1-MON-1', 'TUE', 2, policy, teacherPolicies, blockedSlots)
+    const cells = [makeCell({ teacherId: 't-1', day: 'MON', period: 1 })]
+    const result = validateCellMove(
+      cells,
+      '1-1-MON-1',
+      'TUE',
+      2,
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(true)
   })
 
@@ -138,31 +194,59 @@ describe('validateCellMove', () => {
       makeCell({ teacherId: 't-1', day: 'MON', period: 1 }),
       makeCell({ teacherId: 't-2', subjectId: 'sub-2', day: 'TUE', period: 2 }),
     ]
-    const result = validateCellMove(cells, '1-1-MON-1', 'TUE', 2, policy, teacherPolicies, blockedSlots)
+    const result = validateCellMove(
+      cells,
+      '1-1-MON-1',
+      'TUE',
+      2,
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'SLOT_OCCUPIED')).toBe(true)
   })
 
   it('고정 셀의 이동을 거부한다', () => {
-    const cells = [
-      makeCell({ isFixed: true, day: 'MON', period: 1 }),
-    ]
-    const result = validateCellMove(cells, '1-1-MON-1', 'TUE', 2, policy, teacherPolicies, blockedSlots)
+    const cells = [makeCell({ isFixed: true, day: 'MON', period: 1 })]
+    const result = validateCellMove(
+      cells,
+      '1-1-MON-1',
+      'TUE',
+      2,
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'NOT_EDITABLE')).toBe(true)
   })
 
   it('잠긴 셀의 이동을 거부한다', () => {
-    const cells = [
-      makeCell({ status: 'LOCKED', day: 'MON', period: 1 }),
-    ]
-    const result = validateCellMove(cells, '1-1-MON-1', 'TUE', 2, policy, teacherPolicies, blockedSlots)
+    const cells = [makeCell({ status: 'LOCKED', day: 'MON', period: 1 })]
+    const result = validateCellMove(
+      cells,
+      '1-1-MON-1',
+      'TUE',
+      2,
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'NOT_EDITABLE')).toBe(true)
   })
 
   it('존재하지 않는 셀의 이동을 거부한다', () => {
-    const result = validateCellMove([], '1-1-MON-1', 'TUE', 2, policy, teacherPolicies, blockedSlots)
+    const result = validateCellMove(
+      [],
+      '1-1-MON-1',
+      'TUE',
+      2,
+      policy,
+      teacherPolicies,
+      blockedSlots,
+    )
     expect(result.valid).toBe(false)
     expect(result.violations.some((v) => v.type === 'NOT_FOUND')).toBe(true)
   })

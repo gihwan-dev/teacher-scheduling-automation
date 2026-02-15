@@ -14,7 +14,9 @@ export function ConstraintConfigForm() {
       <CardContent>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="studentMaxConsecutive">학생 동일과목 최대 연강</Label>
+            <Label htmlFor="studentMaxConsecutive">
+              학생 동일과목 최대 연강
+            </Label>
             <Input
               id="studentMaxConsecutive"
               type="number"
@@ -65,7 +67,9 @@ export function ConstraintConfigForm() {
                 })
               }
             />
-            <p className="text-muted-foreground text-xs">교사가 하루에 수업하는 최대 시수</p>
+            <p className="text-muted-foreground text-xs">
+              교사가 하루에 수업하는 최대 시수
+            </p>
           </div>
         </div>
       </CardContent>

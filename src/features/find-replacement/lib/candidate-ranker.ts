@@ -1,13 +1,13 @@
-import type { ConstraintPolicy, ConstraintViolation } from '@/entities/constraint-policy'
+import type {
+  ConstraintPolicy,
+  ConstraintViolation,
+} from '@/entities/constraint-policy'
 import type { TimetableCell } from '@/entities/timetable'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { DayOfWeek } from '@/shared/lib/types'
 import type { CandidateRanking, ReplacementCandidate } from '../model/types'
 import { validateTimetable } from '@/entities/constraint-policy'
-import {
-  TimetableGrid,
-  computeTotalScore,
-} from '@/features/generate-timetable'
+import { TimetableGrid, computeTotalScore } from '@/features/generate-timetable'
 
 interface RankingContext {
   allCells: Array<TimetableCell>
@@ -26,7 +26,10 @@ export function rankCandidate(
   ctx: RankingContext,
 ): CandidateRanking {
   // 1. 제약 위반 수
-  const violations: Array<ConstraintViolation> = validateTimetable(afterCells, ctx.constraintPolicy)
+  const violations: Array<ConstraintViolation> = validateTimetable(
+    afterCells,
+    ctx.constraintPolicy,
+  )
   const violationCount = violations.filter((v) => v.severity === 'error').length
 
   // 2. 점수 변화량 (before → after)
@@ -54,7 +57,11 @@ export function rankCandidate(
   const similarityScore = Math.round((1 - changedCells / totalCells) * 100)
 
   // 4. 공강 최소화 점수
-  const idleMinimizationScore = computeIdleScore(afterCells, ctx.activeDays, ctx.periodsPerDay)
+  const idleMinimizationScore = computeIdleScore(
+    afterCells,
+    ctx.activeDays,
+    ctx.periodsPerDay,
+  )
 
   // 5. 종합 점수
   const totalRank =

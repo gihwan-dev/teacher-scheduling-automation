@@ -60,7 +60,10 @@ describe('validateTeacherPolicy', () => {
   it('규칙 1: 모든 가용 슬롯 회피 → error + 가이드', () => {
     const config = createSchoolConfig()
     const allSlots = config.activeDays.flatMap((day) =>
-      Array.from({ length: config.periodsPerDay }, (_, i) => ({ day, period: i + 1 })),
+      Array.from({ length: config.periodsPerDay }, (_, i) => ({
+        day,
+        period: i + 1,
+      })),
     )
     const policy = createPolicy({ avoidanceSlots: allSlots })
     const teacher = createTeacher()
@@ -78,7 +81,10 @@ describe('validateTeacherPolicy', () => {
     // 25개 회피 → 가용 5개 < 시수 10
     const avoidanceSlots = config.activeDays
       .flatMap((day) =>
-        Array.from({ length: config.periodsPerDay }, (_, i) => ({ day, period: i + 1 })),
+        Array.from({ length: config.periodsPerDay }, (_, i) => ({
+          day,
+          period: i + 1,
+        })),
       )
       .slice(0, 25)
     const policy = createPolicy({ avoidanceSlots })
@@ -97,7 +103,10 @@ describe('validateTeacherPolicy', () => {
     // 총 슬롯 30, 80% = 24개 회피, 가용 6개 (시수 5만 되도록 교사 조정)
     const avoidanceSlots = config.activeDays
       .flatMap((day) =>
-        Array.from({ length: config.periodsPerDay }, (_, i) => ({ day, period: i + 1 })),
+        Array.from({ length: config.periodsPerDay }, (_, i) => ({
+          day,
+          period: i + 1,
+        })),
       )
       .slice(0, 24)
     const policy = createPolicy({ avoidanceSlots })
@@ -199,7 +208,10 @@ describe('validateAllPolicies', () => {
   it('에러가 있으면 valid: false', () => {
     const config = createSchoolConfig()
     const allSlots = config.activeDays.flatMap((day) =>
-      Array.from({ length: config.periodsPerDay }, (_, i) => ({ day, period: i + 1 })),
+      Array.from({ length: config.periodsPerDay }, (_, i) => ({
+        day,
+        period: i + 1,
+      })),
     )
     const policies = [createPolicy({ avoidanceSlots: allSlots })]
     const teachers = [createTeacher()]
@@ -262,6 +274,8 @@ describe('validateAllPolicies', () => {
 
     const result = validateAllPolicies(policies, [teacher1, teacher2], config)
     expect(result.valid).toBe(false)
-    expect(result.messages.filter((m) => m.teacherId === 'teacher-2')).toHaveLength(1)
+    expect(
+      result.messages.filter((m) => m.teacherId === 'teacher-2'),
+    ).toHaveLength(1)
   })
 })

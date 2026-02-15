@@ -27,7 +27,10 @@ interface ChangeHistoryState {
   markLastUndone: (snapshotId: string) => Promise<void>
   markLastRedone: (snapshotId: string) => Promise<void>
   appendRecomputeEvent: (snapshotId: string) => Promise<void>
-  confirmTempModified: (snapshotId: string, cellKeys: Array<CellKey>) => Promise<void>
+  confirmTempModified: (
+    snapshotId: string,
+    cellKeys: Array<CellKey>,
+  ) => Promise<void>
 }
 
 export const useChangeHistoryStore = create<ChangeHistoryState>((set, get) => ({

@@ -16,7 +16,10 @@ describe('compressToUrl / decompressFromUrl', () => {
   })
 
   it('큰 데이터도 round-trip이 성공한다', () => {
-    const bigArray = Array.from({ length: 500 }, (_, i) => ({ idx: i, val: `item-${i}` }))
+    const bigArray = Array.from({ length: 500 }, (_, i) => ({
+      idx: i,
+      val: `item-${i}`,
+    }))
     const original = JSON.stringify(bigArray)
     const compressed = compressToUrl(original)
     expect(decompressFromUrl(compressed)).toBe(original)

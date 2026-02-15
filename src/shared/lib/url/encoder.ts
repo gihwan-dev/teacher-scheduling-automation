@@ -49,11 +49,22 @@ export function buildSharePayload(
       s: t.subjectIds.map((id) => subjectIdToIndex.get(id) ?? -1),
       h: t.baseHoursPerWeek,
       ca: t.classAssignments.map(
-        (ca) => [ca.grade, ca.classNumber, ca.hoursPerWeek] as [number, number, number],
+        (ca) =>
+          [ca.grade, ca.classNumber, ca.hoursPerWeek] as [
+            number,
+            number,
+            number,
+          ],
       ),
     })),
     grid: snapshot.cells.map((cell) =>
-      encodeCell(cell, schoolConfig, activeDayIndices, teacherIdToIndex, subjectIdToIndex),
+      encodeCell(
+        cell,
+        schoolConfig,
+        activeDayIndices,
+        teacherIdToIndex,
+        subjectIdToIndex,
+      ),
     ),
     policy: {
       sc: constraintPolicy.studentMaxConsecutiveSameSubject,
@@ -110,7 +121,9 @@ export function computeFlatIndex(
   const dayIndex = DAY_TO_INDEX[day]
   const dayPositionInActive = activeDayIndices.indexOf(dayIndex)
 
-  const maxClassPerGrade = Math.max(...Object.values(schoolConfig.classCountByGrade))
+  const maxClassPerGrade = Math.max(
+    ...Object.values(schoolConfig.classCountByGrade),
+  )
   const slotsPerClass = activeDayIndices.length * schoolConfig.periodsPerDay
 
   return (

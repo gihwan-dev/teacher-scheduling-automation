@@ -1,6 +1,13 @@
 import type { DayOfWeek } from './types'
 
-export const DAYS_OF_WEEK: Array<DayOfWeek> = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+export const DAYS_OF_WEEK: Array<DayOfWeek> = [
+  'MON',
+  'TUE',
+  'WED',
+  'THU',
+  'FRI',
+  'SAT',
+]
 
 export const DAY_LABELS: Record<DayOfWeek, string> = {
   MON: '월',

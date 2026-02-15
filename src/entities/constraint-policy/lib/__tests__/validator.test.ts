@@ -5,7 +5,9 @@ import type { TimetableCell } from '@/entities/timetable'
 
 const ts = '2024-01-01T00:00:00.000Z'
 
-function makePolicy(overrides: Partial<ConstraintPolicy> = {}): ConstraintPolicy {
+function makePolicy(
+  overrides: Partial<ConstraintPolicy> = {},
+): ConstraintPolicy {
   return {
     id: 'policy-1',
     studentMaxConsecutiveSameSubject: 2,
@@ -44,8 +46,18 @@ describe('validateTimetable', () => {
 
   it('교사 충돌: 같은 시간에 2개 반 배정 시 TEACHER_CONFLICT 검출', () => {
     const cells: Array<TimetableCell> = [
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 1, classNumber: 1 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 1, classNumber: 2 }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 1,
+        classNumber: 1,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 1,
+        classNumber: 2,
+      }),
     ]
     const result = validateTimetable(cells, makePolicy())
     expect(result).toHaveLength(1)
@@ -64,7 +76,9 @@ describe('validateTimetable', () => {
     ]
     const policy = makePolicy({ studentMaxConsecutiveSameSubject: 2 })
     const result = validateTimetable(cells, policy)
-    const consecutive = result.filter((v) => v.type === 'STUDENT_CONSECUTIVE_EXCEEDED')
+    const consecutive = result.filter(
+      (v) => v.type === 'STUDENT_CONSECUTIVE_EXCEEDED',
+    )
     expect(consecutive).toHaveLength(1)
     expect(consecutive[0].location.subjectId).toBe('sub-1')
     expect(consecutive[0].location.grade).toBe(1)
@@ -73,15 +87,42 @@ describe('validateTimetable', () => {
 
   it('교사 연속 수업 초과 시 TEACHER_CONSECUTIVE_EXCEEDED 검출', () => {
     const cells: Array<TimetableCell> = [
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 1, classNumber: 1 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 2, classNumber: 2 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 3, classNumber: 3 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 4, classNumber: 4 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 5, classNumber: 5 }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 1,
+        classNumber: 1,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 2,
+        classNumber: 2,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 3,
+        classNumber: 3,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 4,
+        classNumber: 4,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 5,
+        classNumber: 5,
+      }),
     ]
     const policy = makePolicy({ teacherMaxConsecutiveHours: 4 })
     const result = validateTimetable(cells, policy)
-    const exceeded = result.filter((v) => v.type === 'TEACHER_CONSECUTIVE_EXCEEDED')
+    const exceeded = result.filter(
+      (v) => v.type === 'TEACHER_CONSECUTIVE_EXCEEDED',
+    )
     expect(exceeded).toHaveLength(1)
     expect(exceeded[0].location.teacherId).toBe('teacher-1')
     expect(exceeded[0].location.day).toBe('MON')
@@ -89,13 +130,48 @@ describe('validateTimetable', () => {
 
   it('교사 일일 시수 초과 시 TEACHER_DAILY_OVERLOAD 검출', () => {
     const cells: Array<TimetableCell> = [
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 1, classNumber: 1 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 2, classNumber: 2 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 3, classNumber: 3 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 5, classNumber: 4 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 6, classNumber: 5 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 7, classNumber: 6 }),
-      makeCell({ teacherId: 'teacher-1', day: 'MON', period: 8, classNumber: 7 }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 1,
+        classNumber: 1,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 2,
+        classNumber: 2,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 3,
+        classNumber: 3,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 5,
+        classNumber: 4,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 6,
+        classNumber: 5,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 7,
+        classNumber: 6,
+      }),
+      makeCell({
+        teacherId: 'teacher-1',
+        day: 'MON',
+        period: 8,
+        classNumber: 7,
+      }),
     ]
     const policy = makePolicy({ teacherMaxDailyHours: 6 })
     const result = validateTimetable(cells, policy)

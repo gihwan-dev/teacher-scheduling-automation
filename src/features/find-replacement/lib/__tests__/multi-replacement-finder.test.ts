@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { findMultiReplacementCandidates, isCombinationCompatible } from '../multi-replacement-finder'
+import {
+  findMultiReplacementCandidates,
+  isCombinationCompatible,
+} from '../multi-replacement-finder'
 import type { ReplacementFinderContext } from '../replacement-finder'
 import type { CellKey, TimetableCell } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { SchoolConfig } from '@/entities/school'
-import type { ReplacementCandidate, ReplacementSearchConfig } from '../../model/types'
+import type {
+  ReplacementCandidate,
+  ReplacementSearchConfig,
+} from '../../model/types'
 import type { DayOfWeek } from '@/shared/lib/types'
 
 function makeCell(
-  overrides: Partial<TimetableCell> & Pick<TimetableCell, 'teacherId' | 'subjectId' | 'day' | 'period'>,
+  overrides: Partial<TimetableCell> &
+    Pick<TimetableCell, 'teacherId' | 'subjectId' | 'day' | 'period'>,
 ): TimetableCell {
   return {
     grade: 1,
@@ -19,7 +26,12 @@ function makeCell(
   }
 }
 
-function makeCellKey(grade: number, classNumber: number, day: DayOfWeek, period: number): CellKey {
+function makeCellKey(
+  grade: number,
+  classNumber: number,
+  day: DayOfWeek,
+  period: number,
+): CellKey {
   return `${grade}-${classNumber}-${day}-${period}`
 }
 
@@ -48,7 +60,9 @@ const defaultConfig: ReplacementSearchConfig = {
   maxCandidates: 20,
 }
 
-function makeContext(overrides?: Partial<ReplacementFinderContext>): ReplacementFinderContext {
+function makeContext(
+  overrides?: Partial<ReplacementFinderContext>,
+): ReplacementFinderContext {
   return {
     schoolConfig: defaultSchoolConfig,
     constraintPolicy: defaultPolicy,
@@ -67,8 +81,18 @@ describe('isCombinationCompatible', () => {
           type: 'SWAP' as const,
           sourceCellKey: '1-1-MON-1' as CellKey,
           targetCellKey: '1-1-MON-2' as CellKey,
-          resultTargetCell: makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 2 }),
-          resultSourceCell: makeCell({ teacherId: 'T2', subjectId: 'S2', day: 'MON', period: 1 }),
+          resultTargetCell: makeCell({
+            teacherId: 'T1',
+            subjectId: 'S1',
+            day: 'MON',
+            period: 2,
+          }),
+          resultSourceCell: makeCell({
+            teacherId: 'T2',
+            subjectId: 'S2',
+            day: 'MON',
+            period: 1,
+          }),
         } as ReplacementCandidate,
       },
       {
@@ -77,8 +101,18 @@ describe('isCombinationCompatible', () => {
           type: 'SWAP' as const,
           sourceCellKey: '1-1-TUE-1' as CellKey,
           targetCellKey: '1-1-TUE-2' as CellKey,
-          resultTargetCell: makeCell({ teacherId: 'T3', subjectId: 'S3', day: 'TUE', period: 2 }),
-          resultSourceCell: makeCell({ teacherId: 'T4', subjectId: 'S4', day: 'TUE', period: 1 }),
+          resultTargetCell: makeCell({
+            teacherId: 'T3',
+            subjectId: 'S3',
+            day: 'TUE',
+            period: 2,
+          }),
+          resultSourceCell: makeCell({
+            teacherId: 'T4',
+            subjectId: 'S4',
+            day: 'TUE',
+            period: 1,
+          }),
         } as ReplacementCandidate,
       },
     ]
@@ -94,8 +128,18 @@ describe('isCombinationCompatible', () => {
           type: 'SWAP' as const,
           sourceCellKey: '1-1-MON-1' as CellKey,
           targetCellKey: '1-1-MON-3' as CellKey,
-          resultTargetCell: makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 3 }),
-          resultSourceCell: makeCell({ teacherId: 'T3', subjectId: 'S3', day: 'MON', period: 1 }),
+          resultTargetCell: makeCell({
+            teacherId: 'T1',
+            subjectId: 'S1',
+            day: 'MON',
+            period: 3,
+          }),
+          resultSourceCell: makeCell({
+            teacherId: 'T3',
+            subjectId: 'S3',
+            day: 'MON',
+            period: 1,
+          }),
         } as ReplacementCandidate,
       },
       {
@@ -104,8 +148,18 @@ describe('isCombinationCompatible', () => {
           type: 'SWAP' as const,
           sourceCellKey: '1-1-MON-2' as CellKey,
           targetCellKey: '1-1-MON-3' as CellKey, // 같은 타겟 슬롯!
-          resultTargetCell: makeCell({ teacherId: 'T2', subjectId: 'S2', day: 'MON', period: 3 }),
-          resultSourceCell: makeCell({ teacherId: 'T3', subjectId: 'S3', day: 'MON', period: 2 }),
+          resultTargetCell: makeCell({
+            teacherId: 'T2',
+            subjectId: 'S2',
+            day: 'MON',
+            period: 3,
+          }),
+          resultSourceCell: makeCell({
+            teacherId: 'T3',
+            subjectId: 'S3',
+            day: 'MON',
+            period: 2,
+          }),
         } as ReplacementCandidate,
       },
     ]
@@ -123,7 +177,12 @@ describe('isCombinationCompatible', () => {
           type: 'MOVE' as const,
           sourceCellKey: '1-1-MON-1' as CellKey,
           targetCellKey: '1-1-MON-3' as CellKey,
-          resultTargetCell: makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 3 }),
+          resultTargetCell: makeCell({
+            teacherId: 'T1',
+            subjectId: 'S1',
+            day: 'MON',
+            period: 3,
+          }),
           resultSourceCell: null,
         } as ReplacementCandidate,
       },
@@ -133,7 +192,12 @@ describe('isCombinationCompatible', () => {
           type: 'MOVE' as const,
           sourceCellKey: '1-1-TUE-1' as CellKey,
           targetCellKey: '1-1-MON-4' as CellKey,
-          resultTargetCell: makeCell({ teacherId: 'T1', subjectId: 'S2', day: 'MON', period: 3 }), // T1이 MON-3에 또 배치
+          resultTargetCell: makeCell({
+            teacherId: 'T1',
+            subjectId: 'S2',
+            day: 'MON',
+            period: 3,
+          }), // T1이 MON-3에 또 배치
           resultSourceCell: null,
         } as ReplacementCandidate,
       },
@@ -157,7 +221,12 @@ describe('findMultiReplacementCandidates', () => {
       makeCellKey(1, 1, 'TUE', 1),
     ]
 
-    const result = findMultiReplacementCandidates(sourceKeys, cells, defaultConfig, makeContext())
+    const result = findMultiReplacementCandidates(
+      sourceKeys,
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     expect(result.perSourceResults).toHaveLength(2)
     expect(result.stats.totalCombinationsExamined).toBeGreaterThan(0)
@@ -195,7 +264,12 @@ describe('findMultiReplacementCandidates', () => {
       makeCellKey(1, 1, 'TUE', 1),
     ]
 
-    const result = findMultiReplacementCandidates(sourceKeys, cells, defaultConfig, makeContext())
+    const result = findMultiReplacementCandidates(
+      sourceKeys,
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     expect(result.perSourceResults).toHaveLength(2)
     expect(result.perSourceResults[0].sourceKey).toBe(sourceKeys[0])
@@ -209,7 +283,12 @@ describe('findMultiReplacementCandidates', () => {
     ]
     const sourceKeys: Array<CellKey> = [makeCellKey(1, 1, 'MON', 1)]
 
-    const result = findMultiReplacementCandidates(sourceKeys, cells, defaultConfig, makeContext())
+    const result = findMultiReplacementCandidates(
+      sourceKeys,
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     expect(typeof result.stats.timedOut).toBe('boolean')
     expect(typeof result.stats.searchTimeMs).toBe('number')

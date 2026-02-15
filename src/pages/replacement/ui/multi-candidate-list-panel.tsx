@@ -27,8 +27,12 @@ interface MultiCandidateListPanelProps {
 }
 
 export function MultiCandidateListPanel(_props: MultiCandidateListPanelProps) {
-  const { multiSearchResult, selectedMultiCandidate, selectMultiCandidate, confirmMultiReplacement } =
-    useReplacementStore()
+  const {
+    multiSearchResult,
+    selectedMultiCandidate,
+    selectMultiCandidate,
+    confirmMultiReplacement,
+  } = useReplacementStore()
   const [isConfirming, setIsConfirming] = useState(false)
 
   if (!multiSearchResult) return null
@@ -47,8 +51,13 @@ export function MultiCandidateListPanel(_props: MultiCandidateListPanelProps) {
         <CardTitle className="text-sm font-medium">
           다중 교체 후보
           <span className="ml-2 text-xs text-muted-foreground font-normal">
-            {stats.validCombinations}건 / {stats.totalCombinationsExamined}건 조합 ({stats.searchTimeMs}ms)
-            {stats.timedOut && <Badge variant="secondary" className="ml-1 text-[10px]">시간 초과</Badge>}
+            {stats.validCombinations}건 / {stats.totalCombinationsExamined}건
+            조합 ({stats.searchTimeMs}ms)
+            {stats.timedOut && (
+              <Badge variant="secondary" className="ml-1 text-[10px]">
+                시간 초과
+              </Badge>
+            )}
           </span>
         </CardTitle>
       </CardHeader>
@@ -74,20 +83,27 @@ export function MultiCandidateListPanel(_props: MultiCandidateListPanelProps) {
             {selectedMultiCandidate && (
               <AlertDialog>
                 <AlertDialogTrigger
-                  render={<Button className="w-full mt-3" disabled={isConfirming} />}
+                  render={
+                    <Button className="w-full mt-3" disabled={isConfirming} />
+                  }
                 >
                   다중 교체 확정
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>다중 교체를 확정하시겠습니까?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      다중 교체를 확정하시겠습니까?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      선택한 {selectedMultiCandidate.sources.length}개 셀의 교체를 동시에 적용합니다. 이 작업은 즉시 저장됩니다.
+                      선택한 {selectedMultiCandidate.sources.length}개 셀의
+                      교체를 동시에 적용합니다. 이 작업은 즉시 저장됩니다.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>취소</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirm}>확정</AlertDialogAction>
+                    <AlertDialogAction onClick={handleConfirm}>
+                      확정
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -112,7 +128,8 @@ function MultiCandidateRow({
 }) {
   const { combinedRanking, sources } = candidate
   const scoreDelta = combinedRanking.combinedScoreDelta
-  const scoreDeltaLabel = scoreDelta > 0 ? `+${scoreDelta.toFixed(1)}` : scoreDelta.toFixed(1)
+  const scoreDeltaLabel =
+    scoreDelta > 0 ? `+${scoreDelta.toFixed(1)}` : scoreDelta.toFixed(1)
 
   return (
     <button
@@ -123,14 +140,19 @@ function MultiCandidateRow({
       onClick={onSelect}
     >
       <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground w-5 shrink-0">{rank}</span>
+        <span className="text-xs text-muted-foreground w-5 shrink-0">
+          {rank}
+        </span>
         <span className="flex-1">
           {sources.map(({ candidate: c }, i) => {
             const target = parseCellKey(c.targetCellKey)
             return (
               <span key={i}>
                 {i > 0 && ' / '}
-                <Badge variant={c.type === 'SWAP' ? 'default' : 'secondary'} className="text-[10px] mr-1">
+                <Badge
+                  variant={c.type === 'SWAP' ? 'default' : 'secondary'}
+                  className="text-[10px] mr-1"
+                >
                   {c.type === 'SWAP' ? '교환' : '이동'}
                 </Badge>
                 {DAY_LABELS[target.day]} {target.period}교시
@@ -138,7 +160,12 @@ function MultiCandidateRow({
             )
           })}
         </span>
-        <span className={cn('text-xs shrink-0', scoreDelta >= 0 ? 'text-green-600' : 'text-destructive')}>
+        <span
+          className={cn(
+            'text-xs shrink-0',
+            scoreDelta >= 0 ? 'text-green-600' : 'text-destructive',
+          )}
+        >
           {scoreDeltaLabel}
         </span>
         {combinedRanking.totalViolationCount > 0 && (

@@ -35,10 +35,19 @@ export const useShareStore = create<ShareState>((set, get) => ({
   isImported: false,
 
   generateShareUrl: async () => {
-    set({ isGenerating: true, generateError: null, generatedUrl: null, urlLength: 0 })
+    set({
+      isGenerating: true,
+      generateError: null,
+      generatedUrl: null,
+      urlLength: 0,
+    })
     try {
       const result = await buildShareUrl()
-      set({ generatedUrl: result.url, urlLength: result.urlLength, isGenerating: false })
+      set({
+        generatedUrl: result.url,
+        urlLength: result.urlLength,
+        isGenerating: false,
+      })
     } catch (e) {
       set({ generateError: (e as Error).message, isGenerating: false })
     }

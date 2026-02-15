@@ -2,15 +2,27 @@ import { create } from 'zustand'
 
 import { buildCellMap, makeCellKey, parseCellKey } from '../lib/cell-key'
 import { isCellEditable, validateCellEdit } from '../lib/edit-validator'
-import type { ConstraintPolicy, ConstraintViolation } from '@/entities/constraint-policy'
+import type {
+  ConstraintPolicy,
+  ConstraintViolation,
+} from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
-import type { CellKey, CellStatus, EditAction, TimetableCell, TimetableSnapshot } from '@/entities/timetable'
+import type {
+  CellKey,
+  CellStatus,
+  EditAction,
+  TimetableCell,
+  TimetableSnapshot,
+} from '@/entities/timetable'
 import { validateTimetable } from '@/entities/constraint-policy'
-import { buildBlockedSlots, expandGradeBlockedSlots } from '@/features/generate-timetable'
+import {
+  buildBlockedSlots,
+  expandGradeBlockedSlots,
+} from '@/features/generate-timetable'
 import { recomputeUnlocked } from '@/features/recompute-timetable'
 import { useChangeHistoryStore } from '@/features/track-change-history'
 import {
@@ -109,12 +121,13 @@ export const useEditStore = create<EditState>((set, get) => ({
 
   loadSnapshot: async () => {
     set({ isLoading: true })
-    const [setupData, snapshot, savedPolicy, teacherPolicies] = await Promise.all([
-      loadAllSetupData(),
-      loadLatestTimetableSnapshot(),
-      loadConstraintPolicy(),
-      loadTeacherPolicies(),
-    ])
+    const [setupData, snapshot, savedPolicy, teacherPolicies] =
+      await Promise.all([
+        loadAllSetupData(),
+        loadLatestTimetableSnapshot(),
+        loadConstraintPolicy(),
+        loadTeacherPolicies(),
+      ])
 
     if (!snapshot) {
       set({
@@ -151,7 +164,12 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   setViewTarget: (grade, classNumber) => {
-    set({ viewGrade: grade, viewClassNumber: classNumber, focusedCell: null, selectedCells: new Set() })
+    set({
+      viewGrade: grade,
+      viewClassNumber: classNumber,
+      focusedCell: null,
+      selectedCells: new Set(),
+    })
   },
 
   setFocusedCell: (key) => {
@@ -163,7 +181,9 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (!schoolConfig) return
 
     const { activeDays, periodsPerDay } = schoolConfig
-    const dayIndex = focusedCell ? activeDays.indexOf(parseCellKey(focusedCell).day) : 0
+    const dayIndex = focusedCell
+      ? activeDays.indexOf(parseCellKey(focusedCell).day)
+      : 0
     const period = focusedCell ? parseCellKey(focusedCell).period : 1
 
     let newDayIndex = dayIndex
@@ -184,7 +204,12 @@ export const useEditStore = create<EditState>((set, get) => ({
         break
     }
 
-    const newKey = makeCellKey(viewGrade, viewClassNumber, activeDays[newDayIndex], newPeriod)
+    const newKey = makeCellKey(
+      viewGrade,
+      viewClassNumber,
+      activeDays[newDayIndex],
+      newPeriod,
+    )
     set({ focusedCell: newKey })
   },
 
@@ -220,8 +245,18 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   confirmEdit: () => {
-    const { editingCellKey, editDraft, cells, constraintPolicy, teacherPolicies, fixedEvents, schoolConfig, snapshot } = get()
-    if (!editingCellKey || !editDraft || !constraintPolicy || !schoolConfig) return
+    const {
+      editingCellKey,
+      editDraft,
+      cells,
+      constraintPolicy,
+      teacherPolicies,
+      fixedEvents,
+      schoolConfig,
+      snapshot,
+    } = get()
+    if (!editingCellKey || !editDraft || !constraintPolicy || !schoolConfig)
+      return
 
     // 빈 draft인 경우 편집 취소
     if (!editDraft.teacherId || !editDraft.subjectId) {
@@ -231,7 +266,10 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     // blocked slots 구축
     let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
-    blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
+    blockedSlots = expandGradeBlockedSlots(
+      blockedSlots,
+      schoolConfig.classCountByGrade,
+    )
 
     // 검증
     const result = validateCellEdit(
@@ -277,7 +315,10 @@ export const useEditStore = create<EditState>((set, get) => ({
     // cells 업데이트
     const newCells = oldCell
       ? cells.map((c) =>
-          c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period
             ? newCell
             : c,
         )
@@ -329,9 +370,17 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     const { grade, classNumber, day, period } = parseCellKey(key)
     const newCells = cells.filter(
-      (c) => !(c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period),
+      (c) =>
+        !(
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period
+        ),
     )
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -361,7 +410,11 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (!cell || cell.isFixed) return
 
     const isLocking = cell.status !== 'LOCKED'
-    const newStatus: CellStatus = isLocking ? 'LOCKED' : (cell.status === 'LOCKED' ? 'CONFIRMED_MODIFIED' : cell.status)
+    const newStatus: CellStatus = isLocking
+      ? 'LOCKED'
+      : cell.status === 'LOCKED'
+        ? 'CONFIRMED_MODIFIED'
+        : cell.status
 
     const action: EditAction = {
       type: isLocking ? 'LOCK' : 'UNLOCK',
@@ -373,12 +426,17 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     const { grade, classNumber, day, period } = parseCellKey(key)
     const newCells = cells.map((c) =>
-      c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period
+      c.grade === grade &&
+      c.classNumber === classNumber &&
+      c.day === day &&
+      c.period === period
         ? { ...c, status: newStatus }
         : c,
     )
 
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -403,7 +461,14 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   lockSelected: () => {
-    const { selectedCells, cells, cellMap, constraintPolicy, undoStack, snapshot } = get()
+    const {
+      selectedCells,
+      cells,
+      cellMap,
+      constraintPolicy,
+      undoStack,
+      snapshot,
+    } = get()
     if (selectedCells.size === 0) return
 
     const actions: Array<EditAction> = []
@@ -423,7 +488,10 @@ export const useEditStore = create<EditState>((set, get) => ({
 
       const { grade, classNumber, day, period } = parseCellKey(key)
       newCells = newCells.map((c) =>
-        c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period
+        c.grade === grade &&
+        c.classNumber === classNumber &&
+        c.day === day &&
+        c.period === period
           ? { ...c, status: 'LOCKED' as CellStatus }
           : c,
       )
@@ -431,7 +499,9 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     if (actions.length === 0) return
 
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -459,7 +529,14 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   unlockSelected: () => {
-    const { selectedCells, cells, cellMap, constraintPolicy, undoStack, snapshot } = get()
+    const {
+      selectedCells,
+      cells,
+      cellMap,
+      constraintPolicy,
+      undoStack,
+      snapshot,
+    } = get()
     if (selectedCells.size === 0) return
 
     const actions: Array<EditAction> = []
@@ -479,7 +556,10 @@ export const useEditStore = create<EditState>((set, get) => ({
 
       const { grade, classNumber, day, period } = parseCellKey(key)
       newCells = newCells.map((c) =>
-        c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period
+        c.grade === grade &&
+        c.classNumber === classNumber &&
+        c.day === day &&
+        c.period === period
           ? { ...c, status: 'CONFIRMED_MODIFIED' as CellStatus }
           : c,
       )
@@ -487,7 +567,9 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     if (actions.length === 0) return
 
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -527,16 +609,29 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (action.before === null) {
       // 이전에 셀이 없었음 → 현재 셀 제거
       newCells = cells.filter(
-        (c) => !(c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period),
+        (c) =>
+          !(
+            c.grade === grade &&
+            c.classNumber === classNumber &&
+            c.day === day &&
+            c.period === period
+          ),
       )
     } else {
       // 이전 셀로 복원
       const exists = cells.some(
-        (c) => c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period,
+        (c) =>
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period,
       )
       if (exists) {
         newCells = cells.map((c) =>
-          c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period
             ? action.before!
             : c,
         )
@@ -545,7 +640,9 @@ export const useEditStore = create<EditState>((set, get) => ({
       }
     }
 
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -575,15 +672,28 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (action.after === null) {
       // 셀 제거 (clear 재적용)
       newCells = cells.filter(
-        (c) => !(c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period),
+        (c) =>
+          !(
+            c.grade === grade &&
+            c.classNumber === classNumber &&
+            c.day === day &&
+            c.period === period
+          ),
       )
     } else {
       const exists = cells.some(
-        (c) => c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period,
+        (c) =>
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period,
       )
       if (exists) {
         newCells = cells.map((c) =>
-          c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period
             ? action.after!
             : c,
         )
@@ -592,7 +702,9 @@ export const useEditStore = create<EditState>((set, get) => ({
       }
     }
 
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -610,7 +722,16 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   recompute: async () => {
-    const { cells, schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies, snapshot } = get()
+    const {
+      cells,
+      schoolConfig,
+      teachers,
+      subjects,
+      fixedEvents,
+      constraintPolicy,
+      teacherPolicies,
+      snapshot,
+    } = get()
     if (!schoolConfig || !constraintPolicy) return
 
     set({ isRecomputing: true })
@@ -676,7 +797,11 @@ export const useEditStore = create<EditState>((set, get) => ({
     const actions: Array<EditAction> = tempModifiedKeys.map((key) => {
       const { grade, classNumber, day, period } = parseCellKey(key)
       const oldCell = cells.find(
-        (c) => c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period,
+        (c) =>
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period,
       )!
       return {
         type: 'MOVE' as const, // CONFIRM action uses MOVE type in EditAction union
@@ -687,7 +812,9 @@ export const useEditStore = create<EditState>((set, get) => ({
       }
     })
 
-    const violations = constraintPolicy ? validateTimetable(newCells, constraintPolicy) : []
+    const violations = constraintPolicy
+      ? validateTimetable(newCells, constraintPolicy)
+      : []
 
     set({
       cells: newCells,
@@ -700,7 +827,9 @@ export const useEditStore = create<EditState>((set, get) => ({
 
     // 이력 기록
     if (snapshot) {
-      useChangeHistoryStore.getState().confirmTempModified(snapshot.id, tempModifiedKeys)
+      useChangeHistoryStore
+        .getState()
+        .confirmTempModified(snapshot.id, tempModifiedKeys)
     }
   },
 }))

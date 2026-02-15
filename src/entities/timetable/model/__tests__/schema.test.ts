@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { cellStatusSchema, timetableCellSchema, timetableSnapshotSchema } from '../schema'
+import {
+  cellStatusSchema,
+  timetableCellSchema,
+  timetableSnapshotSchema,
+} from '../schema'
 
 describe('timetableCellSchema', () => {
   const validCell = {
@@ -27,37 +31,59 @@ describe('timetableCellSchema', () => {
   })
 
   it('유효한 status 값을 통과시킨다', () => {
-    for (const status of ['BASE', 'TEMP_MODIFIED', 'CONFIRMED_MODIFIED', 'LOCKED'] as const) {
-      expect(timetableCellSchema.safeParse({ ...validCell, status }).success).toBe(true)
+    for (const status of [
+      'BASE',
+      'TEMP_MODIFIED',
+      'CONFIRMED_MODIFIED',
+      'LOCKED',
+    ] as const) {
+      expect(
+        timetableCellSchema.safeParse({ ...validCell, status }).success,
+      ).toBe(true)
     }
   })
 
   it('잘못된 status 값을 거부한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, status: 'INVALID' }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, status: 'INVALID' })
+        .success,
+    ).toBe(false)
   })
 
   it('teacherId가 빈 문자열이면 실패한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, teacherId: '' }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, teacherId: '' }).success,
+    ).toBe(false)
   })
 
   it('subjectId가 빈 문자열이면 실패한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, subjectId: '' }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, subjectId: '' }).success,
+    ).toBe(false)
   })
 
   it('grade가 0이면 실패한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, grade: 0 }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, grade: 0 }).success,
+    ).toBe(false)
   })
 
   it('grade가 4이면 실패한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, grade: 4 }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, grade: 4 }).success,
+    ).toBe(false)
   })
 
   it('period가 0이면 실패한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, period: 0 }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, period: 0 }).success,
+    ).toBe(false)
   })
 
   it('period가 11이면 실패한다', () => {
-    expect(timetableCellSchema.safeParse({ ...validCell, period: 11 }).success).toBe(false)
+    expect(
+      timetableCellSchema.safeParse({ ...validCell, period: 11 }).success,
+    ).toBe(false)
   })
 })
 
@@ -102,19 +128,24 @@ describe('timetableSnapshotSchema', () => {
 
   it('cells가 빈 배열이어도 통과한다', () => {
     expect(
-      timetableSnapshotSchema.safeParse({ ...validSnapshot, cells: [] }).success,
+      timetableSnapshotSchema.safeParse({ ...validSnapshot, cells: [] })
+        .success,
     ).toBe(true)
   })
 
   it('score가 음수이면 실패한다', () => {
     expect(
-      timetableSnapshotSchema.safeParse({ ...validSnapshot, score: -1 }).success,
+      timetableSnapshotSchema.safeParse({ ...validSnapshot, score: -1 })
+        .success,
     ).toBe(false)
   })
 
   it('generationTimeMs가 음수이면 실패한다', () => {
     expect(
-      timetableSnapshotSchema.safeParse({ ...validSnapshot, generationTimeMs: -1 }).success,
+      timetableSnapshotSchema.safeParse({
+        ...validSnapshot,
+        generationTimeMs: -1,
+      }).success,
     ).toBe(false)
   })
 })

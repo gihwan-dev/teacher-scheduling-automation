@@ -25,26 +25,36 @@ export function PolicyValidationSummary() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           검증 결과
-          {errors.length > 0 && <Badge variant="destructive">오류 {errors.length}</Badge>}
-          {warnings.length > 0 && <Badge variant="secondary">경고 {warnings.length}</Badge>}
+          {errors.length > 0 && (
+            <Badge variant="destructive">오류 {errors.length}</Badge>
+          )}
+          {warnings.length > 0 && (
+            <Badge variant="secondary">경고 {warnings.length}</Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <ul className="space-y-2">
           {errors.map((msg, i) => (
             <li key={`error-${i}`} className="flex items-start gap-2 text-sm">
-              <span className="text-destructive font-medium shrink-0">[오류]</span>
+              <span className="text-destructive font-medium shrink-0">
+                [오류]
+              </span>
               <span>
                 {msg.message}
                 {msg.guide && (
-                  <span className="text-muted-foreground ml-1">— {msg.guide}</span>
+                  <span className="text-muted-foreground ml-1">
+                    — {msg.guide}
+                  </span>
                 )}
               </span>
             </li>
           ))}
           {warnings.map((msg, i) => (
             <li key={`warn-${i}`} className="flex items-start gap-2 text-sm">
-              <span className="text-yellow-600 font-medium shrink-0">[경고]</span>
+              <span className="text-yellow-600 font-medium shrink-0">
+                [경고]
+              </span>
               <span>{msg.message}</span>
             </li>
           ))}

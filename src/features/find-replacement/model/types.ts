@@ -73,5 +73,8 @@ export interface MultiReplacementSearchResult {
     searchTimeMs: number
     timedOut: boolean
   }
-  perSourceResults: Array<{ sourceKey: CellKey; result: ReplacementSearchResult }>
+  perSourceResults: Array<{
+    sourceKey: CellKey
+    result: ReplacementSearchResult
+  }>
 }

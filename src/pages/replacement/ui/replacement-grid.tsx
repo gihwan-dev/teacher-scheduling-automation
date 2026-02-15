@@ -20,7 +20,11 @@ interface ReplacementGridProps {
   subjects: Array<Subject>
 }
 
-export function ReplacementGrid({ schoolConfig, teachers, subjects }: ReplacementGridProps) {
+export function ReplacementGrid({
+  schoolConfig,
+  teachers,
+  subjects,
+}: ReplacementGridProps) {
   const {
     cellMap,
     targetCellKey,
@@ -54,7 +58,11 @@ export function ReplacementGrid({ schoolConfig, teachers, subjects }: Replacemen
     }
   }
 
-  const handleCellClick = (key: CellKey, cell: TimetableCell | undefined, isFixedOrLocked: boolean) => {
+  const handleCellClick = (
+    key: CellKey,
+    cell: TimetableCell | undefined,
+    isFixedOrLocked: boolean,
+  ) => {
     if (isFixedOrLocked || !cell) return
 
     if (isMultiMode) {
@@ -78,13 +86,22 @@ export function ReplacementGrid({ schoolConfig, teachers, subjects }: Replacemen
       <div
         role="row"
         className="grid border-b bg-muted/50"
-        style={{ gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)` }}
+        style={{
+          gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)`,
+        }}
       >
-        <div role="columnheader" className="p-2 text-center text-xs font-medium text-muted-foreground">
+        <div
+          role="columnheader"
+          className="p-2 text-center text-xs font-medium text-muted-foreground"
+        >
           교시
         </div>
         {activeDays.map((day) => (
-          <div key={day} role="columnheader" className="p-2 text-center text-xs font-medium text-muted-foreground border-l">
+          <div
+            key={day}
+            role="columnheader"
+            className="p-2 text-center text-xs font-medium text-muted-foreground border-l"
+          >
             {DAY_LABELS[day]}
           </div>
         ))}
@@ -96,9 +113,14 @@ export function ReplacementGrid({ schoolConfig, teachers, subjects }: Replacemen
           key={period}
           role="row"
           className="grid border-b last:border-b-0"
-          style={{ gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)` }}
+          style={{
+            gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)`,
+          }}
         >
-          <div role="rowheader" className="p-2 text-center text-xs font-medium text-muted-foreground flex items-center justify-center">
+          <div
+            role="rowheader"
+            className="p-2 text-center text-xs font-medium text-muted-foreground flex items-center justify-center"
+          >
             {period}
           </div>
           {activeDays.map((day) => {
@@ -108,12 +130,18 @@ export function ReplacementGrid({ schoolConfig, teachers, subjects }: Replacemen
 
             // 단일 모드 상태
             const isSource = !isMultiMode && targetCellKey === key
-            const isCandidateTarget = !isMultiMode && candidateTargetKeys.has(key)
+            const isCandidateTarget =
+              !isMultiMode && candidateTargetKeys.has(key)
 
             // 다중 모드 상태
-            const multiIndex = isMultiMode ? multiTargetCellKeys.indexOf(key) : -1
+            const multiIndex = isMultiMode
+              ? multiTargetCellKeys.indexOf(key)
+              : -1
             const isMultiSelected = multiIndex >= 0
-            const isMultiCandidateTarget = isMultiMode && multiCandidateTargetKeys.has(key) && !isMultiSelected
+            const isMultiCandidateTarget =
+              isMultiMode &&
+              multiCandidateTargetKeys.has(key) &&
+              !isMultiSelected
 
             return (
               <div
@@ -129,28 +157,42 @@ export function ReplacementGrid({ schoolConfig, teachers, subjects }: Replacemen
                   isSource && 'ring-2 ring-destructive ring-inset',
                   isCandidateTarget && !isSource && 'bg-primary/20',
                   // 다중 모드
-                  isMultiSelected && `ring-2 ring-inset ${MULTI_COLORS[multiIndex % MULTI_COLORS.length]}`,
+                  isMultiSelected &&
+                    `ring-2 ring-inset ${MULTI_COLORS[multiIndex % MULTI_COLORS.length]}`,
                   isMultiCandidateTarget && 'bg-primary/10',
                   // 호버
-                  !isSource && !isCandidateTarget && !isMultiSelected && !isMultiCandidateTarget && !isFixedOrLocked && 'hover:bg-muted/30',
+                  !isSource &&
+                    !isCandidateTarget &&
+                    !isMultiSelected &&
+                    !isMultiCandidateTarget &&
+                    !isFixedOrLocked &&
+                    'hover:bg-muted/30',
                 )}
                 onClick={() => handleCellClick(key, cell, !!isFixedOrLocked)}
               >
                 {/* 다중 모드 번호 뱃지 */}
                 {isMultiSelected && (
-                  <span className={cn(
-                    'absolute top-0.5 right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white',
-                    multiIndex === 0 && 'bg-blue-500',
-                    multiIndex === 1 && 'bg-orange-500',
-                    multiIndex === 2 && 'bg-purple-500',
-                  )}>
+                  <span
+                    className={cn(
+                      'absolute top-0.5 right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-white',
+                      multiIndex === 0 && 'bg-blue-500',
+                      multiIndex === 1 && 'bg-orange-500',
+                      multiIndex === 2 && 'bg-purple-500',
+                    )}
+                  >
                     {multiIndex + 1}
                   </span>
                 )}
                 {cell ? (
-                  <CellContent cell={cell} teacherMap={teacherMap} subjectMap={subjectMap} />
+                  <CellContent
+                    cell={cell}
+                    teacherMap={teacherMap}
+                    subjectMap={subjectMap}
+                  />
                 ) : (
-                  <span className="text-muted-foreground text-xs flex h-full items-center justify-center">-</span>
+                  <span className="text-muted-foreground text-xs flex h-full items-center justify-center">
+                    -
+                  </span>
                 )}
               </div>
             )
@@ -175,8 +217,12 @@ function CellContent({
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-0.5">
-      <div className="text-xs font-medium leading-tight">{subject?.abbreviation ?? cell.subjectId}</div>
-      <div className="text-muted-foreground text-[10px] leading-tight">{teacher?.name ?? cell.teacherId}</div>
+      <div className="text-xs font-medium leading-tight">
+        {subject?.abbreviation ?? cell.subjectId}
+      </div>
+      <div className="text-muted-foreground text-[10px] leading-tight">
+        {teacher?.name ?? cell.teacherId}
+      </div>
       <StatusIndicator cell={cell} />
     </div>
   )

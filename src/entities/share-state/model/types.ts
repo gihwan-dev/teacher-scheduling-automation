@@ -1,1 +1,5 @@
-export type { SharePayload, CompactCell, CompactSchool } from '@/shared/lib/url/types'
+export type {
+  SharePayload,
+  CompactCell,
+  CompactSchool,
+} from '@/shared/lib/url/types'

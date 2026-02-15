@@ -47,7 +47,9 @@ export async function loadTeachers(): Promise<Array<Teacher>> {
 }
 
 // FixedEvents
-export async function saveFixedEvents(events: Array<FixedEvent>): Promise<void> {
+export async function saveFixedEvents(
+  events: Array<FixedEvent>,
+): Promise<void> {
   await db.transaction('rw', db.fixedEvents, async () => {
     await db.fixedEvents.clear()
     await db.fixedEvents.bulkPut(events)
@@ -105,33 +107,47 @@ export async function loadAllSetupData(): Promise<{
 }
 
 // TimetableSnapshot
-export async function saveTimetableSnapshot(snapshot: TimetableSnapshot): Promise<void> {
+export async function saveTimetableSnapshot(
+  snapshot: TimetableSnapshot,
+): Promise<void> {
   await db.timetableSnapshots.put(snapshot)
 }
 
-export async function loadLatestTimetableSnapshot(): Promise<TimetableSnapshot | undefined> {
+export async function loadLatestTimetableSnapshot(): Promise<
+  TimetableSnapshot | undefined
+> {
   return db.timetableSnapshots.orderBy('createdAt').last()
 }
 
-export async function loadTimetableSnapshotById(id: string): Promise<TimetableSnapshot | undefined> {
+export async function loadTimetableSnapshotById(
+  id: string,
+): Promise<TimetableSnapshot | undefined> {
   return db.timetableSnapshots.get(id)
 }
 
-export async function updateTimetableSnapshot(snapshot: TimetableSnapshot): Promise<void> {
+export async function updateTimetableSnapshot(
+  snapshot: TimetableSnapshot,
+): Promise<void> {
   await db.timetableSnapshots.put(snapshot)
 }
 
 // ConstraintPolicy
-export async function saveConstraintPolicy(policy: ConstraintPolicy): Promise<void> {
+export async function saveConstraintPolicy(
+  policy: ConstraintPolicy,
+): Promise<void> {
   await db.constraintPolicies.put(policy)
 }
 
-export async function loadConstraintPolicy(): Promise<ConstraintPolicy | undefined> {
+export async function loadConstraintPolicy(): Promise<
+  ConstraintPolicy | undefined
+> {
   return db.constraintPolicies.orderBy('updatedAt').last()
 }
 
 // TeacherPolicies
-export async function saveTeacherPolicies(policies: Array<TeacherPolicy>): Promise<void> {
+export async function saveTeacherPolicies(
+  policies: Array<TeacherPolicy>,
+): Promise<void> {
   await db.transaction('rw', db.teacherPolicies, async () => {
     await db.teacherPolicies.clear()
     await db.teacherPolicies.bulkPut(policies)
@@ -147,18 +163,27 @@ export async function saveChangeEvent(event: ChangeEvent): Promise<void> {
   await db.changeEvents.put(event)
 }
 
-export async function saveChangeEvents(events: Array<ChangeEvent>): Promise<void> {
+export async function saveChangeEvents(
+  events: Array<ChangeEvent>,
+): Promise<void> {
   await db.changeEvents.bulkPut(events)
 }
 
-export async function loadChangeEvents(snapshotId: string): Promise<Array<ChangeEvent>> {
-  return db.changeEvents.where('snapshotId').equals(snapshotId).sortBy('timestamp')
+export async function loadChangeEvents(
+  snapshotId: string,
+): Promise<Array<ChangeEvent>> {
+  return db.changeEvents
+    .where('snapshotId')
+    .equals(snapshotId)
+    .sortBy('timestamp')
 }
 
 export async function updateChangeEvent(event: ChangeEvent): Promise<void> {
   await db.changeEvents.put(event)
 }
 
-export async function deleteChangeEventsBySnapshot(snapshotId: string): Promise<void> {
+export async function deleteChangeEventsBySnapshot(
+  snapshotId: string,
+): Promise<void> {
   await db.changeEvents.where('snapshotId').equals(snapshotId).delete()
 }

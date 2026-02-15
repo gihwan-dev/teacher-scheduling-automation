@@ -4,7 +4,11 @@ import {
   loadLatestTimetableSnapshot,
   loadTeacherPolicies,
 } from '@/shared/persistence/indexeddb/repository'
-import { URL_LENGTH_MAX, buildSharePayload, compressToUrl } from '@/shared/lib/url'
+import {
+  URL_LENGTH_MAX,
+  buildSharePayload,
+  compressToUrl,
+} from '@/shared/lib/url'
 
 export interface ShareBuildResult {
   url: string
@@ -12,12 +16,13 @@ export interface ShareBuildResult {
 }
 
 export async function buildShareUrl(): Promise<ShareBuildResult> {
-  const [setupData, snapshot, constraintPolicy, teacherPolicies] = await Promise.all([
-    loadAllSetupData(),
-    loadLatestTimetableSnapshot(),
-    loadConstraintPolicy(),
-    loadTeacherPolicies(),
-  ])
+  const [setupData, snapshot, constraintPolicy, teacherPolicies] =
+    await Promise.all([
+      loadAllSetupData(),
+      loadLatestTimetableSnapshot(),
+      loadConstraintPolicy(),
+      loadTeacherPolicies(),
+    ])
 
   if (!snapshot) {
     throw new Error('시간표를 먼저 생성해주세요.')

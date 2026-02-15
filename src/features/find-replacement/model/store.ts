@@ -8,7 +8,11 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
-import type { CellKey, TimetableCell, TimetableSnapshot } from '@/entities/timetable'
+import type {
+  CellKey,
+  TimetableCell,
+  TimetableSnapshot,
+} from '@/entities/timetable'
 import type {
   MultiReplacementCandidate,
   MultiReplacementSearchResult,
@@ -107,12 +111,13 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
 
   loadSnapshot: async () => {
     set({ isLoading: true })
-    const [setupData, snapshot, savedPolicy, teacherPolicies] = await Promise.all([
-      loadAllSetupData(),
-      loadLatestTimetableSnapshot(),
-      loadConstraintPolicy(),
-      loadTeacherPolicies(),
-    ])
+    const [setupData, snapshot, savedPolicy, teacherPolicies] =
+      await Promise.all([
+        loadAllSetupData(),
+        loadLatestTimetableSnapshot(),
+        loadConstraintPolicy(),
+        loadTeacherPolicies(),
+      ])
 
     if (!snapshot) {
       set({
@@ -172,7 +177,16 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   },
 
   search: () => {
-    const { targetCellKey, cellMap, cells, searchConfig, schoolConfig, constraintPolicy, teacherPolicies, fixedEvents } = get()
+    const {
+      targetCellKey,
+      cellMap,
+      cells,
+      searchConfig,
+      schoolConfig,
+      constraintPolicy,
+      teacherPolicies,
+      fixedEvents,
+    } = get()
     if (!targetCellKey || !schoolConfig || !constraintPolicy) return
 
     const sourceCell = cellMap.get(targetCellKey)
@@ -211,18 +225,23 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
     let newCells: Array<TimetableCell>
 
     if (selectedCandidate.type === 'SWAP') {
-      const { sourceCell, targetCell, resultSourceCell, resultTargetCell } = selectedCandidate
+      const { sourceCell, targetCell, resultSourceCell, resultTargetCell } =
+        selectedCandidate
       newCells = cells.map((c) => {
         if (
-          c.grade === sourceCell.grade && c.classNumber === sourceCell.classNumber &&
-          c.day === sourceCell.day && c.period === sourceCell.period
+          c.grade === sourceCell.grade &&
+          c.classNumber === sourceCell.classNumber &&
+          c.day === sourceCell.day &&
+          c.period === sourceCell.period
         ) {
           return resultSourceCell!
         }
         if (
           targetCell &&
-          c.grade === targetCell.grade && c.classNumber === targetCell.classNumber &&
-          c.day === targetCell.day && c.period === targetCell.period
+          c.grade === targetCell.grade &&
+          c.classNumber === targetCell.classNumber &&
+          c.day === targetCell.day &&
+          c.period === targetCell.period
         ) {
           return resultTargetCell
         }
@@ -307,8 +326,17 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   },
 
   searchMulti: () => {
-    const { multiTargetCellKeys, cells, searchConfig, schoolConfig, constraintPolicy, teacherPolicies, fixedEvents } = get()
-    if (multiTargetCellKeys.length < 2 || !schoolConfig || !constraintPolicy) return
+    const {
+      multiTargetCellKeys,
+      cells,
+      searchConfig,
+      schoolConfig,
+      constraintPolicy,
+      teacherPolicies,
+      fixedEvents,
+    } = get()
+    if (multiTargetCellKeys.length < 2 || !schoolConfig || !constraintPolicy)
+      return
 
     set({ isSearching: true })
 
@@ -343,18 +371,23 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
 
     for (const { candidate } of selectedMultiCandidate.sources) {
       if (candidate.type === 'SWAP') {
-        const { sourceCell, targetCell, resultSourceCell, resultTargetCell } = candidate
+        const { sourceCell, targetCell, resultSourceCell, resultTargetCell } =
+          candidate
         newCells = newCells.map((c) => {
           if (
-            c.grade === sourceCell.grade && c.classNumber === sourceCell.classNumber &&
-            c.day === sourceCell.day && c.period === sourceCell.period
+            c.grade === sourceCell.grade &&
+            c.classNumber === sourceCell.classNumber &&
+            c.day === sourceCell.day &&
+            c.period === sourceCell.period
           ) {
             return resultSourceCell!
           }
           if (
             targetCell &&
-            c.grade === targetCell.grade && c.classNumber === targetCell.classNumber &&
-            c.day === targetCell.day && c.period === targetCell.period
+            c.grade === targetCell.grade &&
+            c.classNumber === targetCell.classNumber &&
+            c.day === targetCell.day &&
+            c.period === targetCell.period
           ) {
             return resultTargetCell
           }

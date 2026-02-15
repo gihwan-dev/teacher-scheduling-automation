@@ -15,8 +15,18 @@ export const teacherPolicySchema = z.object({
   teacherId: z.string().min(1),
   avoidanceSlots: z.array(avoidanceSlotSchema),
   timePreference: timePreferenceSchema,
-  maxConsecutiveHoursOverride: z.number().int().min(1).max(MAX_PERIODS_PER_DAY).nullable(),
-  maxDailyHoursOverride: z.number().int().min(1).max(MAX_PERIODS_PER_DAY).nullable(),
+  maxConsecutiveHoursOverride: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PERIODS_PER_DAY)
+    .nullable(),
+  maxDailyHoursOverride: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PERIODS_PER_DAY)
+    .nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

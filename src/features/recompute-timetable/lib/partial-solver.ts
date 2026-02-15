@@ -1,11 +1,17 @@
-import type { ConstraintPolicy, ConstraintViolation } from '@/entities/constraint-policy'
+import type {
+  ConstraintPolicy,
+  ConstraintViolation,
+} from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableCell } from '@/entities/timetable'
-import type { RelaxationSuggestion, UnplacedAssignment } from '@/features/generate-timetable'
+import type {
+  RelaxationSuggestion,
+  UnplacedAssignment,
+} from '@/features/generate-timetable'
 import { validateTimetable } from '@/entities/constraint-policy'
 import {
   TimetableGrid,
@@ -42,7 +48,15 @@ export interface RecomputeResult {
  */
 export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
   const startTime = performance.now()
-  const { cells, schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = input
+  const {
+    cells,
+    schoolConfig,
+    teachers,
+    subjects,
+    fixedEvents,
+    constraintPolicy,
+    teacherPolicies,
+  } = input
   const { activeDays, periodsPerDay } = schoolConfig
 
   // 1. locked / unlocked 분류
@@ -65,11 +79,18 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
 
   // 3. 차단 슬롯 구축
   let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
-  blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
+  blockedSlots = expandGradeBlockedSlots(
+    blockedSlots,
+    schoolConfig.classCountByGrade,
+  )
 
   // 4. 잠긴 시수 차감된 배정 단위 생성
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
-  const assignments = buildAssignmentUnitsFromCells(teachers, subjectMap, lockedCells)
+  const assignments = buildAssignmentUnitsFromCells(
+    teachers,
+    subjectMap,
+    lockedCells,
+  )
 
   // 5. 배치 파이프라인 실행
   const { unplaced } = runPlacementPipeline(
@@ -98,14 +119,23 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
   })
 
   // 7. 검증
-  const score = computeTotalScore(grid, constraintPolicy, activeDays, periodsPerDay, teacherPolicies)
+  const score = computeTotalScore(
+    grid,
+    constraintPolicy,
+    activeDays,
+    periodsPerDay,
+    teacherPolicies,
+  )
   const violations = validateTimetable(mergedCells, constraintPolicy)
-  const suggestions = unplaced.length > 0 ? suggestRelaxations(unplaced, constraintPolicy) : []
+  const suggestions =
+    unplaced.length > 0 ? suggestRelaxations(unplaced, constraintPolicy) : []
 
   const endTime = performance.now()
 
   return {
-    success: unplaced.length === 0 && violations.filter((v) => v.severity === 'error').length === 0,
+    success:
+      unplaced.length === 0 &&
+      violations.filter((v) => v.severity === 'error').length === 0,
     cells: mergedCells,
     score,
     violations,

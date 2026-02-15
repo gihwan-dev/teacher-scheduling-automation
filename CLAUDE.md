@@ -19,6 +19,7 @@ pnpm check        # prettier --write . && eslint --fix
 ```
 
 단일 테스트 실행:
+
 ```bash
 npx vitest run src/entities/school/model/__tests__/schema.test.ts
 ```
@@ -79,6 +80,7 @@ src/
 ## 영속화 패턴
 
 모든 데이터는 `src/shared/persistence/indexeddb/`를 통해 IndexedDB에 저장된다.
+
 - `database.ts`: Dexie 스키마 정의 (버전 마이그레이션 포함)
 - `repository.ts`: CRUD 함수들 (save/load/delete)
 - Feature store의 `loadFromDB()` / `saveToDB()`로 영속화 연동

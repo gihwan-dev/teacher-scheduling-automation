@@ -35,7 +35,11 @@ function makeTeacher(
   id: string,
   name: string,
   subjectId: string,
-  assignments: Array<{ grade: number; classNumber: number; hoursPerWeek: number }>,
+  assignments: Array<{
+    grade: number
+    classNumber: number
+    hoursPerWeek: number
+  }>,
 ): Teacher {
   const baseHours = assignments.reduce((s, a) => s + a.hoursPerWeek, 0)
   return {
@@ -49,7 +53,9 @@ function makeTeacher(
   }
 }
 
-function makePolicy(overrides: Partial<ConstraintPolicy> = {}): ConstraintPolicy {
+function makePolicy(
+  overrides: Partial<ConstraintPolicy> = {},
+): ConstraintPolicy {
   return {
     id: 'policy-1',
     studentMaxConsecutiveSameSubject: 2,
@@ -75,27 +81,75 @@ function makeCell(overrides: Partial<TimetableCell> = {}): TimetableCell {
   }
 }
 
-function makeBasicInput(cellOverrides?: Array<Partial<TimetableCell>>): RecomputeInput {
+function makeBasicInput(
+  cellOverrides?: Array<Partial<TimetableCell>>,
+): RecomputeInput {
   const subjects = [
     makeSubject('sub-math', '수학'),
     makeSubject('sub-kor', '국어'),
     makeSubject('sub-eng', '영어'),
   ]
   const teachers = [
-    makeTeacher('t-math', '김수학', 'sub-math', [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }]),
-    makeTeacher('t-kor', '이국어', 'sub-kor', [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }]),
-    makeTeacher('t-eng', '박영어', 'sub-eng', [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }]),
+    makeTeacher('t-math', '김수학', 'sub-math', [
+      { grade: 1, classNumber: 1, hoursPerWeek: 3 },
+    ]),
+    makeTeacher('t-kor', '이국어', 'sub-kor', [
+      { grade: 1, classNumber: 1, hoursPerWeek: 3 },
+    ]),
+    makeTeacher('t-eng', '박영어', 'sub-eng', [
+      { grade: 1, classNumber: 1, hoursPerWeek: 2 },
+    ]),
   ]
 
   const defaultCells = [
-    makeCell({ teacherId: 't-math', subjectId: 'sub-math', day: 'MON', period: 1 }),
-    makeCell({ teacherId: 't-math', subjectId: 'sub-math', day: 'TUE', period: 1 }),
-    makeCell({ teacherId: 't-math', subjectId: 'sub-math', day: 'WED', period: 1 }),
-    makeCell({ teacherId: 't-kor', subjectId: 'sub-kor', day: 'MON', period: 2 }),
-    makeCell({ teacherId: 't-kor', subjectId: 'sub-kor', day: 'TUE', period: 2 }),
-    makeCell({ teacherId: 't-kor', subjectId: 'sub-kor', day: 'WED', period: 2 }),
-    makeCell({ teacherId: 't-eng', subjectId: 'sub-eng', day: 'THU', period: 1 }),
-    makeCell({ teacherId: 't-eng', subjectId: 'sub-eng', day: 'FRI', period: 1 }),
+    makeCell({
+      teacherId: 't-math',
+      subjectId: 'sub-math',
+      day: 'MON',
+      period: 1,
+    }),
+    makeCell({
+      teacherId: 't-math',
+      subjectId: 'sub-math',
+      day: 'TUE',
+      period: 1,
+    }),
+    makeCell({
+      teacherId: 't-math',
+      subjectId: 'sub-math',
+      day: 'WED',
+      period: 1,
+    }),
+    makeCell({
+      teacherId: 't-kor',
+      subjectId: 'sub-kor',
+      day: 'MON',
+      period: 2,
+    }),
+    makeCell({
+      teacherId: 't-kor',
+      subjectId: 'sub-kor',
+      day: 'TUE',
+      period: 2,
+    }),
+    makeCell({
+      teacherId: 't-kor',
+      subjectId: 'sub-kor',
+      day: 'WED',
+      period: 2,
+    }),
+    makeCell({
+      teacherId: 't-eng',
+      subjectId: 'sub-eng',
+      day: 'THU',
+      period: 1,
+    }),
+    makeCell({
+      teacherId: 't-eng',
+      subjectId: 'sub-eng',
+      day: 'FRI',
+      period: 1,
+    }),
   ]
 
   const cells = cellOverrides
@@ -151,7 +205,9 @@ describe('recomputeUnlocked', () => {
     const result = recomputeUnlocked(input)
 
     expect(result.success).toBe(true)
-    const teacherConflicts = result.violations.filter((v) => v.type === 'TEACHER_CONFLICT')
+    const teacherConflicts = result.violations.filter(
+      (v) => v.type === 'TEACHER_CONFLICT',
+    )
     expect(teacherConflicts).toHaveLength(0)
   })
 
@@ -178,13 +234,27 @@ describe('recomputeUnlocked', () => {
     // 교사가 많은 시수 + 거의 모든 슬롯 잠금 → 배치 불가 상황
     const subjects = [makeSubject('sub-a', '과목A')]
     const teachers = [
-      makeTeacher('t-a', '교사A', 'sub-a', [{ grade: 1, classNumber: 1, hoursPerWeek: 5 }]),
+      makeTeacher('t-a', '교사A', 'sub-a', [
+        { grade: 1, classNumber: 1, hoursPerWeek: 5 },
+      ]),
     ]
 
     // 1반 MON~FRI 교시 1~7 중 5개 잠금, 나머지 2개 슬롯에 5시수 배치는 불가능
     const cells: Array<TimetableCell> = [
-      makeCell({ teacherId: 't-a', subjectId: 'sub-a', day: 'MON', period: 1, status: 'LOCKED' }),
-      makeCell({ teacherId: 't-a', subjectId: 'sub-a', day: 'TUE', period: 1, status: 'LOCKED' }),
+      makeCell({
+        teacherId: 't-a',
+        subjectId: 'sub-a',
+        day: 'MON',
+        period: 1,
+        status: 'LOCKED',
+      }),
+      makeCell({
+        teacherId: 't-a',
+        subjectId: 'sub-a',
+        day: 'TUE',
+        period: 1,
+        status: 'LOCKED',
+      }),
     ]
 
     const result = recomputeUnlocked({

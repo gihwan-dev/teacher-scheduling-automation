@@ -34,7 +34,9 @@ export function HistoryTimeline({ events }: HistoryTimelineProps) {
 
         return (
           <div key={weekTag} className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">{weekTag}</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">
+              {weekTag}
+            </h3>
             <div className="space-y-2">
               {sorted.map((event) => (
                 <HistoryEventCard key={event.id} event={event} />

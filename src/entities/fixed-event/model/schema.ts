@@ -3,7 +3,11 @@ import { DAYS_OF_WEEK } from '@/shared/lib/constants'
 
 const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
 
-const fixedEventTypeSchema = z.enum(['FIXED_CLASS', 'BUSINESS_TRIP', 'SCHOOL_EVENT'])
+const fixedEventTypeSchema = z.enum([
+  'FIXED_CLASS',
+  'BUSINESS_TRIP',
+  'SCHOOL_EVENT',
+])
 
 export const fixedEventSchema = z
   .object({

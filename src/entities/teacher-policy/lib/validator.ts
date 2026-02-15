@@ -25,12 +25,18 @@ export function validateTeacherPolicy(
 
   // 유효한 회피 슬롯만 카운트 (운영 요일/교시 범위 내)
   const validAvoidanceCount = policy.avoidanceSlots.filter(
-    (slot) => activeDays.includes(slot.day) && slot.period >= 1 && slot.period <= periodsPerDay,
+    (slot) =>
+      activeDays.includes(slot.day) &&
+      slot.period >= 1 &&
+      slot.period <= periodsPerDay,
   ).length
 
   // 비운영 요일/범위 밖 교시 회피 설정 경고 (규칙 4)
   const invalidSlots = policy.avoidanceSlots.filter(
-    (slot) => !activeDays.includes(slot.day) || slot.period < 1 || slot.period > periodsPerDay,
+    (slot) =>
+      !activeDays.includes(slot.day) ||
+      slot.period < 1 ||
+      slot.period > periodsPerDay,
   )
   if (invalidSlots.length > 0) {
     messages.push({

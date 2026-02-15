@@ -92,16 +92,31 @@ describe('validateClassCapacity', () => {
     const config = makeSchoolConfig({ periodsPerDay: 7 }) // capacity = 35
     const overflows = validateClassCapacity(teachers, config)
     expect(overflows).toHaveLength(1)
-    expect(overflows[0]).toEqual({ grade: 1, classNumber: 1, total: 40, capacity: 35 })
+    expect(overflows[0]).toEqual({
+      grade: 1,
+      classNumber: 1,
+      total: 40,
+      capacity: 35,
+    })
   })
 })
 
 describe('findUnassignedSubjects', () => {
   const subject1: Subject = {
-    id: 'sub-1', name: '수학', abbreviation: '수', track: 'COMMON', createdAt: ts, updatedAt: ts,
+    id: 'sub-1',
+    name: '수학',
+    abbreviation: '수',
+    track: 'COMMON',
+    createdAt: ts,
+    updatedAt: ts,
   }
   const subject2: Subject = {
-    id: 'sub-2', name: '영어', abbreviation: '영', track: 'COMMON', createdAt: ts, updatedAt: ts,
+    id: 'sub-2',
+    name: '영어',
+    abbreviation: '영',
+    track: 'COMMON',
+    createdAt: ts,
+    updatedAt: ts,
   }
 
   it('모든 과목에 교사가 배정되면 빈 배열 반환', () => {
@@ -111,10 +126,15 @@ describe('findUnassignedSubjects', () => {
 
   it('배정되지 않은 과목을 반환한다', () => {
     const teachers = [makeTeacher({ subjectIds: ['sub-1'] })]
-    expect(findUnassignedSubjects([subject1, subject2], teachers)).toEqual([subject2])
+    expect(findUnassignedSubjects([subject1, subject2], teachers)).toEqual([
+      subject2,
+    ])
   })
 
   it('교사가 없으면 모든 과목을 반환한다', () => {
-    expect(findUnassignedSubjects([subject1, subject2], [])).toEqual([subject1, subject2])
+    expect(findUnassignedSubjects([subject1, subject2], [])).toEqual([
+      subject1,
+      subject2,
+    ])
   })
 })

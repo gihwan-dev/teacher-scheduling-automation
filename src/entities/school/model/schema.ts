@@ -14,9 +14,16 @@ const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
 export const schoolConfigSchema = z.object({
   id: z.string().min(1),
   gradeCount: z.number().int().min(MIN_GRADE_COUNT).max(MAX_GRADE_COUNT),
-  classCountByGrade: z.record(z.coerce.number(), z.number().int().min(MIN_CLASS_COUNT).max(MAX_CLASS_COUNT)),
+  classCountByGrade: z.record(
+    z.coerce.number(),
+    z.number().int().min(MIN_CLASS_COUNT).max(MAX_CLASS_COUNT),
+  ),
   activeDays: z.array(dayOfWeekSchema).min(1),
-  periodsPerDay: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+  periodsPerDay: z
+    .number()
+    .int()
+    .min(MIN_PERIODS_PER_DAY)
+    .max(MAX_PERIODS_PER_DAY),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

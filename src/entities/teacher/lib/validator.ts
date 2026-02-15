@@ -7,25 +7,45 @@ export function validateHoursConsistency(teacher: Teacher): {
   assigned: number
   base: number
 } {
-  const assigned = teacher.classAssignments.reduce((sum, a) => sum + a.hoursPerWeek, 0)
-  return { valid: assigned === teacher.baseHoursPerWeek, assigned, base: teacher.baseHoursPerWeek }
+  const assigned = teacher.classAssignments.reduce(
+    (sum, a) => sum + a.hoursPerWeek,
+    0,
+  )
+  return {
+    valid: assigned === teacher.baseHoursPerWeek,
+    assigned,
+    base: teacher.baseHoursPerWeek,
+  }
 }
 
 export function validateClassCapacity(
   teachers: Array<Teacher>,
   schoolConfig: SchoolConfig,
-): Array<{ grade: number; classNumber: number; total: number; capacity: number }> {
+): Array<{
+  grade: number
+  classNumber: number
+  total: number
+  capacity: number
+}> {
   const capacity = schoolConfig.activeDays.length * schoolConfig.periodsPerDay
   const classHoursMap = new Map<string, number>()
 
   for (const teacher of teachers) {
     for (const assignment of teacher.classAssignments) {
       const key = `${assignment.grade}-${assignment.classNumber}`
-      classHoursMap.set(key, (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek)
+      classHoursMap.set(
+        key,
+        (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek,
+      )
     }
   }
 
-  const overflows: Array<{ grade: number; classNumber: number; total: number; capacity: number }> = []
+  const overflows: Array<{
+    grade: number
+    classNumber: number
+    total: number
+    capacity: number
+  }> = []
   for (const [key, total] of classHoursMap) {
     if (total > capacity) {
       const [grade, classNumber] = key.split('-').map(Number)

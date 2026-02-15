@@ -13,7 +13,11 @@ export interface TimetableCell {
 }
 
 // 셀 상태
-export type CellStatus = 'BASE' | 'TEMP_MODIFIED' | 'CONFIRMED_MODIFIED' | 'LOCKED'
+export type CellStatus =
+  | 'BASE'
+  | 'TEMP_MODIFIED'
+  | 'CONFIRMED_MODIFIED'
+  | 'LOCKED'
 
 // 셀 고유 키: "grade-classNumber-day-period"
 export type CellKey = `${number}-${number}-${DayOfWeek}-${number}`

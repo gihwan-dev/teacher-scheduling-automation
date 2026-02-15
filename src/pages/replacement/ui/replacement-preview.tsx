@@ -10,7 +10,10 @@ interface ReplacementPreviewProps {
   subjects: Array<Subject>
 }
 
-export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewProps) {
+export function ReplacementPreview({
+  teachers,
+  subjects,
+}: ReplacementPreviewProps) {
   const { selectedCandidate } = useReplacementStore()
 
   if (!selectedCandidate) return null
@@ -21,7 +24,13 @@ export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewPro
   const source = parseCellKey(selectedCandidate.sourceCellKey)
   const target = parseCellKey(selectedCandidate.targetCellKey)
 
-  const { sourceCell, targetCell, resultSourceCell, resultTargetCell, ranking } = selectedCandidate
+  const {
+    sourceCell,
+    targetCell,
+    resultSourceCell,
+    resultTargetCell,
+    ranking,
+  } = selectedCandidate
 
   return (
     <Card>
@@ -33,9 +42,15 @@ export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewPro
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">위치</th>
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">변경 전</th>
-                <th className="text-left py-2 font-medium text-muted-foreground">변경 후</th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                  위치
+                </th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                  변경 전
+                </th>
+                <th className="text-left py-2 font-medium text-muted-foreground">
+                  변경 후
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -44,17 +59,25 @@ export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewPro
                   {DAY_LABELS[source.day]} {source.period}교시
                 </td>
                 <td className="py-2 pr-4">
-                  {subjectMap.get(sourceCell.subjectId)?.abbreviation ?? sourceCell.subjectId}{' '}
+                  {subjectMap.get(sourceCell.subjectId)?.abbreviation ??
+                    sourceCell.subjectId}{' '}
                   <span className="text-muted-foreground">
-                    ({teacherMap.get(sourceCell.teacherId)?.name ?? sourceCell.teacherId})
+                    (
+                    {teacherMap.get(sourceCell.teacherId)?.name ??
+                      sourceCell.teacherId}
+                    )
                   </span>
                 </td>
                 <td className="py-2">
                   {resultSourceCell ? (
                     <>
-                      {subjectMap.get(resultSourceCell.subjectId)?.abbreviation ?? resultSourceCell.subjectId}{' '}
+                      {subjectMap.get(resultSourceCell.subjectId)
+                        ?.abbreviation ?? resultSourceCell.subjectId}{' '}
                       <span className="text-muted-foreground">
-                        ({teacherMap.get(resultSourceCell.teacherId)?.name ?? resultSourceCell.teacherId})
+                        (
+                        {teacherMap.get(resultSourceCell.teacherId)?.name ??
+                          resultSourceCell.teacherId}
+                        )
                       </span>
                     </>
                   ) : (
@@ -69,9 +92,13 @@ export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewPro
                 <td className="py-2 pr-4">
                   {targetCell ? (
                     <>
-                      {subjectMap.get(targetCell.subjectId)?.abbreviation ?? targetCell.subjectId}{' '}
+                      {subjectMap.get(targetCell.subjectId)?.abbreviation ??
+                        targetCell.subjectId}{' '}
                       <span className="text-muted-foreground">
-                        ({teacherMap.get(targetCell.teacherId)?.name ?? targetCell.teacherId})
+                        (
+                        {teacherMap.get(targetCell.teacherId)?.name ??
+                          targetCell.teacherId}
+                        )
                       </span>
                     </>
                   ) : (
@@ -79,9 +106,13 @@ export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewPro
                   )}
                 </td>
                 <td className="py-2">
-                  {subjectMap.get(resultTargetCell.subjectId)?.abbreviation ?? resultTargetCell.subjectId}{' '}
+                  {subjectMap.get(resultTargetCell.subjectId)?.abbreviation ??
+                    resultTargetCell.subjectId}{' '}
                   <span className="text-muted-foreground">
-                    ({teacherMap.get(resultTargetCell.teacherId)?.name ?? resultTargetCell.teacherId})
+                    (
+                    {teacherMap.get(resultTargetCell.teacherId)?.name ??
+                      resultTargetCell.teacherId}
+                    )
                   </span>
                 </td>
               </tr>
@@ -92,8 +123,14 @@ export function ReplacementPreview({ teachers, subjects }: ReplacementPreviewPro
         {/* 점수 변화 요약 */}
         <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
           <span>
-            점수 변화: <span className={ranking.scoreDelta >= 0 ? 'text-green-600' : 'text-destructive'}>
-              {ranking.scoreDelta > 0 ? '+' : ''}{ranking.scoreDelta.toFixed(1)}
+            점수 변화:{' '}
+            <span
+              className={
+                ranking.scoreDelta >= 0 ? 'text-green-600' : 'text-destructive'
+              }
+            >
+              {ranking.scoreDelta > 0 ? '+' : ''}
+              {ranking.scoreDelta.toFixed(1)}
             </span>
           </span>
           <span>위반: {ranking.violationCount}건</span>

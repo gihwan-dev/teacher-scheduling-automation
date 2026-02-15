@@ -30,8 +30,22 @@ const sampleSchoolConfig: SchoolConfig = {
 }
 
 const sampleSubjects: Array<Subject> = [
-  { id: 'sub-1', name: '수학', abbreviation: '수', track: 'COMMON', createdAt: ts, updatedAt: ts },
-  { id: 'sub-2', name: '영어', abbreviation: '영', track: 'COMMON', createdAt: ts, updatedAt: ts },
+  {
+    id: 'sub-1',
+    name: '수학',
+    abbreviation: '수',
+    track: 'COMMON',
+    createdAt: ts,
+    updatedAt: ts,
+  },
+  {
+    id: 'sub-2',
+    name: '영어',
+    abbreviation: '영',
+    track: 'COMMON',
+    createdAt: ts,
+    updatedAt: ts,
+  },
 ]
 
 const sampleTeachers: Array<Teacher> = [
@@ -135,7 +149,11 @@ describe('Full setup round-trip', () => {
       fixedEvents: sampleFixedEvents,
     })
 
-    const updatedConfig = { ...sampleSchoolConfig, periodsPerDay: 8, updatedAt: '2024-02-01T00:00:00.000Z' }
+    const updatedConfig = {
+      ...sampleSchoolConfig,
+      periodsPerDay: 8,
+      updatedAt: '2024-02-01T00:00:00.000Z',
+    }
     await saveAllSetupData({
       schoolConfig: updatedConfig,
       subjects: [sampleSubjects[0]],

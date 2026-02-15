@@ -25,13 +25,19 @@ export function runFullValidation(
   const messages: Array<ValidationMessage> = []
 
   if (!schoolConfig) {
-    messages.push({ severity: 'error', message: '학교 구조가 설정되지 않았습니다.' })
+    messages.push({
+      severity: 'error',
+      message: '학교 구조가 설정되지 않았습니다.',
+    })
     return messages
   }
 
   // 필수 필드 누락 체크
   if (schoolConfig.activeDays.length === 0) {
-    messages.push({ severity: 'error', message: '운영 요일이 선택되지 않았습니다.' })
+    messages.push({
+      severity: 'error',
+      message: '운영 요일이 선택되지 않았습니다.',
+    })
   }
 
   if (subjects.length === 0) {
@@ -68,7 +74,10 @@ export function runFullValidation(
   for (const teacher of teachers) {
     for (const assignment of teacher.classAssignments) {
       const key = `${assignment.grade}-${assignment.classNumber}`
-      classHoursMap.set(key, (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek)
+      classHoursMap.set(
+        key,
+        (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek,
+      )
     }
   }
   for (let grade = 1; grade <= schoolConfig.gradeCount; grade++) {

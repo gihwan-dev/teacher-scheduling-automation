@@ -94,7 +94,14 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   },
 
   generate: async () => {
-    const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = get()
+    const {
+      schoolConfig,
+      teachers,
+      subjects,
+      fixedEvents,
+      constraintPolicy,
+      teacherPolicies,
+    } = get()
     if (!schoolConfig) return
 
     set({ isGenerating: true, result: null })

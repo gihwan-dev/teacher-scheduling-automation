@@ -35,7 +35,11 @@ function makeTeacher(
   id: string,
   name: string,
   subjectId: string,
-  assignments: Array<{ grade: number; classNumber: number; hoursPerWeek: number }>,
+  assignments: Array<{
+    grade: number
+    classNumber: number
+    hoursPerWeek: number
+  }>,
 ): Teacher {
   const baseHours = assignments.reduce((s, a) => s + a.hoursPerWeek, 0)
   return {
@@ -49,7 +53,9 @@ function makeTeacher(
   }
 }
 
-function makePolicy(overrides: Partial<ConstraintPolicy> = {}): ConstraintPolicy {
+function makePolicy(
+  overrides: Partial<ConstraintPolicy> = {},
+): ConstraintPolicy {
   return {
     id: 'policy-1',
     studentMaxConsecutiveSameSubject: 2,
@@ -292,7 +298,12 @@ describe('generateTimetable', () => {
           assignments.push({ grade, classNumber: cls, hoursPerWeek: 3 })
         }
         teachers.push(
-          makeTeacher(`t-${teacherIdx}`, `교사${teacherIdx}`, subjectId, assignments),
+          makeTeacher(
+            `t-${teacherIdx}`,
+            `교사${teacherIdx}`,
+            subjectId,
+            assignments,
+          ),
         )
       }
     }

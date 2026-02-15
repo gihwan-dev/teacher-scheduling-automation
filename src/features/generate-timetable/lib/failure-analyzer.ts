@@ -1,6 +1,10 @@
 import type { DayOfWeek } from '@/shared/lib/types'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
-import type { AssignmentUnit, RelaxationSuggestion, UnplacedAssignment } from '../model/types'
+import type {
+  AssignmentUnit,
+  RelaxationSuggestion,
+  UnplacedAssignment,
+} from '../model/types'
 import type { TimetableGrid } from './grid'
 
 /**
@@ -22,15 +26,23 @@ export function diagnoseFailure(
   for (const day of activeDays) {
     for (let period = 1; period <= periodsPerDay; period++) {
       const teacherFree = !grid.isTeacherBusy(unit.teacherId, day, period)
-      const teacherNotBlocked = !blockedSlots.has(`teacher-${unit.teacherId}-${day}-${period}`)
-      const classFree = !grid.isClassSlotFilled(unit.grade, unit.classNumber, day, period)
+      const teacherNotBlocked = !blockedSlots.has(
+        `teacher-${unit.teacherId}-${day}-${period}`,
+      )
+      const classFree = !grid.isClassSlotFilled(
+        unit.grade,
+        unit.classNumber,
+        day,
+        period,
+      )
       const classNotBlocked = !blockedSlots.has(
         `class-${unit.grade}-${unit.classNumber}-${day}-${period}`,
       )
 
       if (teacherFree && teacherNotBlocked) teacherAvailable++
       if (classFree && classNotBlocked) classAvailable++
-      if (teacherFree && teacherNotBlocked && classFree && classNotBlocked) overlapAvailable++
+      if (teacherFree && teacherNotBlocked && classFree && classNotBlocked)
+        overlapAvailable++
     }
   }
 

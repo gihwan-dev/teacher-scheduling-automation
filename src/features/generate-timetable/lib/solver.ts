@@ -1,4 +1,3 @@
-
 import {
   buildBlockedSlots,
   expandGradeBlockedSlots,
@@ -40,7 +39,15 @@ export function runPlacementPipeline(
   blockedSlots: Set<string>,
   teacherPolicies?: Array<TeacherPolicy>,
 ): { unplaced: Array<UnplacedAssignment> } {
-  sortByMRV(assignments, grid, activeDays, periodsPerDay, constraintPolicy, blockedSlots, teacherPolicies)
+  sortByMRV(
+    assignments,
+    grid,
+    activeDays,
+    periodsPerDay,
+    constraintPolicy,
+    blockedSlots,
+    teacherPolicies,
+  )
 
   const unplaced: Array<UnplacedAssignment> = []
 
@@ -120,7 +127,14 @@ export function runPlacementPipeline(
     }
   }
 
-  hillClimb(grid, constraintPolicy, activeDays, periodsPerDay, blockedSlots, teacherPolicies)
+  hillClimb(
+    grid,
+    constraintPolicy,
+    activeDays,
+    periodsPerDay,
+    blockedSlots,
+    teacherPolicies,
+  )
 
   return { unplaced }
 }
@@ -132,7 +146,11 @@ export function buildAssignmentUnitsFromCells(
   teachers: Array<{
     id: string
     subjectIds: Array<string>
-    classAssignments: Array<{ grade: number; classNumber: number; hoursPerWeek: number }>
+    classAssignments: Array<{
+      grade: number
+      classNumber: number
+      hoursPerWeek: number
+    }>
   }>,
   subjectMap: Map<string, { id: string }>,
   prePlacedCells: Array<TimetableCell>,
@@ -150,7 +168,14 @@ export function buildAssignmentUnitsFromCells(
  */
 export function generateTimetable(input: GenerationInput): GenerationResult {
   const startTime = performance.now()
-  const { schoolConfig, teachers, subjects, fixedEvents, constraintPolicy, teacherPolicies } = input
+  const {
+    schoolConfig,
+    teachers,
+    subjects,
+    fixedEvents,
+    constraintPolicy,
+    teacherPolicies,
+  } = input
 
   // === 전처리 ===
   const grid = new TimetableGrid()
@@ -158,7 +183,10 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
 
   // 차단 슬롯 구축 (교사 회피 슬롯 포함)
   let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
-  blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
+  blockedSlots = expandGradeBlockedSlots(
+    blockedSlots,
+    schoolConfig.classCountByGrade,
+  )
 
   // 고정 이벤트 배치
   const fixedCells = placeFixedEvents(fixedEvents, subjects, grid)
@@ -168,7 +196,10 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
   const assignments = buildAssignmentUnits(teachers, subjectMap, fixedCells)
 
   // 총 슬롯 수 계산
-  const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce((s, c) => s + c, 0)
+  const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce(
+    (s, c) => s + c,
+    0,
+  )
   const totalSlots = totalClasses * activeDays.length * periodsPerDay
 
   // === 배치 파이프라인 ===
@@ -186,7 +217,13 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
   const endTime = performance.now()
   const generationTimeMs = Math.round(endTime - startTime)
   const cells = grid.getAllCells()
-  const score = computeTotalScore(grid, constraintPolicy, activeDays, periodsPerDay, teacherPolicies)
+  const score = computeTotalScore(
+    grid,
+    constraintPolicy,
+    activeDays,
+    periodsPerDay,
+    teacherPolicies,
+  )
   const violations = validateTimetable(cells, constraintPolicy)
   const suggestions = suggestRelaxations(unplaced, constraintPolicy)
 
@@ -263,7 +300,11 @@ function buildAssignmentUnits(
   teachers: Array<{
     id: string
     subjectIds: Array<string>
-    classAssignments: Array<{ grade: number; classNumber: number; hoursPerWeek: number }>
+    classAssignments: Array<{
+      grade: number
+      classNumber: number
+      hoursPerWeek: number
+    }>
   }>,
   subjectMap: Map<string, { id: string }>,
   fixedCells: Array<TimetableCell>,
@@ -383,7 +424,17 @@ function tryBacktrack(
         // 점유 셀을 제거하고 이 unit을 배치할 수 있는지 확인
         grid.removeCell(occupyingCell)
 
-        if (isPlacementValid(grid, unit, day, period, policy, blockedSlots, teacherPolicies)) {
+        if (
+          isPlacementValid(
+            grid,
+            unit,
+            day,
+            period,
+            policy,
+            blockedSlots,
+            teacherPolicies,
+          )
+        ) {
           // 이 unit 배치
           const newCell: TimetableCell = {
             teacherId: unit.teacherId,
@@ -423,7 +474,16 @@ function tryBacktrack(
             let bestCandidate = displacedCandidates[0]
             let bestScore = -1
             for (const c of displacedCandidates) {
-              const s = scoreSlot(grid, displacedUnit, c.day, c.period, policy, activeDays, teacherPolicies, periodsPerDay)
+              const s = scoreSlot(
+                grid,
+                displacedUnit,
+                c.day,
+                c.period,
+                policy,
+                activeDays,
+                teacherPolicies,
+                periodsPerDay,
+              )
               if (s > bestScore) {
                 bestScore = s
                 bestCandidate = c
@@ -483,7 +543,13 @@ function hillClimb(
   blockedSlots: Set<string>,
   teacherPolicies?: Array<TeacherPolicy>,
 ): void {
-  let currentScore = computeTotalScore(grid, policy, activeDays, periodsPerDay, teacherPolicies)
+  let currentScore = computeTotalScore(
+    grid,
+    policy,
+    activeDays,
+    periodsPerDay,
+    teacherPolicies,
+  )
   let iterations = 0
 
   while (iterations < MAX_HILL_CLIMBING_ITERATIONS) {
@@ -500,7 +566,11 @@ function hillClimb(
         const cellB = nonFixedCells[j]
 
         // 같은 반이 아니면 스왑 불가 (반-교시 매핑이 바뀜)
-        if (cellA.grade !== cellB.grade || cellA.classNumber !== cellB.classNumber) continue
+        if (
+          cellA.grade !== cellB.grade ||
+          cellA.classNumber !== cellB.classNumber
+        )
+          continue
         // 이미 같은 슬롯이면 스킵
         if (cellA.day === cellB.day && cellA.period === cellB.period) continue
 
@@ -525,17 +595,47 @@ function hillClimb(
           remainingHours: 1,
         }
 
-        const aAtB = isPlacementValid(grid, unitA, cellB.day, cellB.period, policy, blockedSlots, teacherPolicies)
-        const bAtA = isPlacementValid(grid, unitB, cellA.day, cellA.period, policy, blockedSlots, teacherPolicies)
+        const aAtB = isPlacementValid(
+          grid,
+          unitA,
+          cellB.day,
+          cellB.period,
+          policy,
+          blockedSlots,
+          teacherPolicies,
+        )
+        const bAtA = isPlacementValid(
+          grid,
+          unitB,
+          cellA.day,
+          cellA.period,
+          policy,
+          blockedSlots,
+          teacherPolicies,
+        )
 
         if (aAtB && bAtA) {
-          const swappedA: TimetableCell = { ...cellA, day: cellB.day, period: cellB.period }
-          const swappedB: TimetableCell = { ...cellB, day: cellA.day, period: cellA.period }
+          const swappedA: TimetableCell = {
+            ...cellA,
+            day: cellB.day,
+            period: cellB.period,
+          }
+          const swappedB: TimetableCell = {
+            ...cellB,
+            day: cellA.day,
+            period: cellA.period,
+          }
 
           grid.placeCell(swappedA)
           grid.placeCell(swappedB)
 
-          const newScore = computeTotalScore(grid, policy, activeDays, periodsPerDay, teacherPolicies)
+          const newScore = computeTotalScore(
+            grid,
+            policy,
+            activeDays,
+            periodsPerDay,
+            teacherPolicies,
+          )
           if (newScore > currentScore) {
             currentScore = newScore
             improved = true

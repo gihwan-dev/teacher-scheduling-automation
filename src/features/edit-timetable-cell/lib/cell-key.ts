@@ -25,7 +25,9 @@ export function parseCellKey(key: CellKey): {
   }
 }
 
-export function buildCellMap(cells: Array<TimetableCell>): Map<CellKey, TimetableCell> {
+export function buildCellMap(
+  cells: Array<TimetableCell>,
+): Map<CellKey, TimetableCell> {
   const map = new Map<CellKey, TimetableCell>()
   for (const cell of cells) {
     const key = makeCellKey(cell.grade, cell.classNumber, cell.day, cell.period)

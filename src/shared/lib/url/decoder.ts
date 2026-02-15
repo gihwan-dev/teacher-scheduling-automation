@@ -1,4 +1,9 @@
-import { INDEX_TO_CELL_STATUS, INDEX_TO_DAY, INDEX_TO_TIME_PREF, INDEX_TO_TRACK } from './constants'
+import {
+  INDEX_TO_CELL_STATUS,
+  INDEX_TO_DAY,
+  INDEX_TO_TIME_PREF,
+  INDEX_TO_TRACK,
+} from './constants'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
@@ -20,7 +25,9 @@ export interface RestoredState {
 
 export function restoreFromPayload(payload: SharePayload): RestoredState {
   const now = new Date().toISOString()
-  const activeDays: Array<DayOfWeek> = payload.school.d.map((i) => INDEX_TO_DAY[i])
+  const activeDays: Array<DayOfWeek> = payload.school.d.map(
+    (i) => INDEX_TO_DAY[i],
+  )
 
   // Subjects: 새 UUID 생성
   const subjects: Array<Subject> = payload.subjects.map((s) => ({
@@ -110,21 +117,30 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
   }
 
   // TeacherPolicies
-  const teacherPolicies: Array<TeacherPolicy> = payload.teacherPolicies.map((tp) => ({
-    id: generateId(),
-    teacherId: teacherIds[tp.ti],
-    avoidanceSlots: tp.av.map(([dayIdx, period]) => ({
-      day: INDEX_TO_DAY[dayIdx],
-      period,
-    })),
-    timePreference: INDEX_TO_TIME_PREF[tp.tp],
-    maxConsecutiveHoursOverride: tp.mco,
-    maxDailyHoursOverride: tp.mdo,
-    createdAt: now,
-    updatedAt: now,
-  }))
+  const teacherPolicies: Array<TeacherPolicy> = payload.teacherPolicies.map(
+    (tp) => ({
+      id: generateId(),
+      teacherId: teacherIds[tp.ti],
+      avoidanceSlots: tp.av.map(([dayIdx, period]) => ({
+        day: INDEX_TO_DAY[dayIdx],
+        period,
+      })),
+      timePreference: INDEX_TO_TIME_PREF[tp.tp],
+      maxConsecutiveHoursOverride: tp.mco,
+      maxDailyHoursOverride: tp.mdo,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  )
 
-  return { schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies }
+  return {
+    schoolConfig,
+    subjects,
+    teachers,
+    snapshot,
+    constraintPolicy,
+    teacherPolicies,
+  }
 }
 
 function decodeFlatIndex(

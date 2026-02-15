@@ -2,7 +2,14 @@ import type { ChangeEvent } from '@/entities/change-history'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-const ACTION_CONFIG: Record<string, { label: string; icon: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+const ACTION_CONFIG: Record<
+  string,
+  {
+    label: string
+    icon: string
+    variant: 'default' | 'secondary' | 'outline' | 'destructive'
+  }
+> = {
   EDIT: { label: '편집', icon: '✏️', variant: 'default' },
   CLEAR: { label: '삭제', icon: '🗑️', variant: 'destructive' },
   LOCK: { label: '잠금', icon: '🔒', variant: 'secondary' },
@@ -17,22 +24,41 @@ interface HistoryEventCardProps {
 }
 
 export function HistoryEventCard({ event }: HistoryEventCardProps) {
-  const config = ACTION_CONFIG[event.actionType] ?? { label: event.actionType, icon: '?', variant: 'outline' as const }
-  const time = new Date(event.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const config = ACTION_CONFIG[event.actionType] ?? {
+    label: event.actionType,
+    icon: '?',
+    variant: 'outline' as const,
+  }
+  const time = new Date(event.timestamp).toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 
   return (
-    <div className={cn('flex items-start gap-3 rounded-lg border p-3', event.isUndone && 'opacity-50')}>
-      <span className="text-lg" aria-hidden="true">{config.icon}</span>
+    <div
+      className={cn(
+        'flex items-start gap-3 rounded-lg border p-3',
+        event.isUndone && 'opacity-50',
+      )}
+    >
+      <span className="text-lg" aria-hidden="true">
+        {config.icon}
+      </span>
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant={config.variant} className="text-[10px]">
             {config.label}
           </Badge>
           {event.cellKey.length > 0 && (
-            <span className="text-xs text-muted-foreground font-mono">{event.cellKey}</span>
+            <span className="text-xs text-muted-foreground font-mono">
+              {event.cellKey}
+            </span>
           )}
           {event.isUndone && (
-            <Badge variant="outline" className="text-[10px]">취소됨</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              취소됨
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-4 text-[11px] text-muted-foreground">

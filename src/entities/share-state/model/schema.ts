@@ -36,7 +36,9 @@ const compactPolicySchema = z.object({
 
 const compactTeacherPolicySchema = z.object({
   ti: z.number().int().min(0),
-  av: z.array(z.tuple([z.number().int().min(0).max(5), z.number().int().min(1).max(10)])),
+  av: z.array(
+    z.tuple([z.number().int().min(0).max(5), z.number().int().min(1).max(10)]),
+  ),
   tp: z.number().int().min(0).max(2),
   mco: z.number().int().min(1).max(10).nullable(),
   mdo: z.number().int().min(1).max(10).nullable(),

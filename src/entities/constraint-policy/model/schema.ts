@@ -5,7 +5,11 @@ const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
 
 export const constraintPolicySchema = z.object({
   id: z.string().min(1),
-  studentMaxConsecutiveSameSubject: z.number().int().min(1).max(MAX_PERIODS_PER_DAY),
+  studentMaxConsecutiveSameSubject: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PERIODS_PER_DAY),
   teacherMaxConsecutiveHours: z.number().int().min(1).max(MAX_PERIODS_PER_DAY),
   teacherMaxDailyHours: z.number().int().min(1).max(MAX_PERIODS_PER_DAY),
   createdAt: z.string(),

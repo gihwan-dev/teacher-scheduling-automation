@@ -18,9 +18,7 @@ const validPayload = {
     { i: 42, t: 1, s: 1, f: 7 },
   ],
   policy: { sc: 2, tc: 4, td: 6 },
-  teacherPolicies: [
-    { ti: 0, av: [[4, 7]], tp: 0, mco: 3, mdo: null },
-  ],
+  teacherPolicies: [{ ti: 0, av: [[4, 7]], tp: 0, mco: 3, mdo: null }],
 }
 
 describe('sharePayloadSchema', () => {

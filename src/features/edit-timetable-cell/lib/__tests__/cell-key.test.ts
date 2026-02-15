@@ -23,7 +23,9 @@ describe('parseCellKey', () => {
     const key = makeCellKey(2, 5, 'FRI', 7)
     const parsed = parseCellKey(key)
     expect(parsed).toEqual({ grade: 2, classNumber: 5, day: 'FRI', period: 7 })
-    expect(makeCellKey(parsed.grade, parsed.classNumber, parsed.day, parsed.period)).toBe(key)
+    expect(
+      makeCellKey(parsed.grade, parsed.classNumber, parsed.day, parsed.period),
+    ).toBe(key)
   })
 })
 
@@ -63,8 +65,20 @@ describe('buildCellMap', () => {
 
   it('같은 위치의 셀이 있으면 마지막 셀이 남는다', () => {
     const cells = [
-      makeCell({ teacherId: 't-1', grade: 1, classNumber: 1, day: 'MON', period: 1 }),
-      makeCell({ teacherId: 't-2', grade: 1, classNumber: 1, day: 'MON', period: 1 }),
+      makeCell({
+        teacherId: 't-1',
+        grade: 1,
+        classNumber: 1,
+        day: 'MON',
+        period: 1,
+      }),
+      makeCell({
+        teacherId: 't-2',
+        grade: 1,
+        classNumber: 1,
+        day: 'MON',
+        period: 1,
+      }),
     ]
     const map = buildCellMap(cells)
     expect(map.size).toBe(1)

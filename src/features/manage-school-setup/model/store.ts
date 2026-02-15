@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import {  runFullValidation } from './validation'
-import type {ValidationMessage} from './validation';
+import { runFullValidation } from './validation'
+import type { ValidationMessage } from './validation'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
@@ -40,7 +40,9 @@ interface SetupState {
   removeTeacher: (id: string) => void
 
   // FixedEvents
-  addFixedEvent: (event: Omit<FixedEvent, 'id' | 'createdAt' | 'updatedAt'>) => void
+  addFixedEvent: (
+    event: Omit<FixedEvent, 'id' | 'createdAt' | 'updatedAt'>,
+  ) => void
   updateFixedEvent: (id: string, updates: Partial<FixedEvent>) => void
   removeFixedEvent: (id: string) => void
 
@@ -174,7 +176,12 @@ export const useSetupStore = create<SetupState>((set, get) => ({
   // Validation
   runValidation: () => {
     const { schoolConfig, subjects, teachers, fixedEvents } = get()
-    const messages = runFullValidation(schoolConfig, subjects, teachers, fixedEvents)
+    const messages = runFullValidation(
+      schoolConfig,
+      subjects,
+      teachers,
+      fixedEvents,
+    )
     set({ validationMessages: messages })
   },
 }))

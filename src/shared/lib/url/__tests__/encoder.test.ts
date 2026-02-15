@@ -18,8 +18,22 @@ const schoolConfig: SchoolConfig = {
 }
 
 const subjects: Array<Subject> = [
-  { id: 'sub-1', name: '국어', abbreviation: '국', track: 'COMMON', createdAt: '', updatedAt: '' },
-  { id: 'sub-2', name: '수학', abbreviation: '수', track: 'COMMON', createdAt: '', updatedAt: '' },
+  {
+    id: 'sub-1',
+    name: '국어',
+    abbreviation: '국',
+    track: 'COMMON',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'sub-2',
+    name: '수학',
+    abbreviation: '수',
+    track: 'COMMON',
+    createdAt: '',
+    updatedAt: '',
+  },
 ]
 
 const teachers: Array<Teacher> = [
@@ -98,14 +112,24 @@ const teacherPolicies: Array<TeacherPolicy> = [
 describe('buildSharePayload', () => {
   it('올바른 스키마 버전을 설정한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     expect(payload.v).toBe(1)
   })
 
   it('메타 정보를 올바르게 인코딩한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     expect(payload.meta).toEqual({
       score: 85.5,
@@ -116,7 +140,12 @@ describe('buildSharePayload', () => {
 
   it('학교 설정을 컴팩트 형태로 인코딩한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     expect(payload.school).toEqual({
       g: 2,
@@ -128,7 +157,12 @@ describe('buildSharePayload', () => {
 
   it('과목을 인덱스 기반으로 인코딩한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     expect(payload.subjects).toEqual([
       { n: '국어', a: '국', t: 0 },
@@ -138,7 +172,12 @@ describe('buildSharePayload', () => {
 
   it('교사의 subject 참조를 인덱스로 변환한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     expect(payload.teachers[0].s).toEqual([0]) // sub-1 → index 0
     expect(payload.teachers[1].s).toEqual([1]) // sub-2 → index 1
@@ -146,7 +185,12 @@ describe('buildSharePayload', () => {
 
   it('셀의 flags bitfield를 올바르게 설정한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     // cell 0: BASE(0), isFixed=false → (0 << 1) | 0 = 0
     expect(payload.grid[0].f).toBe(0)
@@ -156,7 +200,12 @@ describe('buildSharePayload', () => {
 
   it('교사 정책의 회피 슬롯을 인덱스 기반으로 인코딩한다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     expect(payload.teacherPolicies[0].av).toEqual([[4, 7]]) // FRI=4, period=7
     expect(payload.teacherPolicies[0].tp).toBe(0) // MORNING

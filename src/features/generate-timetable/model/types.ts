@@ -2,7 +2,10 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { FixedEvent } from '@/entities/fixed-event'
-import type { ConstraintPolicy, ConstraintViolation } from '@/entities/constraint-policy'
+import type {
+  ConstraintPolicy,
+  ConstraintViolation,
+} from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableSnapshot } from '@/entities/timetable'
 

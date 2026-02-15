@@ -18,32 +18,50 @@ describe('schoolConfigSchema', () => {
   })
 
   it('gradeCount가 0이면 실패한다', () => {
-    const result = schoolConfigSchema.safeParse({ ...validConfig, gradeCount: 0 })
+    const result = schoolConfigSchema.safeParse({
+      ...validConfig,
+      gradeCount: 0,
+    })
     expect(result.success).toBe(false)
   })
 
   it('gradeCount가 4이면 실패한다', () => {
-    const result = schoolConfigSchema.safeParse({ ...validConfig, gradeCount: 4 })
+    const result = schoolConfigSchema.safeParse({
+      ...validConfig,
+      gradeCount: 4,
+    })
     expect(result.success).toBe(false)
   })
 
   it('periodsPerDay가 0이면 실패한다', () => {
-    const result = schoolConfigSchema.safeParse({ ...validConfig, periodsPerDay: 0 })
+    const result = schoolConfigSchema.safeParse({
+      ...validConfig,
+      periodsPerDay: 0,
+    })
     expect(result.success).toBe(false)
   })
 
   it('periodsPerDay가 11이면 실패한다', () => {
-    const result = schoolConfigSchema.safeParse({ ...validConfig, periodsPerDay: 11 })
+    const result = schoolConfigSchema.safeParse({
+      ...validConfig,
+      periodsPerDay: 11,
+    })
     expect(result.success).toBe(false)
   })
 
   it('activeDays가 비어있으면 실패한다', () => {
-    const result = schoolConfigSchema.safeParse({ ...validConfig, activeDays: [] })
+    const result = schoolConfigSchema.safeParse({
+      ...validConfig,
+      activeDays: [],
+    })
     expect(result.success).toBe(false)
   })
 
   it('잘못된 요일이면 실패한다', () => {
-    const result = schoolConfigSchema.safeParse({ ...validConfig, activeDays: ['INVALID'] })
+    const result = schoolConfigSchema.safeParse({
+      ...validConfig,
+      activeDays: ['INVALID'],
+    })
     expect(result.success).toBe(false)
   })
 

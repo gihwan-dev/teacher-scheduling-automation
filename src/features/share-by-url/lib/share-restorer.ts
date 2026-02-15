@@ -37,7 +37,12 @@ export function parseShareHash(hash: string): RestoredState {
   }
 
   // 3. 버전 체크 (Zod 이전에 빠른 실패)
-  if (typeof raw === 'object' && raw !== null && 'v' in raw && (raw as { v: unknown }).v !== 1) {
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    'v' in raw &&
+    (raw as { v: unknown }).v !== 1
+  ) {
     throw new Error('지원하지 않는 공유 형식 버전입니다.')
   }
 

@@ -11,7 +11,9 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { AssignmentUnit } from '../../model/types'
 
-function makePolicy(overrides: Partial<ConstraintPolicy> = {}): ConstraintPolicy {
+function makePolicy(
+  overrides: Partial<ConstraintPolicy> = {},
+): ConstraintPolicy {
   return {
     id: 'policy-1',
     studentMaxConsecutiveSameSubject: 2,
@@ -65,7 +67,9 @@ describe('isPlacementValid', () => {
     const unit = makeUnit()
     const policy = makePolicy()
 
-    expect(isPlacementValid(grid, unit, 'MON', 1, policy, new Set())).toBe(false)
+    expect(isPlacementValid(grid, unit, 'MON', 1, policy, new Set())).toBe(
+      false,
+    )
   })
 
   it('반 슬롯이 이미 차있으면 불가능하다', () => {
@@ -75,7 +79,9 @@ describe('isPlacementValid', () => {
     const unit = makeUnit()
     const policy = makePolicy()
 
-    expect(isPlacementValid(grid, unit, 'MON', 1, policy, new Set())).toBe(false)
+    expect(isPlacementValid(grid, unit, 'MON', 1, policy, new Set())).toBe(
+      false,
+    )
   })
 
   it('차단된 슬롯이면 불가능하다', () => {
@@ -97,7 +103,9 @@ describe('isPlacementValid', () => {
 
     const unit = makeUnit({ grade: 1, classNumber: 3 })
 
-    expect(isPlacementValid(grid, unit, 'MON', 3, policy, new Set())).toBe(false)
+    expect(isPlacementValid(grid, unit, 'MON', 3, policy, new Set())).toBe(
+      false,
+    )
   })
 })
 
@@ -108,7 +116,14 @@ describe('findCandidateSlots', () => {
     const policy = makePolicy()
     const activeDays = ['MON', 'TUE', 'WED', 'THU', 'FRI'] as const
 
-    const candidates = findCandidateSlots(grid, unit, [...activeDays], 7, policy, new Set())
+    const candidates = findCandidateSlots(
+      grid,
+      unit,
+      [...activeDays],
+      7,
+      policy,
+      new Set(),
+    )
 
     expect(candidates).toHaveLength(5 * 7) // 5일 × 7교시
   })
@@ -119,7 +134,14 @@ describe('findCandidateSlots', () => {
     const policy = makePolicy()
     const blocked = new Set(['teacher-t-1-MON-1', 'teacher-t-1-MON-2'])
 
-    const candidates = findCandidateSlots(grid, unit, ['MON'], 7, policy, blocked)
+    const candidates = findCandidateSlots(
+      grid,
+      unit,
+      ['MON'],
+      7,
+      policy,
+      blocked,
+    )
 
     expect(candidates).toHaveLength(5) // 7교시 - 2 차단 = 5
   })

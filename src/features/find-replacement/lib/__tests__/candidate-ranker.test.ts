@@ -6,7 +6,8 @@ import type { ReplacementCandidate } from '../../model/types'
 import type { DayOfWeek } from '@/shared/lib/types'
 
 function makeCell(
-  overrides: Partial<TimetableCell> & Pick<TimetableCell, 'teacherId' | 'subjectId' | 'day' | 'period'>,
+  overrides: Partial<TimetableCell> &
+    Pick<TimetableCell, 'teacherId' | 'subjectId' | 'day' | 'period'>,
 ): TimetableCell {
   return {
     grade: 1,
@@ -61,8 +62,16 @@ describe('rankCandidate', () => {
       periodsPerDay: 6,
     }
 
-    const rankClean = rankCandidate({ type: 'SWAP' } as ReplacementCandidate, afterCellsClean, ctx)
-    const rankViolating = rankCandidate({ type: 'SWAP' } as ReplacementCandidate, afterCellsViolating, ctx)
+    const rankClean = rankCandidate(
+      { type: 'SWAP' } as ReplacementCandidate,
+      afterCellsClean,
+      ctx,
+    )
+    const rankViolating = rankCandidate(
+      { type: 'SWAP' } as ReplacementCandidate,
+      afterCellsViolating,
+      ctx,
+    )
 
     expect(rankClean.totalRank).toBeGreaterThan(rankViolating.totalRank)
   })
@@ -100,7 +109,11 @@ describe('rankCandidate', () => {
     }
 
     // 같은 type으로 비교하되 afterCells가 달라서 scoreDelta가 다름
-    const rank1 = rankCandidate({ type: 'SWAP' } as ReplacementCandidate, baseCells, ctx)
+    const rank1 = rankCandidate(
+      { type: 'SWAP' } as ReplacementCandidate,
+      baseCells,
+      ctx,
+    )
 
     // 약간 변경된 셀 목록 (점수에 큰 차이는 없지만 구조적으로 다름)
     const modifiedCells = [
@@ -109,7 +122,11 @@ describe('rankCandidate', () => {
       makeCell({ teacherId: 'T3', subjectId: 'S3', day: 'WED', period: 1 }),
       makeCell({ teacherId: 'T4', subjectId: 'S4', day: 'THU', period: 2 }),
     ]
-    const rank2 = rankCandidate({ type: 'SWAP' } as ReplacementCandidate, modifiedCells, ctx)
+    const rank2 = rankCandidate(
+      { type: 'SWAP' } as ReplacementCandidate,
+      modifiedCells,
+      ctx,
+    )
 
     // 둘 다 위반 0이어야 함
     expect(rank1.violationCount).toBe(0)
@@ -125,9 +142,15 @@ describe('rankCandidate', () => {
 
     const cells: Array<TimetableCell> = []
     // 많은 빈 슬롯이 있도록 1개 셀만 배치
-    cells.push(makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }))
+    cells.push(
+      makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }),
+    )
 
-    const config = { scope: 'SAME_CLASS' as const, includeViolating: false, maxCandidates: 3 }
+    const config = {
+      scope: 'SAME_CLASS' as const,
+      includeViolating: false,
+      maxCandidates: 3,
+    }
     const ctx = {
       schoolConfig: {
         id: 'sc1',

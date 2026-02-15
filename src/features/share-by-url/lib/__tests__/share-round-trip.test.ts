@@ -21,26 +21,53 @@ const schoolConfig: SchoolConfig = {
 }
 
 const subjects: Array<Subject> = [
-  { id: 'sub-1', name: '국어', abbreviation: '국', track: 'COMMON', createdAt: '', updatedAt: '' },
-  { id: 'sub-2', name: '수학', abbreviation: '수', track: 'NATURAL_SCIENCE', createdAt: '', updatedAt: '' },
-  { id: 'sub-3', name: '영어', abbreviation: '영', track: 'ARTS', createdAt: '', updatedAt: '' },
+  {
+    id: 'sub-1',
+    name: '국어',
+    abbreviation: '국',
+    track: 'COMMON',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'sub-2',
+    name: '수학',
+    abbreviation: '수',
+    track: 'NATURAL_SCIENCE',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'sub-3',
+    name: '영어',
+    abbreviation: '영',
+    track: 'ARTS',
+    createdAt: '',
+    updatedAt: '',
+  },
 ]
 
 const teachers: Array<Teacher> = [
   {
-    id: 'tea-1', name: '김교사', subjectIds: ['sub-1', 'sub-3'],
+    id: 'tea-1',
+    name: '김교사',
+    subjectIds: ['sub-1', 'sub-3'],
     baseHoursPerWeek: 20,
     classAssignments: [
       { grade: 1, classNumber: 1, hoursPerWeek: 5 },
       { grade: 1, classNumber: 2, hoursPerWeek: 3 },
     ],
-    createdAt: '', updatedAt: '',
+    createdAt: '',
+    updatedAt: '',
   },
   {
-    id: 'tea-2', name: '이교사', subjectIds: ['sub-2'],
+    id: 'tea-2',
+    name: '이교사',
+    subjectIds: ['sub-2'],
     baseHoursPerWeek: 18,
     classAssignments: [{ grade: 2, classNumber: 1, hoursPerWeek: 4 }],
-    createdAt: '', updatedAt: '',
+    createdAt: '',
+    updatedAt: '',
   },
 ]
 
@@ -48,9 +75,36 @@ const snapshot: TimetableSnapshot = {
   id: 'snap-1',
   schoolConfigId: 'sc-1',
   cells: [
-    { teacherId: 'tea-1', subjectId: 'sub-1', grade: 1, classNumber: 1, day: 'MON', period: 1, isFixed: false, status: 'BASE' },
-    { teacherId: 'tea-1', subjectId: 'sub-3', grade: 1, classNumber: 2, day: 'WED', period: 5, isFixed: true, status: 'LOCKED' },
-    { teacherId: 'tea-2', subjectId: 'sub-2', grade: 2, classNumber: 1, day: 'FRI', period: 7, isFixed: false, status: 'TEMP_MODIFIED' },
+    {
+      teacherId: 'tea-1',
+      subjectId: 'sub-1',
+      grade: 1,
+      classNumber: 1,
+      day: 'MON',
+      period: 1,
+      isFixed: false,
+      status: 'BASE',
+    },
+    {
+      teacherId: 'tea-1',
+      subjectId: 'sub-3',
+      grade: 1,
+      classNumber: 2,
+      day: 'WED',
+      period: 5,
+      isFixed: true,
+      status: 'LOCKED',
+    },
+    {
+      teacherId: 'tea-2',
+      subjectId: 'sub-2',
+      grade: 2,
+      classNumber: 1,
+      day: 'FRI',
+      period: 7,
+      isFixed: false,
+      status: 'TEMP_MODIFIED',
+    },
   ],
   score: 92.3,
   generationTimeMs: 3500,
@@ -62,25 +116,33 @@ const constraintPolicy: ConstraintPolicy = {
   studentMaxConsecutiveSameSubject: 2,
   teacherMaxConsecutiveHours: 4,
   teacherMaxDailyHours: 7,
-  createdAt: '', updatedAt: '',
+  createdAt: '',
+  updatedAt: '',
 }
 
 const teacherPolicies: Array<TeacherPolicy> = [
   {
-    id: 'tp-1', teacherId: 'tea-1',
-    avoidanceSlots: [{ day: 'FRI', period: 6 }, { day: 'FRI', period: 7 }],
+    id: 'tp-1',
+    teacherId: 'tea-1',
+    avoidanceSlots: [
+      { day: 'FRI', period: 6 },
+      { day: 'FRI', period: 7 },
+    ],
     timePreference: 'MORNING',
     maxConsecutiveHoursOverride: 3,
     maxDailyHoursOverride: null,
-    createdAt: '', updatedAt: '',
+    createdAt: '',
+    updatedAt: '',
   },
   {
-    id: 'tp-2', teacherId: 'tea-2',
+    id: 'tp-2',
+    teacherId: 'tea-2',
     avoidanceSlots: [],
     timePreference: 'NONE',
     maxConsecutiveHoursOverride: null,
     maxDailyHoursOverride: 5,
-    createdAt: '', updatedAt: '',
+    createdAt: '',
+    updatedAt: '',
   },
 ]
 
@@ -88,7 +150,12 @@ describe('share round-trip', () => {
   it('encode → compress → decompress → validate → decode 후 데이터가 동치이다', () => {
     // 1. 인코딩
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
 
     // 2. 압축 round-trip
@@ -120,7 +187,9 @@ describe('share round-trip', () => {
     restored.teachers.forEach((t, i) => {
       expect(t.name).toBe(teachers[i].name)
       expect(t.baseHoursPerWeek).toBe(teachers[i].baseHoursPerWeek)
-      expect(t.classAssignments.length).toBe(teachers[i].classAssignments.length)
+      expect(t.classAssignments.length).toBe(
+        teachers[i].classAssignments.length,
+      )
     })
 
     expect(restored.snapshot.cells).toHaveLength(snapshot.cells.length)
@@ -152,7 +221,12 @@ describe('share round-trip', () => {
 
   it('교사-과목 참조가 round-trip 후에도 일관적이다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     const restored = restoreFromPayload(payload)
 
@@ -168,7 +242,12 @@ describe('share round-trip', () => {
 
   it('셀의 teacher/subject 참조가 round-trip 후에도 일관적이다', () => {
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, snapshot, constraintPolicy, teacherPolicies,
+      schoolConfig,
+      subjects,
+      teachers,
+      snapshot,
+      constraintPolicy,
+      teacherPolicies,
     )
     const restored = restoreFromPayload(payload)
 
@@ -188,7 +267,12 @@ describe('share round-trip', () => {
   it('빈 시간표도 round-trip이 성공한다', () => {
     const emptySnapshot = { ...snapshot, cells: [] }
     const payload = buildSharePayload(
-      schoolConfig, subjects, teachers, emptySnapshot, constraintPolicy, [],
+      schoolConfig,
+      subjects,
+      teachers,
+      emptySnapshot,
+      constraintPolicy,
+      [],
     )
     const json = JSON.stringify(payload)
     const compressed = compressToUrl(json)

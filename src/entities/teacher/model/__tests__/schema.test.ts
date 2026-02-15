@@ -20,22 +20,28 @@ describe('teacherSchema', () => {
   })
 
   it('name이 비어있으면 실패한다', () => {
-    expect(teacherSchema.safeParse({ ...validTeacher, name: '' }).success).toBe(false)
+    expect(teacherSchema.safeParse({ ...validTeacher, name: '' }).success).toBe(
+      false,
+    )
   })
 
   it('subjectIds가 비어있으면 실패한다', () => {
-    expect(teacherSchema.safeParse({ ...validTeacher, subjectIds: [] }).success).toBe(false)
+    expect(
+      teacherSchema.safeParse({ ...validTeacher, subjectIds: [] }).success,
+    ).toBe(false)
   })
 
   it('classAssignments가 비어있어도 통과한다', () => {
     expect(
-      teacherSchema.safeParse({ ...validTeacher, classAssignments: [] }).success,
+      teacherSchema.safeParse({ ...validTeacher, classAssignments: [] })
+        .success,
     ).toBe(true)
   })
 
   it('baseHoursPerWeek가 음수이면 실패한다', () => {
     expect(
-      teacherSchema.safeParse({ ...validTeacher, baseHoursPerWeek: -1 }).success,
+      teacherSchema.safeParse({ ...validTeacher, baseHoursPerWeek: -1 })
+        .success,
     ).toBe(false)
   })
 

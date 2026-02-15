@@ -12,7 +12,10 @@ interface MultiReplacementPreviewProps {
   subjects: Array<Subject>
 }
 
-export function MultiReplacementPreview({ teachers, subjects }: MultiReplacementPreviewProps) {
+export function MultiReplacementPreview({
+  teachers,
+  subjects,
+}: MultiReplacementPreviewProps) {
   const { selectedMultiCandidate } = useReplacementStore()
 
   if (!selectedMultiCandidate) return null
@@ -24,31 +27,49 @@ export function MultiReplacementPreview({ teachers, subjects }: MultiReplacement
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium">다중 교체 미리보기</CardTitle>
+        <CardTitle className="text-sm font-medium">
+          다중 교체 미리보기
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">#</th>
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">소스</th>
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">타겟</th>
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">유형</th>
-                <th className="text-left py-2 font-medium text-muted-foreground">점수</th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                  #
+                </th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                  소스
+                </th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                  타겟
+                </th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
+                  유형
+                </th>
+                <th className="text-left py-2 font-medium text-muted-foreground">
+                  점수
+                </th>
               </tr>
             </thead>
             <tbody>
               {sources.map(({ sourceKey, candidate }, index) => {
                 const source = parseCellKey(sourceKey)
                 const target = parseCellKey(candidate.targetCellKey)
-                const sourceSubject = subjectMap.get(candidate.sourceCell.subjectId)?.abbreviation ?? candidate.sourceCell.subjectId
-                const sourceTeacher = teacherMap.get(candidate.sourceCell.teacherId)?.name ?? candidate.sourceCell.teacherId
+                const sourceSubject =
+                  subjectMap.get(candidate.sourceCell.subjectId)
+                    ?.abbreviation ?? candidate.sourceCell.subjectId
+                const sourceTeacher =
+                  teacherMap.get(candidate.sourceCell.teacherId)?.name ??
+                  candidate.sourceCell.teacherId
                 const delta = candidate.ranking.scoreDelta
 
                 return (
                   <tr key={index} className="border-b">
-                    <td className="py-2 pr-4 text-muted-foreground">{index + 1}</td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {index + 1}
+                    </td>
                     <td className="py-2 pr-4">
                       {DAY_LABELS[source.day]} {source.period}교시
                       <span className="text-muted-foreground ml-1">
@@ -59,18 +80,34 @@ export function MultiReplacementPreview({ teachers, subjects }: MultiReplacement
                       {DAY_LABELS[target.day]} {target.period}교시
                       {candidate.targetCell && (
                         <span className="text-muted-foreground ml-1">
-                          ({subjectMap.get(candidate.targetCell.subjectId)?.abbreviation ?? candidate.targetCell.subjectId}{' '}
-                          {teacherMap.get(candidate.targetCell.teacherId)?.name ?? candidate.targetCell.teacherId})
+                          (
+                          {subjectMap.get(candidate.targetCell.subjectId)
+                            ?.abbreviation ??
+                            candidate.targetCell.subjectId}{' '}
+                          {teacherMap.get(candidate.targetCell.teacherId)
+                            ?.name ?? candidate.targetCell.teacherId}
+                          )
                         </span>
                       )}
                     </td>
                     <td className="py-2 pr-4">
-                      <Badge variant={candidate.type === 'SWAP' ? 'default' : 'secondary'} className="text-[10px]">
+                      <Badge
+                        variant={
+                          candidate.type === 'SWAP' ? 'default' : 'secondary'
+                        }
+                        className="text-[10px]"
+                      >
                         {candidate.type === 'SWAP' ? '교환' : '이동'}
                       </Badge>
                     </td>
-                    <td className={cn('py-2 text-xs', delta >= 0 ? 'text-green-600' : 'text-destructive')}>
-                      {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                    <td
+                      className={cn(
+                        'py-2 text-xs',
+                        delta >= 0 ? 'text-green-600' : 'text-destructive',
+                      )}
+                    >
+                      {delta > 0 ? '+' : ''}
+                      {delta.toFixed(1)}
                     </td>
                   </tr>
                 )
@@ -82,7 +119,13 @@ export function MultiReplacementPreview({ teachers, subjects }: MultiReplacement
         <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
           <span>
             종합 점수 변화:{' '}
-            <span className={combinedRanking.combinedScoreDelta >= 0 ? 'text-green-600' : 'text-destructive'}>
+            <span
+              className={
+                combinedRanking.combinedScoreDelta >= 0
+                  ? 'text-green-600'
+                  : 'text-destructive'
+              }
+            >
               {combinedRanking.combinedScoreDelta > 0 ? '+' : ''}
               {combinedRanking.combinedScoreDelta.toFixed(1)}
             </span>

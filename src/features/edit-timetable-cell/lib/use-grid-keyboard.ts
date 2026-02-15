@@ -5,7 +5,9 @@ import { useEditStore } from '../model/store'
  * 시간표 그리드 키보드 네비게이션/편집 훅
  * roving tabindex 패턴 — 그리드 컨테이너에서 키 이벤트 처리
  */
-export function useGridKeyboard(containerRef: React.RefObject<HTMLDivElement | null>) {
+export function useGridKeyboard(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+) {
   const {
     focusedCell,
     isEditing,

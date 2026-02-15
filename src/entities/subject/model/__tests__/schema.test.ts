@@ -16,21 +16,36 @@ describe('subjectSchema', () => {
   })
 
   it('name이 비어있으면 실패한다', () => {
-    expect(subjectSchema.safeParse({ ...validSubject, name: '' }).success).toBe(false)
+    expect(subjectSchema.safeParse({ ...validSubject, name: '' }).success).toBe(
+      false,
+    )
   })
 
   it('abbreviation이 비어있으면 실패한다', () => {
-    expect(subjectSchema.safeParse({ ...validSubject, abbreviation: '' }).success).toBe(false)
+    expect(
+      subjectSchema.safeParse({ ...validSubject, abbreviation: '' }).success,
+    ).toBe(false)
   })
 
   it('잘못된 track이면 실패한다', () => {
-    expect(subjectSchema.safeParse({ ...validSubject, track: 'INVALID' }).success).toBe(false)
+    expect(
+      subjectSchema.safeParse({ ...validSubject, track: 'INVALID' }).success,
+    ).toBe(false)
   })
 
   it('모든 유효한 track을 통과시킨다', () => {
-    const tracks = ['COMMON', 'NATURAL_SCIENCE', 'SOCIAL_SCIENCE', 'ARTS', 'PHYSICAL', 'OTHER']
+    const tracks = [
+      'COMMON',
+      'NATURAL_SCIENCE',
+      'SOCIAL_SCIENCE',
+      'ARTS',
+      'PHYSICAL',
+      'OTHER',
+    ]
     for (const track of tracks) {
-      expect(subjectSchema.safeParse({ ...validSubject, track }).success).toBe(true)
+      expect(subjectSchema.safeParse({ ...validSubject, track }).success).toBe(
+        true,
+      )
     }
   })
 })

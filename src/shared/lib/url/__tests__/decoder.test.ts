@@ -15,13 +15,11 @@ const validPayload: SharePayload = {
     { n: '이교사', s: [1], h: 18, ca: [[1, 2, 4]] },
   ],
   grid: [
-    { i: 0, t: 0, s: 0, f: 0 },   // grade1, class1, MON, period1, BASE, !fixed
-    { i: 42, t: 1, s: 1, f: 7 },   // grade1, class2, TUE, period3, LOCKED, fixed
+    { i: 0, t: 0, s: 0, f: 0 }, // grade1, class1, MON, period1, BASE, !fixed
+    { i: 42, t: 1, s: 1, f: 7 }, // grade1, class2, TUE, period3, LOCKED, fixed
   ],
   policy: { sc: 2, tc: 4, td: 6 },
-  teacherPolicies: [
-    { ti: 0, av: [[4, 7]], tp: 0, mco: 3, mdo: null },
-  ],
+  teacherPolicies: [{ ti: 0, av: [[4, 7]], tp: 0, mco: 3, mdo: null }],
 }
 
 describe('restoreFromPayload', () => {
@@ -93,7 +91,8 @@ describe('restoreFromPayload', () => {
 
   it('모든 ID가 유효한 UUID 형태이다', () => {
     const result = restoreFromPayload(validPayload)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     expect(result.schoolConfig.id).toMatch(uuidRegex)
     expect(result.snapshot.id).toMatch(uuidRegex)
     result.subjects.forEach((s) => expect(s.id).toMatch(uuidRegex))

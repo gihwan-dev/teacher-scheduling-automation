@@ -32,7 +32,10 @@ export function findMultiReplacementCandidates(
   }
 
   // 1. 각 소스 셀에 대해 독립 탐색
-  const perSourceResults: Array<{ sourceKey: CellKey; result: ReplacementSearchResult }> = []
+  const perSourceResults: Array<{
+    sourceKey: CellKey
+    result: ReplacementSearchResult
+  }> = []
 
   for (const sourceKey of sourceKeys) {
     const sourceCell = cellMap.get(sourceKey)
@@ -49,7 +52,13 @@ export function findMultiReplacementCandidates(
     }
 
     const perSourceConfig = { ...config, maxCandidates: PER_SOURCE_MAX }
-    const result = findReplacementCandidates(sourceKey, sourceCell, allCells, perSourceConfig, ctx)
+    const result = findReplacementCandidates(
+      sourceKey,
+      sourceCell,
+      allCells,
+      perSourceConfig,
+      ctx,
+    )
     perSourceResults.push({ sourceKey, result })
   }
 
@@ -111,7 +120,8 @@ export function findMultiReplacementCandidates(
 
   // 4. 종합 점수로 정렬
   validCombinations.sort(
-    (a, b) => b.combinedRanking.aggregateScore - a.combinedRanking.aggregateScore,
+    (a, b) =>
+      b.combinedRanking.aggregateScore - a.combinedRanking.aggregateScore,
   )
 
   return {
@@ -191,7 +201,10 @@ function buildMultiCandidate(
 
   return {
     id: generateId(),
-    sources: combo.map(({ sourceKey, candidate }) => ({ sourceKey, candidate })),
+    sources: combo.map(({ sourceKey, candidate }) => ({
+      sourceKey,
+      candidate,
+    })),
     combinedRanking: {
       aggregateScore: Math.round(aggregateScore * 100) / 100,
       totalViolationCount,

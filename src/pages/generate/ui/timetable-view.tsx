@@ -11,7 +11,12 @@ interface TimetableViewProps {
   subjects: Array<Subject>
 }
 
-export function TimetableView({ cells, schoolConfig, teachers, subjects }: TimetableViewProps) {
+export function TimetableView({
+  cells,
+  schoolConfig,
+  teachers,
+  subjects,
+}: TimetableViewProps) {
   return (
     <ReadOnlyTimetableView
       cells={cells}

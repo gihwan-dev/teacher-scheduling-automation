@@ -34,13 +34,24 @@ export function KeyboardShortcutsPanel() {
           <CardContent>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
               {shortcuts.map((s) => (
-                <div key={s.description} className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">{s.description}</span>
+                <div
+                  key={s.description}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs text-muted-foreground">
+                    {s.description}
+                  </span>
                   <span className="flex items-center gap-0.5">
                     {s.keys.map((key, i) => (
                       <span key={i}>
-                        {i > 0 && <span className="text-[10px] text-muted-foreground mx-0.5">+</span>}
-                        <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">{key}</kbd>
+                        {i > 0 && (
+                          <span className="text-[10px] text-muted-foreground mx-0.5">
+                            +
+                          </span>
+                        )}
+                        <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+                          {key}
+                        </kbd>
                       </span>
                     ))}
                   </span>

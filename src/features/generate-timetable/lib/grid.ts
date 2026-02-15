@@ -21,7 +21,10 @@ export class TimetableGrid {
   private teacherDayPeriods = new Map<string, Set<number>>()
 
   // 반-요일별 과목 배치: "grade-classNumber-day" → Array<{period, subjectId}>
-  private classDaySubjects = new Map<string, Array<{ period: number; subjectId: string }>>()
+  private classDaySubjects = new Map<
+    string,
+    Array<{ period: number; subjectId: string }>
+  >()
 
   getAllCells(): Array<TimetableCell> {
     return [...this.cells]
@@ -46,7 +49,10 @@ export class TimetableGrid {
     this.classSlotMap.set(classSlotKey, true)
 
     const teacherDayKey = `${cell.teacherId}-${cell.day}`
-    this.teacherDayHours.set(teacherDayKey, (this.teacherDayHours.get(teacherDayKey) ?? 0) + 1)
+    this.teacherDayHours.set(
+      teacherDayKey,
+      (this.teacherDayHours.get(teacherDayKey) ?? 0) + 1,
+    )
 
     let periods = this.teacherDayPeriods.get(teacherDayKey)
     if (!periods) {
@@ -116,7 +122,12 @@ export class TimetableGrid {
     return this.teacherSlotMap.has(`${teacherId}-${day}-${period}`)
   }
 
-  isClassSlotFilled(grade: number, classNumber: number, day: DayOfWeek, period: number): boolean {
+  isClassSlotFilled(
+    grade: number,
+    classNumber: number,
+    day: DayOfWeek,
+    period: number,
+  ): boolean {
     return this.classSlotMap.has(`${grade}-${classNumber}-${day}-${period}`)
   }
 
@@ -209,7 +220,10 @@ export class TimetableGrid {
     classNumber: number,
   ): Array<TimetableCell> {
     return this.cells.filter(
-      (c) => c.teacherId === teacherId && c.grade === grade && c.classNumber === classNumber,
+      (c) =>
+        c.teacherId === teacherId &&
+        c.grade === grade &&
+        c.classNumber === classNumber,
     )
   }
 }

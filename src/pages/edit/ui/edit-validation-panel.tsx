@@ -10,7 +10,9 @@ export function EditValidationPanel({ violations }: EditValidationPanelProps) {
     return (
       <Card>
         <CardContent className="py-4">
-          <p className="text-sm text-muted-foreground text-center">제약 위반 없음</p>
+          <p className="text-sm text-muted-foreground text-center">
+            제약 위반 없음
+          </p>
         </CardContent>
       </Card>
     )
@@ -36,7 +38,11 @@ export function EditValidationPanel({ violations }: EditValidationPanelProps) {
           {violations.map((v, i) => (
             <li key={i} className="flex items-start gap-2 text-xs">
               <span
-                className={v.severity === 'error' ? 'text-destructive' : 'text-yellow-600 dark:text-yellow-400'}
+                className={
+                  v.severity === 'error'
+                    ? 'text-destructive'
+                    : 'text-yellow-600 dark:text-yellow-400'
+                }
                 aria-label={v.severity === 'error' ? '오류' : '경고'}
               >
                 {v.severity === 'error' ? '●' : '▲'}

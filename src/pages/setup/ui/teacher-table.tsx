@@ -15,8 +15,14 @@ import { useSetupStore } from '@/features/manage-school-setup'
 import { validateHoursConsistency } from '@/entities/teacher'
 
 export function TeacherTable() {
-  const { teachers, subjects, schoolConfig, addTeacher, updateTeacher, removeTeacher } =
-    useSetupStore()
+  const {
+    teachers,
+    subjects,
+    schoolConfig,
+    addTeacher,
+    updateTeacher,
+    removeTeacher,
+  } = useSetupStore()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [newBaseHours, setNewBaseHours] = useState(18)
@@ -63,7 +69,10 @@ export function TeacherTable() {
           )
         }
       } else if (hours > 0) {
-        newAssignments = [...teacher.classAssignments, { grade, classNumber, hoursPerWeek: hours }]
+        newAssignments = [
+          ...teacher.classAssignments,
+          { grade, classNumber, hoursPerWeek: hours },
+        ]
       } else {
         return
       }
@@ -72,7 +81,11 @@ export function TeacherTable() {
     [updateTeacher],
   )
 
-  const getAssignmentHours = (teacher: Teacher, grade: number, classNumber: number) => {
+  const getAssignmentHours = (
+    teacher: Teacher,
+    grade: number,
+    classNumber: number,
+  ) => {
     return (
       teacher.classAssignments.find(
         (a) => a.grade === grade && a.classNumber === classNumber,
@@ -105,7 +118,9 @@ export function TeacherTable() {
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      onClick={() => setExpandedId(isExpanded ? null : teacher.id)}
+                      onClick={() =>
+                        setExpandedId(isExpanded ? null : teacher.id)
+                      }
                     >
                       {isExpanded ? '−' : '+'}
                     </Button>
@@ -113,7 +128,9 @@ export function TeacherTable() {
                   <TableCell>
                     <Input
                       value={teacher.name}
-                      onChange={(e) => updateTeacher(teacher.id, { name: e.target.value })}
+                      onChange={(e) =>
+                        updateTeacher(teacher.id, { name: e.target.value })
+                      }
                       className="h-7"
                     />
                   </TableCell>
@@ -148,7 +165,9 @@ export function TeacherTable() {
                       className="h-7 w-20"
                     />
                   </TableCell>
-                  <TableCell className="text-center">{consistency.assigned}</TableCell>
+                  <TableCell className="text-center">
+                    {consistency.assigned}
+                  </TableCell>
                   <TableCell>
                     {consistency.valid ? (
                       <Badge variant="secondary">일치</Badge>
@@ -171,42 +190,55 @@ export function TeacherTable() {
                   <TableRow>
                     <TableCell colSpan={7}>
                       <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                        <p className="text-sm font-medium">학년/반별 배정 시수</p>
-                        {Array.from({ length: schoolConfig.gradeCount }, (_, i) => i + 1).map(
-                          (grade) => (
-                            <div key={grade} className="space-y-1">
-                              <p className="text-xs text-muted-foreground font-medium">
-                                {grade}학년
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {Array.from(
-                                  { length: schoolConfig.classCountByGrade[grade] ?? 0 },
-                                  (_, j) => j + 1,
-                                ).map((cls) => (
-                                  <div key={cls} className="flex items-center gap-1">
-                                    <span className="text-xs text-muted-foreground w-6 text-right">
-                                      {cls}반
-                                    </span>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      value={getAssignmentHours(teacher, grade, cls)}
-                                      onChange={(e) =>
-                                        handleAssignmentChange(
-                                          teacher,
-                                          grade,
-                                          cls,
-                                          parseInt(e.target.value, 10) || 0,
-                                        )
-                                      }
-                                      className="h-6 w-14 text-xs"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
+                        <p className="text-sm font-medium">
+                          학년/반별 배정 시수
+                        </p>
+                        {Array.from(
+                          { length: schoolConfig.gradeCount },
+                          (_, i) => i + 1,
+                        ).map((grade) => (
+                          <div key={grade} className="space-y-1">
+                            <p className="text-xs text-muted-foreground font-medium">
+                              {grade}학년
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {Array.from(
+                                {
+                                  length:
+                                    schoolConfig.classCountByGrade[grade] ?? 0,
+                                },
+                                (_, j) => j + 1,
+                              ).map((cls) => (
+                                <div
+                                  key={cls}
+                                  className="flex items-center gap-1"
+                                >
+                                  <span className="text-xs text-muted-foreground w-6 text-right">
+                                    {cls}반
+                                  </span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={getAssignmentHours(
+                                      teacher,
+                                      grade,
+                                      cls,
+                                    )}
+                                    onChange={(e) =>
+                                      handleAssignmentChange(
+                                        teacher,
+                                        grade,
+                                        cls,
+                                        parseInt(e.target.value, 10) || 0,
+                                      )
+                                    }
+                                    className="h-6 w-14 text-xs"
+                                  />
+                                </div>
+                              ))}
                             </div>
-                          ),
-                        )}
+                          </div>
+                        ))}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -232,7 +264,9 @@ export function TeacherTable() {
                 type="number"
                 min={0}
                 value={newBaseHours}
-                onChange={(e) => setNewBaseHours(parseInt(e.target.value, 10) || 0)}
+                onChange={(e) =>
+                  setNewBaseHours(parseInt(e.target.value, 10) || 0)
+                }
                 className="h-7 w-20"
               />
             </TableCell>
