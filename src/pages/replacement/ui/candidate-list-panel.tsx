@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { ReplacementCandidate } from '@/features/find-replacement'
@@ -26,8 +27,16 @@ interface CandidateListPanelProps {
   subjects: Array<Subject>
 }
 
-export function CandidateListPanel({ teachers, subjects }: CandidateListPanelProps) {
-  const { searchResult, selectedCandidate, selectCandidate, confirmReplacement } = useReplacementStore()
+export function CandidateListPanel({
+  teachers,
+  subjects,
+}: CandidateListPanelProps) {
+  const {
+    searchResult,
+    selectedCandidate,
+    selectCandidate,
+    confirmReplacement,
+  } = useReplacementStore()
   const [isConfirming, setIsConfirming] = useState(false)
 
   const teacherMap = new Map(teachers.map((t) => [t.id, t]))
@@ -41,6 +50,7 @@ export function CandidateListPanel({ teachers, subjects }: CandidateListPanelPro
     setIsConfirming(true)
     await confirmReplacement()
     setIsConfirming(false)
+    toast.success('교체를 적용했습니다')
   }
 
   return (
@@ -49,7 +59,8 @@ export function CandidateListPanel({ teachers, subjects }: CandidateListPanelPro
         <CardTitle className="text-sm font-medium">
           후보 목록
           <span className="ml-2 text-xs text-muted-foreground font-normal">
-            {stats.validCandidates}건 / {stats.totalExamined}건 검사 ({stats.searchTimeMs}ms)
+            {stats.validCandidates}건 / {stats.totalExamined}건 검사 (
+            {stats.searchTimeMs}ms)
           </span>
         </CardTitle>
       </CardHeader>
@@ -77,20 +88,27 @@ export function CandidateListPanel({ teachers, subjects }: CandidateListPanelPro
             {selectedCandidate && (
               <AlertDialog>
                 <AlertDialogTrigger
-                  render={<Button className="w-full mt-3" disabled={isConfirming} />}
+                  render={
+                    <Button className="w-full mt-3" disabled={isConfirming} />
+                  }
                 >
                   교체 확정
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>교체를 확정하시겠습니까?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      교체를 확정하시겠습니까?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      선택한 후보로 시간표를 교체합니다. 이 작업은 즉시 저장됩니다.
+                      선택한 후보로 시간표를 교체합니다. 이 작업은 즉시
+                      저장됩니다.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>취소</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirm}>확정</AlertDialogAction>
+                    <AlertDialogAction onClick={handleConfirm}>
+                      확정
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -119,14 +137,17 @@ function CandidateRow({
 }) {
   const target = parseCellKey(candidate.targetCellKey)
   const targetTeacher = candidate.targetCell
-    ? teacherMap.get(candidate.targetCell.teacherId)?.name ?? candidate.targetCell.teacherId
+    ? (teacherMap.get(candidate.targetCell.teacherId)?.name ??
+      candidate.targetCell.teacherId)
     : null
   const targetSubject = candidate.targetCell
-    ? subjectMap.get(candidate.targetCell.subjectId)?.abbreviation ?? candidate.targetCell.subjectId
+    ? (subjectMap.get(candidate.targetCell.subjectId)?.abbreviation ??
+      candidate.targetCell.subjectId)
     : null
 
   const scoreDelta = candidate.ranking.scoreDelta
-  const scoreDeltaLabel = scoreDelta > 0 ? `+${scoreDelta.toFixed(1)}` : scoreDelta.toFixed(1)
+  const scoreDeltaLabel =
+    scoreDelta > 0 ? `+${scoreDelta.toFixed(1)}` : scoreDelta.toFixed(1)
 
   return (
     <button
@@ -137,16 +158,27 @@ function CandidateRow({
       onClick={onSelect}
     >
       <span className="text-xs text-muted-foreground w-5 shrink-0">{rank}</span>
-      <Badge variant={candidate.type === 'SWAP' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+      <Badge
+        variant={candidate.type === 'SWAP' ? 'default' : 'secondary'}
+        className="shrink-0 text-[10px]"
+      >
         {candidate.type === 'SWAP' ? '교환' : '이동'}
       </Badge>
       <span className="flex-1 truncate">
         {DAY_LABELS[target.day]} {target.period}교시
         {targetTeacher && targetSubject && (
-          <span className="text-muted-foreground"> ({targetSubject} {targetTeacher})</span>
+          <span className="text-muted-foreground">
+            {' '}
+            ({targetSubject} {targetTeacher})
+          </span>
         )}
       </span>
-      <span className={cn('text-xs shrink-0', scoreDelta >= 0 ? 'text-green-600' : 'text-destructive')}>
+      <span
+        className={cn(
+          'text-xs shrink-0',
+          scoreDelta >= 0 ? 'text-green-600' : 'text-destructive',
+        )}
+      >
         {scoreDeltaLabel}
       </span>
       {candidate.ranking.violationCount > 0 && (

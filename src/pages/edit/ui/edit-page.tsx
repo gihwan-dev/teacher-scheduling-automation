@@ -12,7 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
+import { LoadingState } from '@/components/ui/loading-state'
+import { EmptyState } from '@/components/ui/empty-state'
+import { useUnsavedWarning } from '@/shared/lib/hooks/use-unsaved-warning'
 
 export function EditPage() {
   const {
@@ -23,6 +25,7 @@ export function EditPage() {
     violations,
     viewGrade,
     viewClassNumber,
+    isDirty,
     isLoading,
     loadSnapshot,
     setViewTarget,
@@ -32,39 +35,31 @@ export function EditPage() {
     loadSnapshot()
   }, [loadSnapshot])
 
+  useUnsavedWarning(isDirty)
+
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">데이터 불러오는 중...</p>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (!snapshot) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">
-              먼저 시간표를 생성하세요. 생성 페이지에서 시간표를 생성한 후 저장하면 편집할 수 있습니다.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        title="시간표가 없습니다"
+        description="먼저 시간표를 생성하세요. 생성 페이지에서 시간표를 생성한 후 저장하면 편집할 수 있습니다."
+        actionLabel="생성 페이지로 이동"
+        actionTo="/generate"
+      />
     )
   }
 
   if (!schoolConfig) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">
-              학교 설정 데이터가 없습니다. 설정 페이지에서 먼저 입력해주세요.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        title="설정 데이터가 없습니다"
+        description="학교 설정 데이터가 없습니다. 설정 페이지에서 먼저 입력해주세요."
+        actionLabel="설정 페이지로 이동"
+        actionTo="/setup"
+      />
     )
   }
 
@@ -89,7 +84,10 @@ export function EditPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: schoolConfig.gradeCount }, (_, i) => i + 1).map((g) => (
+              {Array.from(
+                { length: schoolConfig.gradeCount },
+                (_, i) => i + 1,
+              ).map((g) => (
                 <SelectItem key={g} value={String(g)}>
                   {g}학년
                 </SelectItem>

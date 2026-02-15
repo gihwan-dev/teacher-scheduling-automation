@@ -3,6 +3,8 @@ import { HistoryFilterBar } from './history-filter-bar'
 import { HistoryTimeline } from './history-timeline'
 import { useChangeHistoryStore } from '@/features/track-change-history'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { LoadingState } from '@/components/ui/loading-state'
+import { EmptyState } from '@/components/ui/empty-state'
 import { loadLatestTimetableSnapshot } from '@/shared/persistence/indexeddb/repository'
 
 export function HistoryPage() {
@@ -29,18 +31,16 @@ export function HistoryPage() {
   // 필터 적용
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
-      if (selectedWeekTag !== 'ALL' && e.weekTag !== selectedWeekTag) return false
-      if (selectedActionType !== 'ALL' && e.actionType !== selectedActionType) return false
+      if (selectedWeekTag !== 'ALL' && e.weekTag !== selectedWeekTag)
+        return false
+      if (selectedActionType !== 'ALL' && e.actionType !== selectedActionType)
+        return false
       return true
     })
   }, [events, selectedWeekTag, selectedActionType])
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">이력 불러오는 중...</p>
-      </div>
-    )
+    return <LoadingState message="이력 불러오는 중..." />
   }
 
   return (
@@ -48,13 +48,12 @@ export function HistoryPage() {
       <h1 className="text-2xl font-bold">변경 이력</h1>
 
       {!snapshotId ? (
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">
-              시간표 스냅샷이 없습니다. 먼저 시간표를 생성하세요.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="시간표 스냅샷이 없습니다"
+          description="먼저 시간표를 생성하세요."
+          actionLabel="생성 페이지로 이동"
+          actionTo="/generate"
+        />
       ) : (
         <Card>
           <CardHeader>

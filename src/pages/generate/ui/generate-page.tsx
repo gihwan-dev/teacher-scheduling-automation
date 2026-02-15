@@ -1,13 +1,17 @@
 import { useEffect } from 'react'
-
+import { toast } from 'sonner'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { PlayIcon } from '@hugeicons/core-free-icons'
 import { ConstraintConfigForm } from './constraint-config-form'
 import { GenerationResultPanel } from './generation-result-panel'
 import { TimetableView } from './timetable-view'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { LoadingState } from '@/components/ui/loading-state'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Spinner } from '@/components/ui/spinner'
 import { useGenerateStore } from '@/features/generate-timetable/model/store'
-
 
 export function GeneratePage() {
   const {
@@ -27,29 +31,30 @@ export function GeneratePage() {
     loadSetupData()
   }, [loadSetupData])
 
+  const handleGenerate = async () => {
+    await generate()
+    toast.success('시간표 생성이 완료되었습니다')
+  }
+
   if (isLoading || !setupLoaded) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">데이터 불러오는 중...</p>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (!schoolConfig) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">
-              설정 페이지에서 학교 구조를 먼저 입력해주세요.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        title="설정 데이터가 없습니다"
+        description="설정 페이지에서 학교 구조를 먼저 입력해주세요."
+        actionLabel="설정 페이지로 이동"
+        actionTo="/setup"
+      />
     )
   }
 
-  const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce((s, c) => s + c, 0)
+  const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce(
+    (s, c) => s + c,
+    0,
+  )
   const multiSubjectTeachers = teachers.filter((t) => t.subjectIds.length > 1)
 
   return (
@@ -62,8 +67,18 @@ export function GeneratePage() {
             설정 데이터를 기반으로 시간표를 자동 생성합니다.
           </p>
         </div>
-        <Button onClick={generate} disabled={isGenerating}>
-          {isGenerating ? '생성 중...' : '생성'}
+        <Button onClick={handleGenerate} disabled={isGenerating}>
+          {isGenerating ? (
+            <>
+              <Spinner size="sm" />
+              생성 중...
+            </>
+          ) : (
+            <>
+              <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
+              생성
+            </>
+          )}
         </Button>
       </div>
 
@@ -98,7 +113,8 @@ export function GeneratePage() {
           {multiSubjectTeachers.length > 0 && (
             <div className="mt-3">
               <Badge variant="secondary">
-                다과목 교사 {multiSubjectTeachers.length}명 (첫 번째 과목으로 배정)
+                다과목 교사 {multiSubjectTeachers.length}명 (첫 번째 과목으로
+                배정)
               </Badge>
             </div>
           )}

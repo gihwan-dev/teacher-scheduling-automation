@@ -4,7 +4,11 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { SchoolConfig } from '@/entities/school'
-import { StatusIndicator, getCellStatusClasses, getStatusLabel } from '@/entities/timetable'
+import {
+  StatusIndicator,
+  getCellStatusClasses,
+  getStatusLabel,
+} from '@/entities/timetable'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import { makeCellKey, useEditStore } from '@/features/edit-timetable-cell'
 import { useGridKeyboard } from '@/features/edit-timetable-cell/lib/use-grid-keyboard'
@@ -16,7 +20,11 @@ interface EditableTimetableGridProps {
   subjects: Array<Subject>
 }
 
-export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: EditableTimetableGridProps) {
+export function EditableTimetableGrid({
+  schoolConfig,
+  teachers,
+  subjects,
+}: EditableTimetableGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   useGridKeyboard(containerRef)
 
@@ -46,12 +54,25 @@ export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: Edit
       className="rounded-lg border overflow-hidden focus:outline-none"
     >
       {/* 헤더 행 */}
-      <div role="row" className="grid border-b bg-muted/50" style={{ gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)` }}>
-        <div role="columnheader" className="p-2 text-center text-xs font-medium text-muted-foreground">
+      <div
+        role="row"
+        className="grid border-b bg-muted/50"
+        style={{
+          gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)`,
+        }}
+      >
+        <div
+          role="columnheader"
+          className="p-2 text-center text-xs font-medium text-muted-foreground"
+        >
           교시
         </div>
         {activeDays.map((day) => (
-          <div key={day} role="columnheader" className="p-2 text-center text-xs font-medium text-muted-foreground border-l">
+          <div
+            key={day}
+            role="columnheader"
+            className="p-2 text-center text-xs font-medium text-muted-foreground border-l"
+          >
             {DAY_LABELS[day]}
           </div>
         ))}
@@ -59,8 +80,18 @@ export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: Edit
 
       {/* 데이터 행 */}
       {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((period) => (
-        <div key={period} role="row" className="grid border-b last:border-b-0" style={{ gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)` }}>
-          <div role="rowheader" className="p-2 text-center text-xs font-medium text-muted-foreground flex items-center justify-center">
+        <div
+          key={period}
+          role="row"
+          className="grid border-b last:border-b-0"
+          style={{
+            gridTemplateColumns: `4rem repeat(${activeDays.length}, 1fr)`,
+          }}
+        >
+          <div
+            role="rowheader"
+            className="p-2 text-center text-xs font-medium text-muted-foreground flex items-center justify-center"
+          >
             {period}
           </div>
           {activeDays.map((day) => {
@@ -80,17 +111,16 @@ export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: Edit
                 className={cn(
                   'border-l min-h-16 p-1 cursor-pointer transition-colors',
                   getCellStatusClasses(cell),
-                  isFocused && 'ring-2 ring-primary ring-inset',
-                  isSelected && !isFocused && 'ring-1 ring-secondary ring-inset',
+                  isFocused && 'bg-primary/15 ring-2 ring-primary ring-inset',
+                  isSelected &&
+                    !isFocused &&
+                    'bg-accent ring-1 ring-accent-foreground/20 ring-inset',
                 )}
                 onClick={() => setFocusedCell(key)}
                 onDoubleClick={() => startEdit(key)}
               >
                 {isEditingThis ? (
-                  <CellEditorInline
-                    teachers={teachers}
-                    subjects={subjects}
-                  />
+                  <CellEditorInline teachers={teachers} subjects={subjects} />
                 ) : cell ? (
                   <CellContent
                     cell={cell}
@@ -98,7 +128,9 @@ export function EditableTimetableGrid({ schoolConfig, teachers, subjects }: Edit
                     subjectMap={subjectMap}
                   />
                 ) : (
-                  <span className="text-muted-foreground text-xs flex h-full items-center justify-center">-</span>
+                  <span className="text-muted-foreground text-xs flex h-full items-center justify-center">
+                    -
+                  </span>
                 )}
               </div>
             )
@@ -135,8 +167,12 @@ function CellContent({
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-0.5">
-      <div className="text-xs font-medium leading-tight">{subject?.abbreviation ?? cell.subjectId}</div>
-      <div className="text-muted-foreground text-[10px] leading-tight">{teacher?.name ?? cell.teacherId}</div>
+      <div className="text-xs font-medium leading-tight">
+        {subject?.abbreviation ?? cell.subjectId}
+      </div>
+      <div className="text-muted-foreground text-[10px] leading-tight">
+        {teacher?.name ?? cell.teacherId}
+      </div>
       <StatusIndicator cell={cell} />
     </div>
   )

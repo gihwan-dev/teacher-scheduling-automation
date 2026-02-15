@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -6,18 +7,22 @@ import { useShareStore } from '@/features/share-by-url'
 import { ReadOnlyTimetableView } from '@/widgets/readonly-timetable-view'
 
 export function ShareRestorePanel() {
-  const { previewData, isRestoring, restoreError, isImported, importToLocal } = useShareStore()
+  const { previewData, isRestoring, restoreError, isImported, importToLocal } =
+    useShareStore()
   const navigate = useNavigate()
 
   const handleImport = async () => {
     await importToLocal()
+    toast.success('시간표를 가져왔습니다')
   }
 
   if (restoreError) {
     return (
       <Card>
         <CardContent className="space-y-2 pt-6">
-          <h2 className="text-lg font-semibold text-destructive">잘못된 공유 링크</h2>
+          <h2 className="text-lg font-semibold text-destructive">
+            잘못된 공유 링크
+          </h2>
           <p className="text-sm text-muted-foreground">{restoreError}</p>
         </CardContent>
       </Card>
@@ -48,11 +53,20 @@ export function ShareRestorePanel() {
             <span>{new Date(snapshot.createdAt).toLocaleString('ko-KR')}</span>
           </div>
           {isImported ? (
-            <Button variant="outline" size="sm" onClick={() => navigate({ to: '/edit' })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate({ to: '/edit' })}
+            >
               편집 페이지로 이동
             </Button>
           ) : (
-            <Button variant="outline" size="sm" onClick={handleImport} disabled={isRestoring}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImport}
+              disabled={isRestoring}
+            >
               {isRestoring ? '가져오는 중...' : '내 시간표로 가져오기'}
             </Button>
           )}

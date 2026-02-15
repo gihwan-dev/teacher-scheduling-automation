@@ -1,4 +1,6 @@
 import { useEffect } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Search01Icon } from '@hugeicons/core-free-icons'
 import { ReplacementGrid } from './replacement-grid'
 import { CandidateListPanel } from './candidate-list-panel'
 import { ReplacementPreview } from './replacement-preview'
@@ -14,8 +16,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LoadingState } from '@/components/ui/loading-state'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Spinner } from '@/components/ui/spinner'
 
 export function ReplacementPage() {
   const {
@@ -42,38 +46,28 @@ export function ReplacementPage() {
   }, [loadSnapshot])
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">데이터 불러오는 중...</p>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (!snapshot) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">
-              먼저 시간표를 생성하세요. 생성 페이지에서 시간표를 생성한 후 저장하면 교체 탐색을 할 수 있습니다.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        title="시간표가 없습니다"
+        description="먼저 시간표를 생성하세요. 생성 페이지에서 시간표를 생성한 후 저장하면 교체 탐색을 할 수 있습니다."
+        actionLabel="생성 페이지로 이동"
+        actionTo="/generate"
+      />
     )
   }
 
   if (!schoolConfig) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">
-              학교 설정 데이터가 없습니다. 설정 페이지에서 먼저 입력해주세요.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyState
+        title="설정 데이터가 없습니다"
+        description="학교 설정 데이터가 없습니다. 설정 페이지에서 먼저 입력해주세요."
+        actionLabel="설정 페이지로 이동"
+        actionTo="/setup"
+      />
     )
   }
 
@@ -105,7 +99,10 @@ export function ReplacementPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Array.from({ length: schoolConfig.gradeCount }, (_, i) => i + 1).map((g) => (
+            {Array.from(
+              { length: schoolConfig.gradeCount },
+              (_, i) => i + 1,
+            ).map((g) => (
               <SelectItem key={g} value={String(g)}>
                 {g}학년
               </SelectItem>
@@ -145,7 +142,17 @@ export function ReplacementPage() {
           onClick={isMultiMode ? searchMulti : search}
           disabled={!canSearch || isSearching}
         >
-          {isSearching ? '탐색 중...' : '탐색'}
+          {isSearching ? (
+            <>
+              <Spinner size="sm" />
+              탐색 중...
+            </>
+          ) : (
+            <>
+              <HugeiconsIcon icon={Search01Icon} strokeWidth={2} />
+              탐색
+            </>
+          )}
         </Button>
       </div>
 
@@ -157,15 +164,9 @@ export function ReplacementPage() {
           subjects={subjects}
         />
         {isMultiMode ? (
-          <MultiCandidateListPanel
-            teachers={teachers}
-            subjects={subjects}
-          />
+          <MultiCandidateListPanel teachers={teachers} subjects={subjects} />
         ) : (
-          <CandidateListPanel
-            teachers={teachers}
-            subjects={subjects}
-          />
+          <CandidateListPanel teachers={teachers} subjects={subjects} />
         )}
       </div>
 

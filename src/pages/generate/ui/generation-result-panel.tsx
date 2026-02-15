@@ -1,3 +1,6 @@
+import { toast } from 'sonner'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { FloppyDiskIcon } from '@hugeicons/core-free-icons'
 import type { GenerationResult } from '@/features/generate-timetable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +13,11 @@ interface GenerationResultPanelProps {
 
 export function GenerationResultPanel({ result }: GenerationResultPanelProps) {
   const { saveResult } = useGenerateStore()
+
+  const handleSave = async () => {
+    await saveResult()
+    toast.success('결과를 저장했습니다')
+  }
 
   return (
     <div className="space-y-4">
@@ -28,12 +36,21 @@ export function GenerationResultPanel({ result }: GenerationResultPanelProps) {
             <StatItem label="총 슬롯" value={result.stats.totalSlots} />
             <StatItem label="배치 완료" value={result.stats.filledSlots} />
             <StatItem label="고정 수업" value={result.stats.fixedSlots} />
-            <StatItem label="점수" value={result.snapshot?.score.toFixed(1) ?? '-'} />
-            <StatItem label="생성 시간" value={`${result.stats.generationTimeMs}ms`} />
+            <StatItem
+              label="점수"
+              value={result.snapshot?.score.toFixed(1) ?? '-'}
+            />
+            <StatItem
+              label="생성 시간"
+              value={`${result.stats.generationTimeMs}ms`}
+            />
           </div>
           {result.success && (
             <div className="mt-4">
-              <Button onClick={saveResult}>결과 저장</Button>
+              <Button onClick={handleSave}>
+                <HugeiconsIcon icon={FloppyDiskIcon} strokeWidth={2} />
+                결과 저장
+              </Button>
             </div>
           )}
         </CardContent>
@@ -50,7 +67,9 @@ export function GenerationResultPanel({ result }: GenerationResultPanelProps) {
               {result.violations.map((v, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
                   <Badge
-                    variant={v.severity === 'error' ? 'destructive' : 'secondary'}
+                    variant={
+                      v.severity === 'error' ? 'destructive' : 'secondary'
+                    }
                     className="mt-0.5 shrink-0"
                   >
                     {v.severity === 'error' ? '오류' : '경고'}
@@ -73,7 +92,8 @@ export function GenerationResultPanel({ result }: GenerationResultPanelProps) {
             <ul className="space-y-2">
               {result.unplacedAssignments.map((u, i) => (
                 <li key={i} className="text-sm">
-                  교사 {u.teacherId} → {u.grade}학년 {u.classNumber}반 (잔여 {u.remainingHours}
+                  교사 {u.teacherId} → {u.grade}학년 {u.classNumber}반 (잔여{' '}
+                  {u.remainingHours}
                   시수) — {reasonLabel(u.reason)}
                 </li>
               ))}
@@ -102,7 +122,11 @@ export function GenerationResultPanel({ result }: GenerationResultPanelProps) {
                     }
                     className="mt-0.5 shrink-0"
                   >
-                    {s.priority === 'high' ? '높음' : s.priority === 'medium' ? '보통' : '낮음'}
+                    {s.priority === 'high'
+                      ? '높음'
+                      : s.priority === 'medium'
+                        ? '보통'
+                        : '낮음'}
                   </Badge>
                   <span>{s.message}</span>
                 </li>
