@@ -11,7 +11,13 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useSetupStore } from '@/features/manage-school-setup'
 import { DAYS_OF_WEEK, DAY_LABELS } from '@/shared/lib/constants'
 
@@ -21,7 +27,16 @@ const EVENT_TYPE_LABELS: Record<FixedEventType, string> = {
   SCHOOL_EVENT: '학교 행사',
 }
 
-const EVENT_TYPES: Array<FixedEventType> = ['FIXED_CLASS', 'BUSINESS_TRIP', 'SCHOOL_EVENT']
+const EVENT_TYPES: Array<FixedEventType> = [
+  'FIXED_CLASS',
+  'BUSINESS_TRIP',
+  'SCHOOL_EVENT',
+]
+
+const EVENT_TYPE_OPTIONS = EVENT_TYPES.map((type) => ({
+  value: type,
+  label: EVENT_TYPE_LABELS[type],
+}))
 
 export function FixedEventTable() {
   const {
@@ -41,6 +56,28 @@ export function FixedEventTable() {
 
   const activeDays = schoolConfig?.activeDays ?? DAYS_OF_WEEK.slice(0, 5)
   const periodsPerDay = schoolConfig?.periodsPerDay ?? 7
+  const dayOptions = activeDays.map((day) => ({
+    value: day,
+    label: DAY_LABELS[day],
+  }))
+  const periodOptions = Array.from({ length: periodsPerDay }, (_, i) => {
+    const period = i + 1
+    return { value: period, label: `${period}교시` }
+  })
+  const teacherOptions = [
+    { value: '', label: '없음' },
+    ...teachers.map((teacher) => ({
+      value: teacher.id,
+      label: teacher.name,
+    })),
+  ]
+  const subjectOptions = [
+    { value: '', label: '없음' },
+    ...subjects.map((subject) => ({
+      value: subject.id,
+      label: subject.name,
+    })),
+  ]
 
   const handleAdd = () => {
     addFixedEvent({
@@ -75,16 +112,19 @@ export function FixedEventTable() {
             <TableRow key={event.id}>
               <TableCell>
                 <Select
+                  items={EVENT_TYPE_OPTIONS}
                   value={event.type}
-                  onValueChange={(val) => val && updateFixedEvent(event.id, { type: val })}
+                  onValueChange={(val) =>
+                    val && updateFixedEvent(event.id, { type: val })
+                  }
                 >
                   <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {EVENT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {EVENT_TYPE_LABELS[t]}
+                    {EVENT_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -101,6 +141,7 @@ export function FixedEventTable() {
               </TableCell>
               <TableCell>
                 <Select
+                  items={teacherOptions}
                   value={event.teacherId ?? ''}
                   onValueChange={(val) =>
                     updateFixedEvent(event.id, { teacherId: val || null })
@@ -110,10 +151,9 @@ export function FixedEventTable() {
                     <SelectValue placeholder="선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">없음</SelectItem>
-                    {teachers.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
+                    {teacherOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -121,6 +161,7 @@ export function FixedEventTable() {
               </TableCell>
               <TableCell>
                 <Select
+                  items={subjectOptions}
                   value={event.subjectId ?? ''}
                   onValueChange={(val) =>
                     updateFixedEvent(event.id, { subjectId: val || null })
@@ -130,10 +171,9 @@ export function FixedEventTable() {
                     <SelectValue placeholder="선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">없음</SelectItem>
-                    {subjects.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
+                    {subjectOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -141,16 +181,19 @@ export function FixedEventTable() {
               </TableCell>
               <TableCell>
                 <Select
+                  items={dayOptions}
                   value={event.day}
-                  onValueChange={(val) => val && updateFixedEvent(event.id, { day: val })}
+                  onValueChange={(val) =>
+                    val && updateFixedEvent(event.id, { day: val })
+                  }
                 >
                   <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {activeDays.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {DAY_LABELS[d]}
+                    {dayOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -158,16 +201,19 @@ export function FixedEventTable() {
               </TableCell>
               <TableCell>
                 <Select
+                  items={periodOptions}
                   value={event.period}
-                  onValueChange={(val) => val !== null && updateFixedEvent(event.id, { period: val })}
+                  onValueChange={(val) =>
+                    val !== null && updateFixedEvent(event.id, { period: val })
+                  }
                 >
                   <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}교시
+                    {periodOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -187,14 +233,18 @@ export function FixedEventTable() {
           {/* 새 이벤트 추가 행 */}
           <TableRow>
             <TableCell>
-              <Select value={newType} onValueChange={(val) => val && setNewType(val)}>
+              <Select
+                items={EVENT_TYPE_OPTIONS}
+                value={newType}
+                onValueChange={(val) => val && setNewType(val)}
+              >
                 <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EVENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {EVENT_TYPE_LABELS[t]}
+                  {EVENT_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -211,28 +261,36 @@ export function FixedEventTable() {
             <TableCell />
             <TableCell />
             <TableCell>
-              <Select value={newDay} onValueChange={(val) => val && setNewDay(val)}>
+              <Select
+                items={dayOptions}
+                value={newDay}
+                onValueChange={(val) => val && setNewDay(val)}
+              >
                 <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeDays.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {DAY_LABELS[d]}
+                  {dayOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </TableCell>
             <TableCell>
-              <Select value={newPeriod} onValueChange={(val) => val !== null && setNewPeriod(val)}>
+              <Select
+                items={periodOptions}
+                value={newPeriod}
+                onValueChange={(val) => val !== null && setNewPeriod(val)}
+              >
                 <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}교시
+                  {periodOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

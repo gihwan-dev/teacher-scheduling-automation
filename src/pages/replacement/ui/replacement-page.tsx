@@ -72,6 +72,17 @@ export function ReplacementPage() {
   }
 
   const classCount = schoolConfig.classCountByGrade[viewGrade] ?? 0
+  const gradeOptions = Array.from(
+    { length: schoolConfig.gradeCount },
+    (_, i) => {
+      const grade = i + 1
+      return { value: String(grade), label: `${grade}학년` }
+    },
+  )
+  const classOptions = Array.from({ length: classCount }, (_, i) => {
+    const classNumber = i + 1
+    return { value: String(classNumber), label: `${classNumber}반` }
+  })
 
   const canSearch = isMultiMode
     ? multiTargetCellKeys.length >= 2
@@ -92,6 +103,7 @@ export function ReplacementPage() {
       {/* 컨트롤바 */}
       <div className="flex items-center gap-3 flex-wrap">
         <Select
+          items={gradeOptions}
           value={String(viewGrade)}
           onValueChange={(val) => setViewTarget(Number(val), 1)}
         >
@@ -99,17 +111,15 @@ export function ReplacementPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Array.from(
-              { length: schoolConfig.gradeCount },
-              (_, i) => i + 1,
-            ).map((g) => (
-              <SelectItem key={g} value={String(g)}>
-                {g}학년
+            {gradeOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select
+          items={classOptions}
           value={String(viewClassNumber)}
           onValueChange={(val) => setViewTarget(viewGrade, Number(val))}
         >
@@ -117,9 +127,9 @@ export function ReplacementPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Array.from({ length: classCount }, (_, i) => i + 1).map((c) => (
-              <SelectItem key={c} value={String(c)}>
-                {c}반
+            {classOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>

@@ -17,6 +17,7 @@ export function PolicyPage() {
   const {
     policies,
     teachers,
+    subjects,
     schoolConfig,
     selectedTeacherId,
     isDirty,
@@ -173,6 +174,7 @@ export function PolicyPage() {
           {selectedTeacher ? (
             <TeacherPolicyCard
               teacher={selectedTeacher}
+              subjects={subjects}
               policy={selectedPolicy}
               schoolConfig={schoolConfig}
             />

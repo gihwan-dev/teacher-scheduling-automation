@@ -15,9 +15,20 @@ interface CellEditorInlineProps {
   subjects: Array<Subject>
 }
 
-export function CellEditorInline({ teachers, subjects }: CellEditorInlineProps) {
+export function CellEditorInline({
+  teachers,
+  subjects,
+}: CellEditorInlineProps) {
   const { editDraft, updateEditDraft, confirmEdit, cancelEdit } = useEditStore()
   const containerRef = useRef<HTMLDivElement>(null)
+  const subjectOptions = subjects.map((subject) => ({
+    value: subject.id,
+    label: subject.abbreviation,
+  }))
+  const teacherOptions = teachers.map((teacher) => ({
+    value: teacher.id,
+    label: teacher.name,
+  }))
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,31 +54,37 @@ export function CellEditorInline({ teachers, subjects }: CellEditorInlineProps) 
       onClick={(e) => e.stopPropagation()}
     >
       <Select
+        items={subjectOptions}
         value={editDraft.subjectId}
-        onValueChange={(val) => { if (val) updateEditDraft({ ...editDraft, subjectId: val }) }}
+        onValueChange={(val) => {
+          if (val) updateEditDraft({ ...editDraft, subjectId: val })
+        }}
       >
         <SelectTrigger className="h-6 text-[10px] w-full" size="sm">
           <SelectValue placeholder="과목" />
         </SelectTrigger>
         <SelectContent>
-          {subjects.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.abbreviation}
+          {subjectOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       <Select
+        items={teacherOptions}
         value={editDraft.teacherId}
-        onValueChange={(val) => { if (val) updateEditDraft({ ...editDraft, teacherId: val }) }}
+        onValueChange={(val) => {
+          if (val) updateEditDraft({ ...editDraft, teacherId: val })
+        }}
       >
         <SelectTrigger className="h-6 text-[10px] w-full" size="sm">
           <SelectValue placeholder="교사" />
         </SelectTrigger>
         <SelectContent>
-          {teachers.map((t) => (
-            <SelectItem key={t.id} value={t.id}>
-              {t.name}
+          {teacherOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
             </SelectItem>
           ))}
         </SelectContent>

@@ -10,7 +10,13 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useSetupStore } from '@/features/manage-school-setup'
 
 const TRACK_LABELS: Record<SubjectTrack, string> = {
@@ -31,6 +37,11 @@ const TRACKS: Array<SubjectTrack> = [
   'OTHER',
 ]
 
+const TRACK_OPTIONS = TRACKS.map((track) => ({
+  value: track,
+  label: TRACK_LABELS[track],
+}))
+
 export function SubjectTable() {
   const { subjects, addSubject, updateSubject, removeSubject } = useSetupStore()
   const [newName, setNewName] = useState('')
@@ -39,7 +50,11 @@ export function SubjectTable() {
 
   const handleAdd = () => {
     if (!newName.trim() || !newAbbr.trim()) return
-    addSubject({ name: newName.trim(), abbreviation: newAbbr.trim(), track: newTrack })
+    addSubject({
+      name: newName.trim(),
+      abbreviation: newAbbr.trim(),
+      track: newTrack,
+    })
     setNewName('')
     setNewAbbr('')
     setNewTrack('COMMON')
@@ -62,7 +77,9 @@ export function SubjectTable() {
               <TableCell>
                 <Input
                   value={subject.name}
-                  onChange={(e) => updateSubject(subject.id, { name: e.target.value })}
+                  onChange={(e) =>
+                    updateSubject(subject.id, { name: e.target.value })
+                  }
                   className="h-7"
                 />
               </TableCell>
@@ -77,16 +94,19 @@ export function SubjectTable() {
               </TableCell>
               <TableCell>
                 <Select
+                  items={TRACK_OPTIONS}
                   value={subject.track}
-                  onValueChange={(val) => val && updateSubject(subject.id, { track: val })}
+                  onValueChange={(val) =>
+                    val && updateSubject(subject.id, { track: val })
+                  }
                 >
                   <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TRACKS.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {TRACK_LABELS[t]}
+                    {TRACK_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -124,14 +144,18 @@ export function SubjectTable() {
               />
             </TableCell>
             <TableCell>
-              <Select value={newTrack} onValueChange={(val) => val && setNewTrack(val)}>
+              <Select
+                items={TRACK_OPTIONS}
+                value={newTrack}
+                onValueChange={(val) => val && setNewTrack(val)}
+              >
                 <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TRACKS.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {TRACK_LABELS[t]}
+                  {TRACK_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

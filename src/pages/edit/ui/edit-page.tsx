@@ -64,6 +64,17 @@ export function EditPage() {
   }
 
   const classCount = schoolConfig.classCountByGrade[viewGrade] ?? 0
+  const gradeOptions = Array.from(
+    { length: schoolConfig.gradeCount },
+    (_, i) => {
+      const grade = i + 1
+      return { value: String(grade), label: `${grade}학년` }
+    },
+  )
+  const classOptions = Array.from({ length: classCount }, (_, i) => {
+    const classNumber = i + 1
+    return { value: String(classNumber), label: `${classNumber}반` }
+  })
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-6">
@@ -77,6 +88,7 @@ export function EditPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <Select
+            items={gradeOptions}
             value={String(viewGrade)}
             onValueChange={(val) => setViewTarget(Number(val), 1)}
           >
@@ -84,17 +96,15 @@ export function EditPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from(
-                { length: schoolConfig.gradeCount },
-                (_, i) => i + 1,
-              ).map((g) => (
-                <SelectItem key={g} value={String(g)}>
-                  {g}학년
+              {gradeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select
+            items={classOptions}
             value={String(viewClassNumber)}
             onValueChange={(val) => setViewTarget(viewGrade, Number(val))}
           >
@@ -102,9 +112,9 @@ export function EditPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: classCount }, (_, i) => i + 1).map((c) => (
-                <SelectItem key={c} value={String(c)}>
-                  {c}반
+              {classOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>

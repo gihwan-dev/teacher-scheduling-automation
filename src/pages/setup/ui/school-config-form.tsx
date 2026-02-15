@@ -4,12 +4,23 @@ import type { DayOfWeek } from '@/shared/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useSetupStore } from '@/features/manage-school-setup'
 import { calculateSlotsPerClass, calculateTotalSlots } from '@/entities/school'
 import { DAYS_OF_WEEK, DAY_LABELS } from '@/shared/lib/constants'
 import { generateId } from '@/shared/lib/id'
+
+const GRADE_COUNT_OPTIONS = [1, 2, 3].map((grade) => ({
+  value: grade,
+  label: `${grade}학년`,
+}))
 
 function createDefaultSchoolConfig(): SchoolConfig {
   return {
@@ -45,7 +56,11 @@ export function SchoolConfigForm() {
       for (let g = 1; g <= value; g++) {
         if (!(g in newClassCount)) newClassCount[g] = 1
       }
-      setSchoolConfig({ ...config, gradeCount: value, classCountByGrade: newClassCount })
+      setSchoolConfig({
+        ...config,
+        gradeCount: value,
+        classCountByGrade: newClassCount,
+      })
     },
     [config, setSchoolConfig],
   )
@@ -95,32 +110,47 @@ export function SchoolConfigForm() {
           {/* 학년 수 */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
             <Label>학년 수</Label>
-            <Select value={config.gradeCount} onValueChange={(val) => val !== null && handleGradeCountChange(val)}>
+            <Select
+              items={GRADE_COUNT_OPTIONS}
+              value={config.gradeCount}
+              onValueChange={(val) =>
+                val !== null && handleGradeCountChange(val)
+              }
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={1}>1학년</SelectItem>
-                <SelectItem value={2}>2학년</SelectItem>
-                <SelectItem value={3}>3학년</SelectItem>
+                {GRADE_COUNT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
           {/* 학년별 반 수 */}
-          {Array.from({ length: config.gradeCount }, (_, i) => i + 1).map((grade) => (
-            <div key={grade} className="grid grid-cols-[120px_1fr] items-center gap-4">
-              <Label>{grade}학년 반 수</Label>
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={config.classCountByGrade[grade] ?? 1}
-                onChange={(e) => handleClassCountChange(grade, parseInt(e.target.value, 10))}
-                className="w-24"
-              />
-            </div>
-          ))}
+          {Array.from({ length: config.gradeCount }, (_, i) => i + 1).map(
+            (grade) => (
+              <div
+                key={grade}
+                className="grid grid-cols-[120px_1fr] items-center gap-4"
+              >
+                <Label>{grade}학년 반 수</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={config.classCountByGrade[grade] ?? 1}
+                  onChange={(e) =>
+                    handleClassCountChange(grade, parseInt(e.target.value, 10))
+                  }
+                  className="w-24"
+                />
+              </div>
+            ),
+          )}
 
           {/* 운영 요일 */}
           <div className="grid grid-cols-[120px_1fr] items-start gap-4">
@@ -151,7 +181,9 @@ export function SchoolConfigForm() {
               min={1}
               max={10}
               value={config.periodsPerDay}
-              onChange={(e) => handlePeriodsChange(parseInt(e.target.value, 10))}
+              onChange={(e) =>
+                handlePeriodsChange(parseInt(e.target.value, 10))
+              }
               className="w-24"
             />
           </div>

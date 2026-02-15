@@ -1,8 +1,14 @@
 import { create } from 'zustand'
 
 import type { SchoolConfig } from '@/entities/school'
+import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
-import type { AvoidanceSlot, PolicyValidationMessage, TeacherPolicy, TimePreference } from '@/entities/teacher-policy'
+import type {
+  AvoidanceSlot,
+  PolicyValidationMessage,
+  TeacherPolicy,
+  TimePreference,
+} from '@/entities/teacher-policy'
 import { validateAllPolicies } from '@/entities/teacher-policy'
 import { generateId } from '@/shared/lib/id'
 import {
@@ -18,6 +24,7 @@ function now(): string {
 interface TeacherPolicyState {
   policies: Array<TeacherPolicy>
   teachers: Array<Teacher>
+  subjects: Array<Subject>
   schoolConfig: SchoolConfig | null
   selectedTeacherId: string | null
   isDirty: boolean
@@ -73,6 +80,7 @@ function upsertPolicy(
 export const useTeacherPolicyStore = create<TeacherPolicyState>((set, get) => ({
   policies: [],
   teachers: [],
+  subjects: [],
   schoolConfig: null,
   selectedTeacherId: null,
   isDirty: false,
@@ -138,6 +146,7 @@ export const useTeacherPolicyStore = create<TeacherPolicyState>((set, get) => ({
     set({
       schoolConfig: setupData.schoolConfig ?? null,
       teachers,
+      subjects: setupData.subjects,
       policies,
       selectedTeacherId,
       isDirty: false,
@@ -151,7 +160,11 @@ export const useTeacherPolicyStore = create<TeacherPolicyState>((set, get) => ({
     const { policies, teachers, schoolConfig } = get()
     if (!schoolConfig) return false
 
-    const { valid, messages } = validateAllPolicies(policies, teachers, schoolConfig)
+    const { valid, messages } = validateAllPolicies(
+      policies,
+      teachers,
+      schoolConfig,
+    )
     set({ validationMessages: messages, isSaveBlocked: !valid })
 
     if (!valid) return false
@@ -165,7 +178,11 @@ export const useTeacherPolicyStore = create<TeacherPolicyState>((set, get) => ({
     const { policies, teachers, schoolConfig } = get()
     if (!schoolConfig) return
 
-    const { valid, messages } = validateAllPolicies(policies, teachers, schoolConfig)
+    const { valid, messages } = validateAllPolicies(
+      policies,
+      teachers,
+      schoolConfig,
+    )
     set({ validationMessages: messages, isSaveBlocked: !valid })
   },
 }))

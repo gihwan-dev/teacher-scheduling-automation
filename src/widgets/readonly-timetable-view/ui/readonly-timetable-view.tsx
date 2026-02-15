@@ -3,7 +3,11 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { SchoolConfig } from '@/entities/school'
-import { StatusIndicator, StatusLegend, getCellStatusClasses } from '@/entities/timetable'
+import {
+  StatusIndicator,
+  StatusLegend,
+  getCellStatusClasses,
+} from '@/entities/timetable'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import {
   Table,
@@ -46,6 +50,17 @@ export function ReadOnlyTimetableView({
 
   const { activeDays, periodsPerDay } = schoolConfig
   const classCount = schoolConfig.classCountByGrade[selectedGrade] ?? 0
+  const gradeOptions = Array.from(
+    { length: schoolConfig.gradeCount },
+    (_, i) => {
+      const grade = i + 1
+      return { value: String(grade), label: `${grade}학년` }
+    },
+  )
+  const classOptions = Array.from({ length: classCount }, (_, i) => {
+    const classNumber = i + 1
+    return { value: String(classNumber), label: `${classNumber}반` }
+  })
 
   const filteredCells = cells.filter(
     (c) => c.grade === selectedGrade && c.classNumber === selectedClass,
@@ -63,6 +78,7 @@ export function ReadOnlyTimetableView({
           <CardTitle>{title}</CardTitle>
           <div className="flex items-center gap-2">
             <Select
+              items={gradeOptions}
               value={String(selectedGrade)}
               onValueChange={(val) => {
                 setSelectedGrade(Number(val))
@@ -73,24 +89,25 @@ export function ReadOnlyTimetableView({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: schoolConfig.gradeCount }, (_, i) => i + 1).map((g) => (
-                  <SelectItem key={g} value={String(g)}>
-                    {g}학년
+                {gradeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select
+              items={classOptions}
               value={String(selectedClass)}
               onValueChange={(val) => setSelectedClass(Number(val))}
             >
               <SelectTrigger className="w-24">
-                <SelectValue />
+              <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: classCount }, (_, i) => i + 1).map((c) => (
-                  <SelectItem key={c} value={String(c)}>
-                    {c}반
+                {classOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -112,30 +129,39 @@ export function ReadOnlyTimetableView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((period) => (
-              <TableRow key={period}>
-                <TableCell className="text-center font-medium">{period}</TableCell>
-                {activeDays.map((day) => {
-                  const cell = cellMap.get(`${day}-${period}`)
-                  return (
-                    <TableCell
-                      key={day}
-                      className={cn('text-center', getCellStatusClasses(cell))}
-                    >
-                      {cell ? (
-                        <CellContent
-                          cell={cell}
-                          teacherMap={teacherMap}
-                          subjectMap={subjectMap}
-                        />
-                      ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
-                      )}
-                    </TableCell>
-                  )
-                })}
-              </TableRow>
-            ))}
+            {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map(
+              (period) => (
+                <TableRow key={period}>
+                  <TableCell className="text-center font-medium">
+                    {period}
+                  </TableCell>
+                  {activeDays.map((day) => {
+                    const cell = cellMap.get(`${day}-${period}`)
+                    return (
+                      <TableCell
+                        key={day}
+                        className={cn(
+                          'text-center',
+                          getCellStatusClasses(cell),
+                        )}
+                      >
+                        {cell ? (
+                          <CellContent
+                            cell={cell}
+                            teacherMap={teacherMap}
+                            subjectMap={subjectMap}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground text-xs">
+                            -
+                          </span>
+                        )}
+                      </TableCell>
+                    )
+                  })}
+                </TableRow>
+              ),
+            )}
           </TableBody>
         </Table>
       </CardContent>
@@ -157,8 +183,12 @@ function CellContent({
 
   return (
     <div className="space-y-0.5">
-      <div className="text-xs font-medium">{subject?.abbreviation ?? cell.subjectId}</div>
-      <div className="text-muted-foreground text-[10px]">{teacher?.name ?? cell.teacherId}</div>
+      <div className="text-xs font-medium">
+        {subject?.abbreviation ?? cell.subjectId}
+      </div>
+      <div className="text-muted-foreground text-[10px]">
+        {teacher?.name ?? cell.teacherId}
+      </div>
       <StatusIndicator cell={cell} />
     </div>
   )

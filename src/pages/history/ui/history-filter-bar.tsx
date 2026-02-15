@@ -33,23 +33,35 @@ export function HistoryFilterBar({
   onWeekTagChange,
   onActionTypeChange,
 }: HistoryFilterBarProps) {
+  const weekTagOptions = [
+    { value: 'ALL', label: '전체 주차' },
+    ...weekTags.map((tag) => ({ value: tag, label: tag })),
+  ]
+
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <Select value={selectedWeekTag} onValueChange={(val) => onWeekTagChange(val ?? 'ALL')}>
+      <Select
+        items={weekTagOptions}
+        value={selectedWeekTag}
+        onValueChange={(val) => onWeekTagChange(val ?? 'ALL')}
+      >
         <SelectTrigger className="w-36">
           <SelectValue placeholder="주차 선택" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">전체 주차</SelectItem>
-          {weekTags.map((tag) => (
-            <SelectItem key={tag} value={tag}>
-              {tag}
+          {weekTagOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
-      <Select value={selectedActionType} onValueChange={(val) => onActionTypeChange(val ?? 'ALL')}>
+      <Select
+        items={ACTION_TYPE_OPTIONS}
+        value={selectedActionType}
+        onValueChange={(val) => onActionTypeChange(val ?? 'ALL')}
+      >
         <SelectTrigger className="w-32">
           <SelectValue placeholder="액션 타입" />
         </SelectTrigger>
