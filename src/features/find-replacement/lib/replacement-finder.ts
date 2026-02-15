@@ -52,7 +52,10 @@ export function findReplacementCandidates(
 
   // blocked slots
   let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
-  blockedSlots = expandGradeBlockedSlots(blockedSlots, schoolConfig.classCountByGrade)
+  blockedSlots = expandGradeBlockedSlots(
+    blockedSlots,
+    schoolConfig.classCountByGrade,
+  )
 
   const candidates: Array<ReplacementCandidate> = []
 
@@ -61,8 +64,19 @@ export function findReplacementCandidates(
 
   // SWAP 후보 탐색
   for (const targetCell of allCells) {
-    if (targetCell.grade !== grade || targetCell.classNumber !== classNumber) continue
-    if (targetCell.day === sourceCell.day && targetCell.period === sourceCell.period) continue
+    if (targetCell.grade !== grade || targetCell.classNumber !== classNumber)
+      continue
+    if (
+      targetCell.day === sourceCell.day &&
+      targetCell.period === sourceCell.period
+    )
+      continue
+    // 같은 교사+과목 조합은 교환해도 결과가 동일하므로 제외
+    if (
+      targetCell.teacherId === sourceCell.teacherId &&
+      targetCell.subjectId === sourceCell.subjectId
+    )
+      continue
     if (!isCellEditable(targetCell)) continue
 
     totalExamined++
@@ -90,7 +104,11 @@ export function findReplacementCandidates(
       // 해당 슬롯이 비어있는지 확인
       const slotKey = makeCellKey(grade, classNumber, day, period)
       const existingCell = allCells.find(
-        (c) => c.grade === grade && c.classNumber === classNumber && c.day === day && c.period === period,
+        (c) =>
+          c.grade === grade &&
+          c.classNumber === classNumber &&
+          c.day === day &&
+          c.period === period,
       )
       if (existingCell) continue
 
@@ -153,11 +171,15 @@ function trySwap(
   const grid = new TimetableGrid()
   for (const cell of allCells) {
     const isSource =
-      cell.grade === sourceCell.grade && cell.classNumber === sourceCell.classNumber &&
-      cell.day === sourceCell.day && cell.period === sourceCell.period
+      cell.grade === sourceCell.grade &&
+      cell.classNumber === sourceCell.classNumber &&
+      cell.day === sourceCell.day &&
+      cell.period === sourceCell.period
     const isTarget =
-      cell.grade === targetCell.grade && cell.classNumber === targetCell.classNumber &&
-      cell.day === targetCell.day && cell.period === targetCell.period
+      cell.grade === targetCell.grade &&
+      cell.classNumber === targetCell.classNumber &&
+      cell.day === targetCell.day &&
+      cell.period === targetCell.period
     if (isSource || isTarget) continue
     grid.placeCell(cell)
   }
@@ -235,14 +257,18 @@ function trySwap(
   // 교환 후 전체 셀 목록
   const afterCells = allCells.map((c) => {
     if (
-      c.grade === sourceCell.grade && c.classNumber === sourceCell.classNumber &&
-      c.day === sourceCell.day && c.period === sourceCell.period
+      c.grade === sourceCell.grade &&
+      c.classNumber === sourceCell.classNumber &&
+      c.day === sourceCell.day &&
+      c.period === sourceCell.period
     ) {
       return resultSourceCell
     }
     if (
-      c.grade === targetCell.grade && c.classNumber === targetCell.classNumber &&
-      c.day === targetCell.day && c.period === targetCell.period
+      c.grade === targetCell.grade &&
+      c.classNumber === targetCell.classNumber &&
+      c.day === targetCell.day &&
+      c.period === targetCell.period
     ) {
       return resultTargetCell
     }
@@ -293,8 +319,10 @@ function tryMove(
   const grid = new TimetableGrid()
   for (const cell of allCells) {
     if (
-      cell.day === sourceCell.day && cell.period === sourceCell.period &&
-      cell.grade === sourceCell.grade && cell.classNumber === sourceCell.classNumber
+      cell.day === sourceCell.day &&
+      cell.period === sourceCell.period &&
+      cell.grade === sourceCell.grade &&
+      cell.classNumber === sourceCell.classNumber
     ) {
       continue
     }
@@ -391,7 +419,14 @@ function simulateRelaxations(
         teacherMaxDailyHours: ctx.constraintPolicy.teacherMaxDailyHours + 1,
       },
     }
-    const result = findReplacementCandidates(sourceCellKey, sourceCell, allCells, baseConfig, relaxed, true)
+    const result = findReplacementCandidates(
+      sourceCellKey,
+      sourceCell,
+      allCells,
+      baseConfig,
+      relaxed,
+      true,
+    )
     if (result.candidates.length > 0) {
       suggestions.push({
         type: 'INCREASE_DAILY_LIMIT',
@@ -408,10 +443,18 @@ function simulateRelaxations(
       ...ctx,
       constraintPolicy: {
         ...ctx.constraintPolicy,
-        teacherMaxConsecutiveHours: ctx.constraintPolicy.teacherMaxConsecutiveHours + 1,
+        teacherMaxConsecutiveHours:
+          ctx.constraintPolicy.teacherMaxConsecutiveHours + 1,
       },
     }
-    const result = findReplacementCandidates(sourceCellKey, sourceCell, allCells, baseConfig, relaxed, true)
+    const result = findReplacementCandidates(
+      sourceCellKey,
+      sourceCell,
+      allCells,
+      baseConfig,
+      relaxed,
+      true,
+    )
     if (result.candidates.length > 0) {
       suggestions.push({
         type: 'INCREASE_CONSECUTIVE_LIMIT',
@@ -428,7 +471,14 @@ function simulateRelaxations(
       p.teacherId === sourceCell.teacherId ? { ...p, avoidanceSlots: [] } : p,
     )
     const relaxed = { ...ctx, teacherPolicies: relaxedPolicies }
-    const result = findReplacementCandidates(sourceCellKey, sourceCell, allCells, baseConfig, relaxed, true)
+    const result = findReplacementCandidates(
+      sourceCellKey,
+      sourceCell,
+      allCells,
+      baseConfig,
+      relaxed,
+      true,
+    )
     if (result.candidates.length > 0) {
       suggestions.push({
         type: 'REMOVE_AVOIDANCE',
@@ -444,7 +494,14 @@ function simulateRelaxations(
     const unlockedCells = allCells.map((c) =>
       c.status === 'LOCKED' ? { ...c, status: 'BASE' as const } : c,
     )
-    const result = findReplacementCandidates(sourceCellKey, sourceCell, unlockedCells, baseConfig, ctx, true)
+    const result = findReplacementCandidates(
+      sourceCellKey,
+      sourceCell,
+      unlockedCells,
+      baseConfig,
+      ctx,
+      true,
+    )
     if (result.candidates.length > 0) {
       suggestions.push({
         type: 'UNLOCK_CELLS',

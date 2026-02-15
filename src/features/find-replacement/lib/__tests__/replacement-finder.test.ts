@@ -7,7 +7,10 @@ import type { SchoolConfig } from '@/entities/school'
 import type { ReplacementSearchConfig } from '../../model/types'
 import type { DayOfWeek } from '@/shared/lib/types'
 
-function makeCell(overrides: Partial<TimetableCell> & Pick<TimetableCell, 'teacherId' | 'subjectId' | 'day' | 'period'>): TimetableCell {
+function makeCell(
+  overrides: Partial<TimetableCell> &
+    Pick<TimetableCell, 'teacherId' | 'subjectId' | 'day' | 'period'>,
+): TimetableCell {
   return {
     grade: 1,
     classNumber: 1,
@@ -17,7 +20,12 @@ function makeCell(overrides: Partial<TimetableCell> & Pick<TimetableCell, 'teach
   }
 }
 
-function makeCellKey(grade: number, classNumber: number, day: DayOfWeek, period: number): CellKey {
+function makeCellKey(
+  grade: number,
+  classNumber: number,
+  day: DayOfWeek,
+  period: number,
+): CellKey {
   return `${grade}-${classNumber}-${day}-${period}`
 }
 
@@ -46,7 +54,9 @@ const defaultConfig: ReplacementSearchConfig = {
   maxCandidates: 20,
 }
 
-function makeContext(overrides?: Partial<ReplacementFinderContext>): ReplacementFinderContext {
+function makeContext(
+  overrides?: Partial<ReplacementFinderContext>,
+): ReplacementFinderContext {
   return {
     schoolConfig: defaultSchoolConfig,
     constraintPolicy: defaultPolicy,
@@ -64,7 +74,13 @@ describe('findReplacementCandidates', () => {
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext())
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     // 최소 2개의 SWAP 대상이 있어야 함 (T2와 교환)
     // stats를 통해 검사 수 확인
@@ -80,7 +96,13 @@ describe('findReplacementCandidates', () => {
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext())
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     // 같은 교사끼리 교환은 항상 가능 (충돌 없음)
     // 하지만 같은 교사-같은 요일이면 충돌 없으므로 swap 성공
@@ -91,16 +113,29 @@ describe('findReplacementCandidates', () => {
   it('고정 셀은 SWAP 대상에서 제외한다', () => {
     const cells: Array<TimetableCell> = [
       makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }),
-      makeCell({ teacherId: 'T2', subjectId: 'S2', day: 'MON', period: 2, isFixed: true }),
+      makeCell({
+        teacherId: 'T2',
+        subjectId: 'S2',
+        day: 'MON',
+        period: 2,
+        isFixed: true,
+      }),
       makeCell({ teacherId: 'T3', subjectId: 'S3', day: 'TUE', period: 1 }),
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext())
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     // 고정 셀(MON-2)과의 교환 후보는 없어야 함
     const swapWithFixed = result.candidates.filter(
-      (c) => c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'MON', 2),
+      (c) =>
+        c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'MON', 2),
     )
     expect(swapWithFixed.length).toBe(0)
   })
@@ -108,14 +143,27 @@ describe('findReplacementCandidates', () => {
   it('잠긴 셀은 SWAP 대상에서 제외한다', () => {
     const cells: Array<TimetableCell> = [
       makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }),
-      makeCell({ teacherId: 'T2', subjectId: 'S2', day: 'MON', period: 2, status: 'LOCKED' }),
+      makeCell({
+        teacherId: 'T2',
+        subjectId: 'S2',
+        day: 'MON',
+        period: 2,
+        status: 'LOCKED',
+      }),
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext())
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     const swapWithLocked = result.candidates.filter(
-      (c) => c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'MON', 2),
+      (c) =>
+        c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'MON', 2),
     )
     expect(swapWithLocked.length).toBe(0)
   })
@@ -146,11 +194,18 @@ describe('findReplacementCandidates', () => {
       ],
     })
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, ctx)
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      ctx,
+    )
 
     // T1→TUE-1 swap은 차단되어야 함
     const swapToBlocked = result.candidates.filter(
-      (c) => c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'TUE', 1),
+      (c) =>
+        c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'TUE', 1),
     )
     expect(swapToBlocked.length).toBe(0)
   })
@@ -161,7 +216,13 @@ describe('findReplacementCandidates', () => {
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext())
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     const moveCandidates = result.candidates.filter((c) => c.type === 'MOVE')
     expect(moveCandidates.length).toBeGreaterThan(0)
@@ -172,7 +233,14 @@ describe('findReplacementCandidates', () => {
     const cells: Array<TimetableCell> = [
       makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }),
       // 다른 반 (2반)에서 T1이 TUE 1교시 수업
-      makeCell({ teacherId: 'T1', subjectId: 'S2', day: 'TUE', period: 1, grade: 1, classNumber: 2 }),
+      makeCell({
+        teacherId: 'T1',
+        subjectId: 'S2',
+        day: 'TUE',
+        period: 1,
+        grade: 1,
+        classNumber: 2,
+      }),
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
@@ -183,10 +251,17 @@ describe('findReplacementCandidates', () => {
       },
     })
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, ctx)
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      ctx,
+    )
 
     const moveToConflict = result.candidates.filter(
-      (c) => c.type === 'MOVE' && c.targetCellKey === makeCellKey(1, 1, 'TUE', 1),
+      (c) =>
+        c.type === 'MOVE' && c.targetCellKey === makeCellKey(1, 1, 'TUE', 1),
     )
     expect(moveToConflict.length).toBe(0)
   })
@@ -203,7 +278,13 @@ describe('findReplacementCandidates', () => {
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext({ schoolConfig }))
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext({ schoolConfig }),
+    )
 
     const moveCandidates = result.candidates.filter((c) => c.type === 'MOVE')
     expect(moveCandidates.length).toBe(0)
@@ -211,14 +292,68 @@ describe('findReplacementCandidates', () => {
 
   it('고정 셀은 교체 대상으로 선택할 수 없다', () => {
     const cells: Array<TimetableCell> = [
-      makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1, isFixed: true }),
+      makeCell({
+        teacherId: 'T1',
+        subjectId: 'S1',
+        day: 'MON',
+        period: 1,
+        isFixed: true,
+      }),
     ]
     const sourceKey = makeCellKey(1, 1, 'MON', 1)
 
-    const result = findReplacementCandidates(sourceKey, cells[0], cells, defaultConfig, makeContext())
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      defaultConfig,
+      makeContext(),
+    )
 
     expect(result.candidates.length).toBe(0)
     expect(result.stats.totalExamined).toBe(0)
+  })
+
+  it('동일 교사+과목 셀은 SWAP 후보에서 제외한다', () => {
+    // 슬롯을 모두 채워서 MOVE 후보가 없도록 설정
+    const schoolConfig: SchoolConfig = {
+      ...defaultSchoolConfig,
+      activeDays: ['MON', 'TUE', 'WED'],
+      periodsPerDay: 1,
+    }
+    const cells: Array<TimetableCell> = [
+      makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }),
+      makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'TUE', period: 1 }),
+      makeCell({ teacherId: 'T2', subjectId: 'S2', day: 'WED', period: 1 }),
+    ]
+    const sourceKey = makeCellKey(1, 1, 'MON', 1)
+
+    const configWithViolating: ReplacementSearchConfig = {
+      ...defaultConfig,
+      includeViolating: true,
+    }
+
+    const result = findReplacementCandidates(
+      sourceKey,
+      cells[0],
+      cells,
+      configWithViolating,
+      makeContext({ schoolConfig }),
+    )
+
+    // T1+S1(TUE-1)은 교환해도 결과 동일하므로 제외
+    const swapWithSame = result.candidates.filter(
+      (c) =>
+        c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'TUE', 1),
+    )
+    expect(swapWithSame.length).toBe(0)
+
+    // T2+S2(WED-1)은 다른 교사+과목이므로 후보에 포함
+    const swapWithDifferent = result.candidates.filter(
+      (c) =>
+        c.type === 'SWAP' && c.targetCellKey === makeCellKey(1, 1, 'WED', 1),
+    )
+    expect(swapWithDifferent.length).toBe(1)
   })
 
   it('후보 0건이면 완화 제안을 생성한다', () => {
