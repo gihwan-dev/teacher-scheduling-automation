@@ -3,6 +3,7 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { SchoolConfig } from '@/entities/school'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import {
   StatusIndicator,
   StatusLegend,
@@ -48,7 +49,8 @@ export function ReadOnlyTimetableView({
   const teacherMap = new Map(teachers.map((t) => [t.id, t]))
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
 
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
+  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
   const classCount = schoolConfig.classCountByGrade[selectedGrade] ?? 0
   const gradeOptions = Array.from(
     { length: schoolConfig.gradeCount },
@@ -129,13 +131,19 @@ export function ReadOnlyTimetableView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map(
+            {Array.from({ length: maxPeriodsPerDay }, (_, i) => i + 1).map(
               (period) => (
                 <TableRow key={period}>
                   <TableCell className="text-center font-medium">
                     {period}
                   </TableCell>
                   {activeDays.map((day) => {
+                    const dayMax = getDayPeriodCount(schoolConfig, day)
+                    if (period > dayMax) {
+                      return (
+                        <TableCell key={day} className="bg-muted/40" />
+                      )
+                    }
                     const cell = cellMap.get(`${day}-${period}`)
                     return (
                       <TableCell

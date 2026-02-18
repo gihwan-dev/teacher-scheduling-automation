@@ -1,20 +1,15 @@
-import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { useShareStore } from '@/features/share-by-url'
-import { ReadOnlyTimetableView } from '@/widgets/readonly-timetable-view'
+import {
+  ReadOnlyTeacherTimetableView,
+  ReadOnlyTimetableView,
+} from '@/widgets/readonly-timetable-view'
 
 export function ShareRestorePanel() {
-  const { previewData, isRestoring, restoreError, isImported, importToLocal } =
-    useShareStore()
-  const navigate = useNavigate()
-
-  const handleImport = async () => {
-    await importToLocal()
-    toast.success('시간표를 가져왔습니다')
-  }
+  const { previewData, isRestoring, restoreError } = useShareStore()
+  const [viewMode, setViewMode] = useState<'class' | 'teacher'>('class')
 
   if (restoreError) {
     return (
@@ -43,44 +38,40 @@ export function ShareRestorePanel() {
 
   return (
     <div className="space-y-4">
-      {/* 컴팩트 정보 바 */}
-      <Card>
-        <CardContent className="flex items-center justify-between pt-6">
-          <div className="flex items-center gap-4 text-sm">
-            <Badge variant="secondary">{snapshot.score.toFixed(1)}점</Badge>
-            <span>{teachers.length}명 교사</span>
-            <span>{subjects.length}개 과목</span>
-            <span>{new Date(snapshot.createdAt).toLocaleString('ko-KR')}</span>
-          </div>
-          {isImported ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate({ to: '/edit' })}
-            >
-              편집 페이지로 이동
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImport}
-              disabled={isRestoring}
-            >
-              {isRestoring ? '가져오는 중...' : '내 시간표로 가져오기'}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-2">
+        <Button
+          variant={viewMode === 'teacher' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewMode('teacher')}
+        >
+          교사 중심 보기
+        </Button>
+        <Button
+          variant={viewMode === 'class' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewMode('class')}
+        >
+          학급 중심 보기
+        </Button>
+      </div>
 
-      {/* 읽기 전용 시간표 그리드 */}
-      <ReadOnlyTimetableView
-        cells={snapshot.cells}
-        schoolConfig={schoolConfig}
-        teachers={teachers}
-        subjects={subjects}
-        title="공유된 시간표"
-      />
+      {viewMode === 'class' ? (
+        <ReadOnlyTimetableView
+          cells={snapshot.cells}
+          schoolConfig={schoolConfig}
+          teachers={teachers}
+          subjects={subjects}
+          title="공유된 시간표"
+        />
+      ) : (
+        <ReadOnlyTeacherTimetableView
+          cells={snapshot.cells}
+          schoolConfig={schoolConfig}
+          teachers={teachers}
+          subjects={subjects}
+          title="교사 시간표"
+        />
+      )}
     </div>
   )
 }

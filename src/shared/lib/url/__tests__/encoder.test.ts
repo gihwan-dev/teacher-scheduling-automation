@@ -119,7 +119,7 @@ describe('buildSharePayload', () => {
       constraintPolicy,
       teacherPolicies,
     )
-    expect(payload.v).toBe(1)
+    expect(payload.v).toBe(2)
   })
 
   it('메타 정보를 올바르게 인코딩한다', () => {
@@ -152,6 +152,13 @@ describe('buildSharePayload', () => {
       c: { 1: 2, 2: 2 },
       d: [0, 1, 2, 3, 4], // MON~FRI
       p: 7,
+      pb: [
+        [0, 7],
+        [1, 7],
+        [2, 7],
+        [3, 7],
+        [4, 7],
+      ],
     })
   })
 
