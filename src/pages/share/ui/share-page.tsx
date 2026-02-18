@@ -31,7 +31,7 @@ export function SharePage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isRestoreMode
-            ? '공유된 시간표를 확인하고, 필요 시 내 시간표로 가져올 수 있습니다.'
+            ? '공유된 시간표를 읽기 전용으로 확인합니다.'
             : '현재 시간표 상태를 URL로 공유할 수 있습니다.'}
         </p>
       </div>

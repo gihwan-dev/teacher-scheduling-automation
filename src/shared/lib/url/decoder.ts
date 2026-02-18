@@ -1,6 +1,7 @@
 import {
   INDEX_TO_CELL_STATUS,
   INDEX_TO_DAY,
+  INDEX_TO_SUBJECT_TYPE,
   INDEX_TO_TIME_PREF,
   INDEX_TO_TRACK,
 } from './constants'
@@ -13,6 +14,7 @@ import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { SharePayload } from './types'
 import type { DayOfWeek } from '@/shared/lib/types'
 import { generateId } from '@/shared/lib/id'
+import { DAYS_OF_WEEK } from '@/shared/lib/constants'
 
 export interface RestoredState {
   schoolConfig: SchoolConfig
@@ -28,6 +30,24 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
   const activeDays: Array<DayOfWeek> = payload.school.d.map(
     (i) => INDEX_TO_DAY[i],
   )
+  const periodsPerDay =
+    payload.school.p ??
+    Math.max(
+      ...(payload.school.pb?.map(([, periods]) => periods) ?? [7]),
+    )
+  const periodsByDay = DAYS_OF_WEEK.reduce(
+    (acc, day) => {
+      acc[day] = activeDays.includes(day) ? periodsPerDay : 1
+      return acc
+    },
+    {} as Record<DayOfWeek, number>,
+  )
+  if (payload.school.pb) {
+    for (const [dayIndex, periods] of payload.school.pb) {
+      const day = INDEX_TO_DAY[dayIndex]
+      periodsByDay[day] = periods
+    }
+  }
 
   // Subjects: 새 UUID 생성
   const subjects: Array<Subject> = payload.subjects.map((s) => ({
@@ -41,19 +61,83 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
   const subjectIds = subjects.map((s) => s.id)
 
   // Teachers: 새 UUID 생성, subject 참조 인덱스→ID
-  const teachers: Array<Teacher> = payload.teachers.map((t) => ({
-    id: generateId(),
-    name: t.n,
-    subjectIds: t.s.map((idx) => subjectIds[idx]),
-    baseHoursPerWeek: t.h,
-    classAssignments: t.ca.map(([grade, classNumber, hoursPerWeek]) => ({
-      grade,
-      classNumber,
-      hoursPerWeek,
-    })),
-    createdAt: now,
-    updatedAt: now,
-  }))
+  const teachers: Array<Teacher> = payload.teachers.map((t) => {
+    const legacySubjectIds = (t.s ?? [])
+      .map((idx) => subjectIds[idx])
+      .filter((subjectId): subjectId is string => Boolean(subjectId))
+
+    const hasAmbiguousLegacySubjects =
+      !t.as?.length && legacySubjectIds.length > 1 && (t.ca?.length ?? 0) > 0
+
+    const assignments =
+      t.as && t.as.length > 0
+        ? t.as
+            .map(([subjectIndex, subjectTypeIndex, grade, classNumber, hours]) => {
+              const subjectId = subjectIds[subjectIndex]
+              if (!subjectId) return null
+              return {
+                id: generateId(),
+                subjectId,
+                subjectType: INDEX_TO_SUBJECT_TYPE[subjectTypeIndex] ?? 'CLASS',
+                grade: grade > 0 ? grade : null,
+                classNumber: classNumber > 0 ? classNumber : null,
+                hoursPerWeek: hours,
+              }
+            })
+            .filter(
+              (assignment): assignment is NonNullable<typeof assignment> =>
+                assignment !== null,
+            )
+        : hasAmbiguousLegacySubjects
+          ? []
+          : (() => {
+              const defaultSubjectId = legacySubjectIds[0] ?? subjectIds[0]
+              return (t.ca ?? []).map(([grade, classNumber, hoursPerWeek]) => ({
+                id: generateId(),
+                subjectId: defaultSubjectId,
+                subjectType: 'CLASS' as const,
+                grade,
+                classNumber,
+                hoursPerWeek,
+              }))
+            })()
+
+    const teacherSubjectIds =
+      legacySubjectIds.length > 0
+        ? legacySubjectIds
+        : [...new Set(assignments.map((assignment) => assignment.subjectId))]
+
+    const legacyClassAssignments =
+      !t.as?.length && t.ca && t.ca.length > 0
+        ? t.ca.map(([grade, classNumber, hoursPerWeek]) => ({
+            grade,
+            classNumber,
+            hoursPerWeek,
+          }))
+        : assignments
+            .filter(
+              (assignment) =>
+                assignment.subjectType === 'CLASS' &&
+                assignment.grade !== null &&
+                assignment.classNumber !== null,
+            )
+            .map((assignment) => ({
+              grade: assignment.grade!,
+              classNumber: assignment.classNumber!,
+              hoursPerWeek: assignment.hoursPerWeek,
+            }))
+
+    return {
+      id: generateId(),
+      name: t.n,
+      subjectIds: teacherSubjectIds,
+      baseHoursPerWeek: t.h,
+      assignments,
+      classAssignments: legacyClassAssignments,
+      createdAt: now,
+      updatedAt: now,
+    }
+  })
   const teacherIds = teachers.map((t) => t.id)
 
   // SchoolConfig
@@ -63,14 +147,15 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
     gradeCount: payload.school.g,
     classCountByGrade: payload.school.c,
     activeDays,
-    periodsPerDay: payload.school.p,
+    periodsByDay,
+    periodsPerDay,
     createdAt: now,
     updatedAt: now,
   }
 
   // Grid → TimetableCell
   const maxClassPerGrade = Math.max(...Object.values(payload.school.c))
-  const slotsPerClass = activeDays.length * payload.school.p
+  const slotsPerClass = activeDays.length * periodsPerDay
 
   const cells: Array<TimetableCell> = payload.grid.map((compact) => {
     const { grade, classNumber, day, period } = decodeFlatIndex(
@@ -78,7 +163,7 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
       maxClassPerGrade,
       slotsPerClass,
       activeDays,
-      payload.school.p,
+      periodsPerDay,
     )
 
     const isFixed = (compact.f & 1) === 1
@@ -88,6 +173,7 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
     return {
       teacherId: teacherIds[compact.t],
       subjectId: subjectIds[compact.s],
+      subjectType: INDEX_TO_SUBJECT_TYPE[compact.st ?? 0] ?? 'CLASS',
       grade,
       classNumber,
       day,

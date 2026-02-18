@@ -32,7 +32,7 @@ describe('sharePayloadSchema', () => {
   })
 
   it('지원하지 않는 버전을 거부한다', () => {
-    const bad = { ...validPayload, v: 2 }
+    const bad = { ...validPayload, v: 3 }
     expect(sharePayloadSchema.safeParse(bad).success).toBe(false)
   })
 

@@ -5,7 +5,8 @@ export interface SchoolConfig {
   gradeCount: number
   classCountByGrade: Record<number, number>
   activeDays: Array<DayOfWeek>
-  periodsPerDay: number
+  periodsByDay?: Record<DayOfWeek, number>
+  periodsPerDay: number // legacy compatibility
   createdAt: string
   updatedAt: string
 }

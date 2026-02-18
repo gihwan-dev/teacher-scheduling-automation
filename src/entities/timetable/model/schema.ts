@@ -13,6 +13,7 @@ export const cellStatusSchema = z.enum([
 export const timetableCellSchema = z.object({
   teacherId: z.string().min(1),
   subjectId: z.string().min(1),
+  subjectType: z.enum(['CLASS', 'GRADE', 'SCHOOL']).default('CLASS'),
   grade: z.number().int().min(1).max(3),
   classNumber: z.number().int().min(1),
   day: dayOfWeekSchema,

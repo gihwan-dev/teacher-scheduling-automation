@@ -1,4 +1,4 @@
-import type { DayOfWeek } from '@/shared/lib/types'
+import type { DayOfWeek, SubjectType } from '@/shared/lib/types'
 
 export type FixedEventType = 'FIXED_CLASS' | 'BUSINESS_TRIP' | 'SCHOOL_EVENT'
 
@@ -8,6 +8,7 @@ export interface FixedEvent {
   description: string
   teacherId: string | null
   subjectId: string | null
+  subjectType?: SubjectType | null
   grade: number | null
   classNumber: number | null
   day: DayOfWeek

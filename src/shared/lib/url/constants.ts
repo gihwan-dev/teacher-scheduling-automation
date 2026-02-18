@@ -1,9 +1,9 @@
-import type { DayOfWeek } from '@/shared/lib/types'
+import type { DayOfWeek, SubjectType } from '@/shared/lib/types'
 import type { CellStatus } from '@/entities/timetable'
 import type { SubjectTrack } from '@/entities/subject'
 import type { TimePreference } from '@/entities/teacher-policy'
 
-export const SHARE_SCHEMA_VERSION = 1
+export const SHARE_SCHEMA_VERSION = 2
 
 export const URL_LENGTH_WARNING = 6000
 export const URL_LENGTH_MAX = 8000
@@ -68,4 +68,16 @@ export const INDEX_TO_TIME_PREF: Record<number, TimePreference> = {
   0: 'MORNING',
   1: 'AFTERNOON',
   2: 'NONE',
+}
+
+export const SUBJECT_TYPE_TO_INDEX: Record<SubjectType, number> = {
+  CLASS: 0,
+  GRADE: 1,
+  SCHOOL: 2,
+}
+
+export const INDEX_TO_SUBJECT_TYPE: Record<number, SubjectType> = {
+  0: 'CLASS',
+  1: 'GRADE',
+  2: 'SCHOOL',
 }

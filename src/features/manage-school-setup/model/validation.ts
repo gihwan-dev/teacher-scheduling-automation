@@ -4,6 +4,7 @@ import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
 import {
   findUnassignedSubjects,
+  getTeacherAssignments,
   validateClassCapacity,
   validateHoursConsistency,
 } from '@/entities/teacher'
@@ -72,12 +73,41 @@ export function runFullValidation(
   const slotsPerClass = calculateSlotsPerClass(schoolConfig)
   const classHoursMap = new Map<string, number>()
   for (const teacher of teachers) {
-    for (const assignment of teacher.classAssignments) {
-      const key = `${assignment.grade}-${assignment.classNumber}`
-      classHoursMap.set(
-        key,
-        (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek,
-      )
+    for (const assignment of getTeacherAssignments(teacher)) {
+      if (assignment.subjectType === 'CLASS') {
+        if (assignment.grade === null || assignment.classNumber === null)
+          continue
+        const key = `${assignment.grade}-${assignment.classNumber}`
+        classHoursMap.set(
+          key,
+          (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek,
+        )
+        continue
+      }
+
+      if (assignment.subjectType === 'GRADE') {
+        if (assignment.grade === null) continue
+        const classCount = schoolConfig.classCountByGrade[assignment.grade] ?? 0
+        for (let cls = 1; cls <= classCount; cls++) {
+          const key = `${assignment.grade}-${cls}`
+          classHoursMap.set(
+            key,
+            (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek,
+          )
+        }
+        continue
+      }
+
+      for (let grade = 1; grade <= schoolConfig.gradeCount; grade++) {
+        const classCount = schoolConfig.classCountByGrade[grade] ?? 0
+        for (let cls = 1; cls <= classCount; cls++) {
+          const key = `${grade}-${cls}`
+          classHoursMap.set(
+            key,
+            (classHoursMap.get(key) ?? 0) + assignment.hoursPerWeek,
+          )
+        }
+      }
     }
   }
   for (let grade = 1; grade <= schoolConfig.gradeCount; grade++) {

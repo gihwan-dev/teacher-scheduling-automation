@@ -1,9 +1,10 @@
-import type { DayOfWeek } from '@/shared/lib/types'
+import type { DayOfWeek, SubjectType } from '@/shared/lib/types'
 
 // 시간표 개별 셀 (배치 결과 단위)
 export interface TimetableCell {
   teacherId: string
   subjectId: string
+  subjectType?: SubjectType
   grade: number
   classNumber: number
   day: DayOfWeek

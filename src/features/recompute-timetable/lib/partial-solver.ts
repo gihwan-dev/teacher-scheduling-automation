@@ -13,6 +13,7 @@ import type {
   UnplacedAssignment,
 } from '@/features/generate-timetable'
 import { validateTimetable } from '@/entities/constraint-policy'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import {
   TimetableGrid,
   buildAssignmentUnitsFromCells,
@@ -57,7 +58,8 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     constraintPolicy,
     teacherPolicies,
   } = input
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
+  const periodsPerDay = getMaxPeriodsPerDay(schoolConfig)
 
   // 1. locked / unlocked 분류
   const lockedCells: Array<TimetableCell> = []
@@ -83,6 +85,7 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     blockedSlots,
     schoolConfig.classCountByGrade,
   )
+  blockedSlots = expandOutOfRangeSlots(blockedSlots, schoolConfig, periodsPerDay)
 
   // 4. 잠긴 시수 차감된 배정 단위 생성
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
@@ -90,6 +93,7 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     teachers,
     subjectMap,
     lockedCells,
+    schoolConfig,
   )
 
   // 5. 배치 파이프라인 실행
@@ -143,4 +147,24 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     suggestions,
     recomputeTimeMs: Math.round(endTime - startTime),
   }
+}
+
+function expandOutOfRangeSlots(
+  blockedSlots: Set<string>,
+  schoolConfig: SchoolConfig,
+  maxPeriodsPerDay: number,
+): Set<string> {
+  const expanded = new Set(blockedSlots)
+  for (let grade = 1; grade <= schoolConfig.gradeCount; grade++) {
+    const classCount = schoolConfig.classCountByGrade[grade] ?? 0
+    for (let cls = 1; cls <= classCount; cls++) {
+      for (const day of schoolConfig.activeDays) {
+        const dayMax = getDayPeriodCount(schoolConfig, day)
+        for (let period = dayMax + 1; period <= maxPeriodsPerDay; period++) {
+          expanded.add(`class-${grade}-${cls}-${day}-${period}`)
+        }
+      }
+    }
+  }
+  return expanded
 }

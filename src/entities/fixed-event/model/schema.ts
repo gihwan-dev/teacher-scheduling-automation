@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { DAYS_OF_WEEK } from '@/shared/lib/constants'
 
 const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
+const subjectTypeSchema = z.enum(['CLASS', 'GRADE', 'SCHOOL'])
 
 const fixedEventTypeSchema = z.enum([
   'FIXED_CLASS',
@@ -16,6 +17,7 @@ export const fixedEventSchema = z
     description: z.string(),
     teacherId: z.string().nullable(),
     subjectId: z.string().nullable(),
+    subjectType: subjectTypeSchema.nullable(),
     grade: z.number().int().min(1).max(3).nullable(),
     classNumber: z.number().int().min(1).nullable(),
     day: dayOfWeekSchema,
@@ -26,11 +28,31 @@ export const fixedEventSchema = z
   .refine(
     (data) => {
       if (data.type === 'FIXED_CLASS') {
-        return data.teacherId !== null && data.subjectId !== null
+        return (
+          data.teacherId !== null &&
+          data.subjectId !== null &&
+          data.subjectType !== null
+        )
       }
       return true
     },
-    { message: 'FIXED_CLASS requires teacherId and subjectId' },
+    { message: 'FIXED_CLASS requires teacherId, subjectId and subjectType' },
+  )
+  .refine(
+    (data) => {
+      if (data.type !== 'FIXED_CLASS' || data.subjectType === null) return true
+      if (data.subjectType === 'CLASS') {
+        return data.grade !== null && data.classNumber !== null
+      }
+      if (data.subjectType === 'GRADE') {
+        return data.grade !== null && data.classNumber === null
+      }
+      return data.grade === null && data.classNumber === null
+    },
+    {
+      message:
+        'FIXED_CLASS target mismatch: CLASS(grade+class), GRADE(grade), SCHOOL(none)',
+    },
   )
   .refine(
     (data) => {

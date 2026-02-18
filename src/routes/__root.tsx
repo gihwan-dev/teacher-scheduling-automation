@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { useEffect, useState } from 'react'
 
 import appCss from '../styles.css?url'
 import { Toaster } from '@/components/ui/sonner'
@@ -69,11 +70,33 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const [isShareRestoreMode, setIsShareRestoreMode] = useState(false)
+
+  useEffect(() => {
+    const syncMode = () => {
+      if (typeof window === 'undefined') return
+      const isRestore =
+        window.location.pathname === '/share' &&
+        window.location.hash.includes('data=')
+      setIsShareRestoreMode(isRestore)
+    }
+
+    syncMode()
+    window.addEventListener('hashchange', syncMode)
+    window.addEventListener('popstate', syncMode)
+    return () => {
+      window.removeEventListener('hashchange', syncMode)
+      window.removeEventListener('popstate', syncMode)
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b">
-        <NavProgress />
-      </header>
+      {!isShareRestoreMode && (
+        <header className="border-b">
+          <NavProgress />
+        </header>
+      )}
       <main>
         <Outlet />
       </main>

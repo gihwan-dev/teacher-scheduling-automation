@@ -41,7 +41,8 @@ export function parseShareHash(hash: string): RestoredState {
     typeof raw === 'object' &&
     raw !== null &&
     'v' in raw &&
-    (raw as { v: unknown }).v !== 1
+    (raw as { v: unknown }).v !== 1 &&
+    (raw as { v: unknown }).v !== 2
   ) {
     throw new Error('지원하지 않는 공유 형식 버전입니다.')
   }

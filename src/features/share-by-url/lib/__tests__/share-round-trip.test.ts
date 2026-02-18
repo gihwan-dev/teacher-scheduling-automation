@@ -187,8 +187,8 @@ describe('share round-trip', () => {
     restored.teachers.forEach((t, i) => {
       expect(t.name).toBe(teachers[i].name)
       expect(t.baseHoursPerWeek).toBe(teachers[i].baseHoursPerWeek)
-      expect(t.classAssignments.length).toBe(
-        teachers[i].classAssignments.length,
+      expect(t.classAssignments?.length ?? 0).toBe(
+        teachers[i].classAssignments?.length ?? 0,
       )
     })
 

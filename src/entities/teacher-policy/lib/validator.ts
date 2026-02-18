@@ -1,6 +1,8 @@
 import type { TeacherPolicy } from '../model/types'
 import type { Teacher } from '@/entities/teacher'
 import type { SchoolConfig } from '@/entities/school'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
+import { getTeacherAssignments } from '@/entities/teacher/lib/validator'
 
 export interface PolicyValidationMessage {
   severity: 'error' | 'warning'
@@ -18,17 +20,21 @@ export function validateTeacherPolicy(
   schoolConfig: SchoolConfig,
 ): Array<PolicyValidationMessage> {
   const messages: Array<PolicyValidationMessage> = []
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
 
   // 총 가용 슬롯 수
-  const totalSlots = activeDays.length * periodsPerDay
+  const totalSlots = activeDays.reduce(
+    (sum, day) => sum + getDayPeriodCount(schoolConfig, day),
+    0,
+  )
+  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
 
   // 유효한 회피 슬롯만 카운트 (운영 요일/교시 범위 내)
   const validAvoidanceCount = policy.avoidanceSlots.filter(
     (slot) =>
       activeDays.includes(slot.day) &&
       slot.period >= 1 &&
-      slot.period <= periodsPerDay,
+      slot.period <= getDayPeriodCount(schoolConfig, slot.day),
   ).length
 
   // 비운영 요일/범위 밖 교시 회피 설정 경고 (규칙 4)
@@ -36,7 +42,7 @@ export function validateTeacherPolicy(
     (slot) =>
       !activeDays.includes(slot.day) ||
       slot.period < 1 ||
-      slot.period > periodsPerDay,
+      slot.period > getDayPeriodCount(schoolConfig, slot.day),
   )
   if (invalidSlots.length > 0) {
     messages.push({
@@ -60,7 +66,7 @@ export function validateTeacherPolicy(
   }
 
   // 교사의 총 기준 시수 계산
-  const totalRequiredHours = teacher.classAssignments.reduce(
+  const totalRequiredHours = getTeacherAssignments(teacher).reduce(
     (sum, a) => sum + a.hoursPerWeek,
     0,
   )
@@ -91,23 +97,25 @@ export function validateTeacherPolicy(
   // 규칙 5: override 값 < 1 → error
   if (
     policy.maxConsecutiveHoursOverride !== null &&
-    policy.maxConsecutiveHoursOverride < 1
+    (policy.maxConsecutiveHoursOverride < 1 ||
+      policy.maxConsecutiveHoursOverride > maxPeriodsPerDay)
   ) {
     messages.push({
       severity: 'error',
       teacherId: policy.teacherId,
-      message: `${teacher.name}: 연강 허용 한도는 1 이상이어야 합니다.`,
+      message: `${teacher.name}: 연강 허용 한도는 1~${maxPeriodsPerDay} 범위여야 합니다.`,
     })
   }
 
   if (
     policy.maxDailyHoursOverride !== null &&
-    policy.maxDailyHoursOverride < 1
+    (policy.maxDailyHoursOverride < 1 ||
+      policy.maxDailyHoursOverride > maxPeriodsPerDay)
   ) {
     messages.push({
       severity: 'error',
       teacherId: policy.teacherId,
-      message: `${teacher.name}: 일일 최대 시수는 1 이상이어야 합니다.`,
+      message: `${teacher.name}: 일일 최대 시수는 1~${maxPeriodsPerDay} 범위여야 합니다.`,
     })
   }
 

@@ -1,11 +1,13 @@
 import { z } from 'zod'
-import { SHARE_SCHEMA_VERSION } from '@/shared/lib/url/constants'
 
 const compactSchoolSchema = z.object({
   g: z.number().int().min(1).max(3),
   c: z.record(z.coerce.number(), z.number().int().min(1).max(20)),
   d: z.array(z.number().int().min(0).max(5)).min(1),
-  p: z.number().int().min(1).max(10),
+  p: z.number().int().min(1).max(10).optional(),
+  pb: z
+    .array(z.tuple([z.number().int().min(0).max(5), z.number().int().min(1).max(10)]))
+    .optional(),
 })
 
 const compactSubjectSchema = z.object({
@@ -16,9 +18,20 @@ const compactSubjectSchema = z.object({
 
 const compactTeacherSchema = z.object({
   n: z.string().min(1),
-  s: z.array(z.number().int().min(0)),
+  s: z.array(z.number().int().min(0)).optional(),
   h: z.number().int().min(0),
-  ca: z.array(z.tuple([z.number().int(), z.number().int(), z.number().int()])),
+  ca: z.array(z.tuple([z.number().int(), z.number().int(), z.number().int()])).optional(),
+  as: z
+    .array(
+      z.tuple([
+        z.number().int().min(0),
+        z.number().int().min(0).max(2),
+        z.number().int().min(0),
+        z.number().int().min(0),
+        z.number().int().min(0),
+      ]),
+    )
+    .optional(),
 })
 
 const compactCellSchema = z.object({
@@ -26,6 +39,7 @@ const compactCellSchema = z.object({
   t: z.number().int().min(0),
   s: z.number().int().min(0),
   f: z.number().int().min(0).max(7),
+  st: z.number().int().min(0).max(2).optional(),
 })
 
 const compactPolicySchema = z.object({
@@ -46,7 +60,7 @@ const compactTeacherPolicySchema = z.object({
 
 export const sharePayloadSchema = z
   .object({
-    v: z.literal(SHARE_SCHEMA_VERSION),
+    v: z.union([z.literal(1), z.literal(2)]),
     meta: z.object({
       score: z.number().min(0),
       genMs: z.number().int().min(0),
@@ -65,12 +79,22 @@ export const sharePayloadSchema = z
 
     // teacher의 subject 인덱스 범위 검증
     for (let ti = 0; ti < teacherCount; ti++) {
-      for (const si of data.teachers[ti].s) {
+      for (const si of data.teachers[ti].s ?? []) {
         if (si >= subjectCount) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: `교사[${ti}]의 과목 인덱스 ${si}가 범위를 초과합니다 (과목 수: ${subjectCount}).`,
             path: ['teachers', ti, 's'],
+          })
+        }
+      }
+      for (const assignment of data.teachers[ti].as ?? []) {
+        const subjectIndex = assignment[0]
+        if (subjectIndex >= subjectCount) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `교사[${ti}]의 배정 과목 인덱스 ${subjectIndex}가 범위를 초과합니다 (과목 수: ${subjectCount}).`,
+            path: ['teachers', ti, 'as'],
           })
         }
       }

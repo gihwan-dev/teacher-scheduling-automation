@@ -8,6 +8,7 @@ import type {
 } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableSnapshot } from '@/entities/timetable'
+import type { SubjectType } from '@/shared/lib/types'
 
 export interface GenerationInput {
   schoolConfig: SchoolConfig
@@ -55,6 +56,7 @@ export interface RelaxationSuggestion {
 export interface AssignmentUnit {
   teacherId: string
   subjectId: string
+  subjectType: SubjectType
   grade: number
   classNumber: number
   totalHours: number

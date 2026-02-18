@@ -2,7 +2,8 @@ export interface CompactSchool {
   g: number // gradeCount
   c: Record<number, number> // classCountByGrade
   d: Array<number> // activeDays as indices
-  p: number // periodsPerDay
+  p?: number // periodsPerDay (legacy)
+  pb?: Array<[number, number]> // periodsByDay: [dayIndex, periods]
 }
 
 export interface CompactSubject {
@@ -13,9 +14,10 @@ export interface CompactSubject {
 
 export interface CompactTeacher {
   n: string // name
-  s: Array<number> // subject indices
+  s?: Array<number> // subject indices (legacy)
   h: number // baseHoursPerWeek
-  ca: Array<[number, number, number]> // classAssignments: [grade, classNumber, hoursPerWeek]
+  ca?: Array<[number, number, number]> // classAssignments: [grade, classNumber, hoursPerWeek] (legacy)
+  as?: Array<[number, number, number, number, number]> // assignments: [subjectIndex, subjectTypeIndex, grade(0=null), classNumber(0=null), hours]
 }
 
 export interface CompactCell {
@@ -23,6 +25,7 @@ export interface CompactCell {
   t: number // teacher index
   s: number // subject index
   f: number // flags bitfield: (statusIndex << 1) | (isFixed ? 1 : 0)
+  st?: number // subjectType index
 }
 
 export interface CompactPolicy {

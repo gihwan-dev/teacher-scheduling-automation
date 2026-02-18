@@ -15,6 +15,7 @@ import { TimetableGrid, isPlacementValid } from '@/features/generate-timetable'
 export function isCellEditable(cell: TimetableCell): boolean {
   if (cell.isFixed) return false
   if (cell.status === 'LOCKED') return false
+  if ((cell.subjectType ?? 'CLASS') !== 'CLASS') return false
   return true
 }
 
@@ -68,6 +69,7 @@ export function validateCellEdit(
   const unit = {
     teacherId: newTeacherId,
     subjectId: newSubjectId,
+    subjectType: 'CLASS' as const,
     grade,
     classNumber,
     totalHours: 1,

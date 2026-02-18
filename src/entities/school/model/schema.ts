@@ -10,6 +10,14 @@ import {
 } from '@/shared/lib/constants'
 
 const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
+const periodsByDaySchema = z.object({
+  MON: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+  TUE: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+  WED: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+  THU: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+  FRI: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+  SAT: z.number().int().min(MIN_PERIODS_PER_DAY).max(MAX_PERIODS_PER_DAY),
+})
 
 export const schoolConfigSchema = z.object({
   id: z.string().min(1),
@@ -19,11 +27,13 @@ export const schoolConfigSchema = z.object({
     z.number().int().min(MIN_CLASS_COUNT).max(MAX_CLASS_COUNT),
   ),
   activeDays: z.array(dayOfWeekSchema).min(1),
+  periodsByDay: periodsByDaySchema,
   periodsPerDay: z
     .number()
     .int()
     .min(MIN_PERIODS_PER_DAY)
-    .max(MAX_PERIODS_PER_DAY),
+    .max(MAX_PERIODS_PER_DAY)
+    .optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

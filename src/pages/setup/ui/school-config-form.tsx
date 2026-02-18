@@ -13,7 +13,11 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useSetupStore } from '@/features/manage-school-setup'
-import { calculateSlotsPerClass, calculateTotalSlots } from '@/entities/school'
+import {
+  calculateSlotsPerClass,
+  calculateTotalSlots,
+  getDayPeriodCount,
+} from '@/entities/school'
 import { DAYS_OF_WEEK, DAY_LABELS } from '@/shared/lib/constants'
 import { generateId } from '@/shared/lib/id'
 
@@ -22,12 +26,24 @@ const GRADE_COUNT_OPTIONS = [1, 2, 3].map((grade) => ({
   label: `${grade}학년`,
 }))
 
+function createDefaultPeriodsByDay(): Record<DayOfWeek, number> {
+  return {
+    MON: 6,
+    TUE: 7,
+    WED: 6,
+    THU: 7,
+    FRI: 6,
+    SAT: 1,
+  }
+}
+
 function createDefaultSchoolConfig(): SchoolConfig {
   return {
     id: generateId(),
     gradeCount: 3,
     classCountByGrade: { 1: 10, 2: 10, 3: 9 },
     activeDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+    periodsByDay: createDefaultPeriodsByDay(),
     periodsPerDay: 7,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -89,10 +105,17 @@ export function SchoolConfigForm() {
     [config, setSchoolConfig],
   )
 
-  const handlePeriodsChange = useCallback(
-    (periods: number) => {
+  const handleDayPeriodsChange = useCallback(
+    (day: DayOfWeek, periods: number) => {
       if (periods < 1 || periods > 10 || isNaN(periods)) return
-      setSchoolConfig({ ...config, periodsPerDay: periods })
+      const currentPeriodsByDay = config.periodsByDay ?? createDefaultPeriodsByDay()
+      setSchoolConfig({
+        ...config,
+        periodsByDay: {
+          ...currentPeriodsByDay,
+          [day]: periods,
+        },
+      })
     },
     [config, setSchoolConfig],
   )
@@ -173,19 +196,28 @@ export function SchoolConfigForm() {
             </div>
           </div>
 
-          {/* 교시 수 */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <Label>일일 교시 수</Label>
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={config.periodsPerDay}
-              onChange={(e) =>
-                handlePeriodsChange(parseInt(e.target.value, 10))
-              }
-              className="w-24"
-            />
+          {/* 요일별 교시 수 */}
+          <div className="grid grid-cols-[120px_1fr] items-start gap-4">
+            <Label className="pt-1">요일별 교시 수</Label>
+            <div className="space-y-2">
+              {config.activeDays.map((day) => (
+                <div key={day} className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground w-10">
+                    {DAY_LABELS[day]}
+                  </span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={getDayPeriodCount(config, day)}
+                    onChange={(e) =>
+                      handleDayPeriodsChange(day, parseInt(e.target.value, 10))
+                    }
+                    className="w-24"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
