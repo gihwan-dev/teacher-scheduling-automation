@@ -5,6 +5,9 @@ describe('fixedEventSchema', () => {
   const baseEvent = {
     id: 'event-1',
     description: '테스트 이벤트',
+    teacherId: null,
+    subjectId: null,
+    subjectType: null,
     grade: null,
     classNumber: null,
     day: 'MON' as const,
@@ -19,6 +22,9 @@ describe('fixedEventSchema', () => {
       type: 'FIXED_CLASS',
       teacherId: 'teacher-1',
       subjectId: 'sub-1',
+      subjectType: 'CLASS',
+      grade: 1,
+      classNumber: 1,
     })
     expect(result.success).toBe(true)
   })
@@ -29,6 +35,9 @@ describe('fixedEventSchema', () => {
       type: 'FIXED_CLASS',
       teacherId: null,
       subjectId: 'sub-1',
+      subjectType: 'CLASS',
+      grade: 1,
+      classNumber: 1,
     })
     expect(result.success).toBe(false)
   })
@@ -39,6 +48,9 @@ describe('fixedEventSchema', () => {
       type: 'FIXED_CLASS',
       teacherId: 'teacher-1',
       subjectId: null,
+      subjectType: 'CLASS',
+      grade: 1,
+      classNumber: 1,
     })
     expect(result.success).toBe(false)
   })
@@ -48,7 +60,6 @@ describe('fixedEventSchema', () => {
       ...baseEvent,
       type: 'BUSINESS_TRIP',
       teacherId: 'teacher-1',
-      subjectId: null,
     })
     expect(result.success).toBe(true)
   })
@@ -58,7 +69,6 @@ describe('fixedEventSchema', () => {
       ...baseEvent,
       type: 'BUSINESS_TRIP',
       teacherId: null,
-      subjectId: null,
     })
     expect(result.success).toBe(false)
   })
@@ -67,8 +77,6 @@ describe('fixedEventSchema', () => {
     const result = fixedEventSchema.safeParse({
       ...baseEvent,
       type: 'SCHOOL_EVENT',
-      teacherId: null,
-      subjectId: null,
     })
     expect(result.success).toBe(true)
   })
@@ -77,8 +85,6 @@ describe('fixedEventSchema', () => {
     const result = fixedEventSchema.safeParse({
       ...baseEvent,
       type: 'SCHOOL_EVENT',
-      teacherId: null,
-      subjectId: null,
       day: 'INVALID',
     })
     expect(result.success).toBe(false)
@@ -88,8 +94,6 @@ describe('fixedEventSchema', () => {
     const result = fixedEventSchema.safeParse({
       ...baseEvent,
       type: 'SCHOOL_EVENT',
-      teacherId: null,
-      subjectId: null,
       period: 0,
     })
     expect(result.success).toBe(false)

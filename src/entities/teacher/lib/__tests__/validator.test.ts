@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   findUnassignedSubjects,
+  getTeacherAssignments,
   validateClassCapacity,
   validateHoursConsistency,
 } from '../validator'
@@ -64,6 +65,14 @@ describe('validateHoursConsistency', () => {
   it('배정이 없으면 assigned는 0', () => {
     const teacher = makeTeacher({ baseHoursPerWeek: 0 })
     expect(validateHoursConsistency(teacher).valid).toBe(true)
+  })
+
+  it('assignments가 빈 배열이면 레거시 classAssignments로 자동 변환하지 않는다', () => {
+    const teacher = makeTeacher({
+      assignments: [],
+      classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
+    })
+    expect(getTeacherAssignments(teacher)).toEqual([])
   })
 })
 

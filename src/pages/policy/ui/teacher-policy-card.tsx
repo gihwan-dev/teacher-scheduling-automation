@@ -3,6 +3,7 @@ import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy, TimePreference } from '@/entities/teacher-policy'
 import type { DayOfWeek } from '@/shared/lib/types'
+import { getTeacherAssignments } from '@/entities/teacher'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useTeacherPolicyStore } from '@/features/manage-teacher-policy'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import { DAY_LABELS } from '@/shared/lib/constants'
 
 interface TeacherPolicyCardProps {
@@ -48,7 +50,8 @@ export function TeacherPolicyCard({
     resetPolicy,
   } = useTeacherPolicyStore()
 
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
+  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
 
   const isAvoided = (day: DayOfWeek, period: number): boolean => {
     return (
@@ -83,15 +86,18 @@ export function TeacherPolicyCard({
       (s) =>
         activeDays.includes(s.day) &&
         s.period >= 1 &&
-        s.period <= periodsPerDay,
+        s.period <= getDayPeriodCount(schoolConfig, s.day),
     ).length ?? 0
-  const totalSlots = activeDays.length * periodsPerDay
+  const totalSlots = activeDays.reduce(
+    (sum, day) => sum + getDayPeriodCount(schoolConfig, day),
+    0,
+  )
   const subjectNameById = new Map(
     subjects.map((subject) => [subject.id, subject.name]),
   )
-  const teacherSubjectNames = teacher.subjectIds.map(
-    (subjectId) => subjectNameById.get(subjectId) ?? subjectId,
-  )
+  const teacherSubjectNames = [
+    ...new Set(getTeacherAssignments(teacher).map((assignment) => assignment.subjectId)),
+  ].map((subjectId) => subjectNameById.get(subjectId) ?? subjectId)
 
   return (
     <Card>
@@ -113,7 +119,8 @@ export function TeacherPolicyCard({
             ? teacherSubjectNames.join(', ')
             : '미지정'}{' '}
           · 주당{' '}
-          {teacher.classAssignments.reduce((s, a) => s + a.hoursPerWeek, 0)}시수
+          {getTeacherAssignments(teacher).reduce((s, a) => s + a.hoursPerWeek, 0)}
+          시수
           · 회피 {avoidanceCount}/{totalSlots}
         </p>
       </CardHeader>
@@ -142,11 +149,22 @@ export function TeacherPolicyCard({
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map(
+                {Array.from(
+                  { length: maxPeriodsPerDay },
+                  (_, i) => i + 1,
+                ).map(
                   (period) => (
                     <tr key={period}>
                       <td className="pr-2 text-muted-foreground">{period}</td>
                       {activeDays.map((day) => {
+                        const dayMaxPeriod = getDayPeriodCount(schoolConfig, day)
+                        if (period > dayMaxPeriod) {
+                          return (
+                            <td key={day} className="px-1 py-0.5">
+                              <div className="w-full h-6 rounded text-[10px] bg-muted/40" />
+                            </td>
+                          )
+                        }
                         const avoided = isAvoided(day, period)
                         return (
                           <td key={day} className="px-1 py-0.5">
@@ -200,7 +218,7 @@ export function TeacherPolicyCard({
             <Input
               type="number"
               min={1}
-              max={periodsPerDay}
+              max={maxPeriodsPerDay}
               placeholder="전역 설정 사용"
               value={policy?.maxConsecutiveHoursOverride ?? ''}
               onChange={handleConsecutiveChange}
@@ -211,7 +229,7 @@ export function TeacherPolicyCard({
             <Input
               type="number"
               min={1}
-              max={periodsPerDay}
+              max={maxPeriodsPerDay}
               placeholder="전역 설정 사용"
               value={policy?.maxDailyHoursOverride ?? ''}
               onChange={handleDailyChange}

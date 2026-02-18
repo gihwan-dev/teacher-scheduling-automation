@@ -1,6 +1,50 @@
 import { z } from 'zod'
 
-export const classHoursAssignmentSchema = z.object({
+export const teachingAssignmentSchema = z
+  .object({
+    id: z.string().min(1),
+    subjectId: z.string().min(1),
+    subjectType: z.enum(['CLASS', 'GRADE', 'SCHOOL']),
+    grade: z.number().int().min(1).max(3).nullable(),
+    classNumber: z.number().int().min(1).nullable(),
+    hoursPerWeek: z.number().int().min(0),
+  })
+  .superRefine((assignment, ctx) => {
+    if (assignment.subjectType === 'CLASS') {
+      if (assignment.grade === null || assignment.classNumber === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CLASS assignment requires grade and classNumber',
+        })
+      }
+      return
+    }
+
+    if (assignment.subjectType === 'GRADE') {
+      if (assignment.grade === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'GRADE assignment requires grade',
+        })
+      }
+      if (assignment.classNumber !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'GRADE assignment cannot set classNumber',
+        })
+      }
+      return
+    }
+
+    if (assignment.grade !== null || assignment.classNumber !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'SCHOOL assignment cannot set grade/classNumber',
+      })
+    }
+  })
+
+export const legacyClassHoursAssignmentSchema = z.object({
   grade: z.number().int().min(1).max(3),
   classNumber: z.number().int().min(1),
   hoursPerWeek: z.number().int().min(0),
@@ -9,9 +53,10 @@ export const classHoursAssignmentSchema = z.object({
 export const teacherSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  subjectIds: z.array(z.string().min(1)).min(1),
+  subjectIds: z.array(z.string().min(1)).optional(),
   baseHoursPerWeek: z.number().int().min(0),
-  classAssignments: z.array(classHoursAssignmentSchema),
+  assignments: z.array(teachingAssignmentSchema).optional(),
+  classAssignments: z.array(legacyClassHoursAssignmentSchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
