@@ -32,7 +32,11 @@ function checkTeacherConflicts(
   }
 
   for (const [, group] of slotMap) {
-    if (group.length >= 2) {
+    const classCells = group.filter((cell) => (cell.subjectType ?? 'CLASS') === 'CLASS')
+    const hasClassConflict =
+      classCells.length >= 2 || (classCells.length >= 1 && group.length > classCells.length)
+
+    if (hasClassConflict) {
       const first = group[0]
       violations.push({
         type: 'TEACHER_CONFLICT',
@@ -111,20 +115,20 @@ function checkTeacherConsecutive(
   policy: ConstraintPolicy,
   violations: Array<ConstraintViolation>,
 ): void {
-  const teacherDayMap = new Map<string, Array<number>>()
+  const teacherDayMap = new Map<string, Set<number>>()
 
   for (const cell of cells) {
     const key = `${cell.teacherId}:${cell.day}`
     const existing = teacherDayMap.get(key)
     if (existing) {
-      existing.push(cell.period)
+      existing.add(cell.period)
     } else {
-      teacherDayMap.set(key, [cell.period])
+      teacherDayMap.set(key, new Set([cell.period]))
     }
   }
 
-  for (const [key, periods] of teacherDayMap) {
-    periods.sort((a, b) => a - b)
+  for (const [key, periodSet] of teacherDayMap) {
+    const periods = [...periodSet].sort((a, b) => a - b)
     const [teacherId, day] = key.split(':')
 
     let consecutive = 1
@@ -155,14 +159,20 @@ function checkTeacherDailyOverload(
   policy: ConstraintPolicy,
   violations: Array<ConstraintViolation>,
 ): void {
-  const teacherDayMap = new Map<string, number>()
+  const teacherDayMap = new Map<string, Set<number>>()
 
   for (const cell of cells) {
     const key = `${cell.teacherId}:${cell.day}`
-    teacherDayMap.set(key, (teacherDayMap.get(key) ?? 0) + 1)
+    const existing = teacherDayMap.get(key)
+    if (existing) {
+      existing.add(cell.period)
+    } else {
+      teacherDayMap.set(key, new Set([cell.period]))
+    }
   }
 
-  for (const [key, count] of teacherDayMap) {
+  for (const [key, periodSet] of teacherDayMap) {
+    const count = periodSet.size
     if (count > policy.teacherMaxDailyHours) {
       const [teacherId, day] = key.split(':')
       violations.push({

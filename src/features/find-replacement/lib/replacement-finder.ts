@@ -1,16 +1,17 @@
 import { rankCandidate } from './candidate-ranker'
-import type { ConstraintPolicy } from '@/entities/constraint-policy'
-import type { FixedEvent } from '@/entities/fixed-event'
-import type { SchoolConfig } from '@/entities/school'
-import type { CellKey, TimetableCell } from '@/entities/timetable'
-import type { TeacherPolicy } from '@/entities/teacher-policy'
-import type { DayOfWeek } from '@/shared/lib/types'
 import type {
   RelaxationSuggestion,
   ReplacementCandidate,
   ReplacementSearchConfig,
   ReplacementSearchResult,
 } from '../model/types'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { FixedEvent } from '@/entities/fixed-event'
+import type { SchoolConfig } from '@/entities/school'
+import type { CellKey, TimetableCell } from '@/entities/timetable'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { DayOfWeek } from '@/shared/lib/types'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import { makeCellKey } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
 import {
@@ -46,9 +47,13 @@ export function findReplacementCandidates(
   if (sourceCell.isFixed || sourceCell.status === 'LOCKED') {
     return emptyResult(startTime)
   }
+  if ((sourceCell.subjectType ?? 'CLASS') !== 'CLASS') {
+    return emptyResult(startTime)
+  }
 
   const { schoolConfig, constraintPolicy, teacherPolicies, fixedEvents } = ctx
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
+  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
 
   // blocked slots
   let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
@@ -77,6 +82,7 @@ export function findReplacementCandidates(
       targetCell.subjectId === sourceCell.subjectId
     )
       continue
+    if ((targetCell.subjectType ?? 'CLASS') !== 'CLASS') continue
     if (!isCellEditable(targetCell)) continue
 
     totalExamined++
@@ -90,7 +96,7 @@ export function findReplacementCandidates(
       teacherPolicies,
       blockedSlots,
       activeDays,
-      periodsPerDay,
+      maxPeriodsPerDay,
       config.includeViolating,
     )
     if (swapCandidate) candidates.push(swapCandidate)
@@ -98,7 +104,7 @@ export function findReplacementCandidates(
 
   // MOVE 후보 탐색 (빈 슬롯으로 이동)
   for (const day of activeDays) {
-    for (let period = 1; period <= periodsPerDay; period++) {
+    for (let period = 1; period <= getDayPeriodCount(schoolConfig, day); period++) {
       if (day === sourceCell.day && period === sourceCell.period) continue
 
       // 해당 슬롯이 비어있는지 확인
@@ -125,7 +131,7 @@ export function findReplacementCandidates(
         teacherPolicies,
         blockedSlots,
         activeDays,
-        periodsPerDay,
+        maxPeriodsPerDay,
         config.includeViolating,
       )
       if (moveCandidate) candidates.push(moveCandidate)
@@ -164,7 +170,7 @@ function trySwap(
   teacherPolicies: Array<TeacherPolicy>,
   blockedSlots: Set<string>,
   activeDays: Array<DayOfWeek>,
-  periodsPerDay: number,
+  maxPeriodsPerDay: number,
   includeViolating: boolean,
 ): ReplacementCandidate | null {
   // 그리드: source와 target 모두 제거
@@ -188,6 +194,7 @@ function trySwap(
   const sourceUnit = {
     teacherId: sourceCell.teacherId,
     subjectId: sourceCell.subjectId,
+    subjectType: 'CLASS' as const,
     grade: sourceCell.grade,
     classNumber: sourceCell.classNumber,
     totalHours: 1,
@@ -208,6 +215,7 @@ function trySwap(
   const targetUnit = {
     teacherId: targetCell.teacherId,
     subjectId: targetCell.subjectId,
+    subjectType: 'CLASS' as const,
     grade: targetCell.grade,
     classNumber: targetCell.classNumber,
     totalHours: 1,
@@ -283,7 +291,7 @@ function trySwap(
       constraintPolicy,
       teacherPolicies,
       activeDays,
-      periodsPerDay,
+      periodsPerDay: maxPeriodsPerDay,
     },
   )
 
@@ -313,7 +321,7 @@ function tryMove(
   teacherPolicies: Array<TeacherPolicy>,
   blockedSlots: Set<string>,
   activeDays: Array<DayOfWeek>,
-  periodsPerDay: number,
+  maxPeriodsPerDay: number,
   includeViolating: boolean,
 ): ReplacementCandidate | null {
   const grid = new TimetableGrid()
@@ -332,6 +340,7 @@ function tryMove(
   const unit = {
     teacherId: sourceCell.teacherId,
     subjectId: sourceCell.subjectId,
+    subjectType: 'CLASS' as const,
     grade: sourceCell.grade,
     classNumber: sourceCell.classNumber,
     totalHours: 1,
@@ -378,7 +387,7 @@ function tryMove(
       constraintPolicy,
       teacherPolicies,
       activeDays,
-      periodsPerDay,
+      periodsPerDay: maxPeriodsPerDay,
     },
   )
 

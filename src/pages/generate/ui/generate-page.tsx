@@ -12,6 +12,7 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
 import { useGenerateStore } from '@/features/generate-timetable/model/store'
+import { getTeacherAssignments } from '@/entities/teacher'
 
 export function GeneratePage() {
   const {
@@ -55,7 +56,12 @@ export function GeneratePage() {
     (s, c) => s + c,
     0,
   )
-  const multiSubjectTeachers = teachers.filter((t) => t.subjectIds.length > 1)
+  const multiSubjectTeachers = teachers.filter((teacher) => {
+    const uniqueSubjects = new Set(
+      getTeacherAssignments(teacher).map((assignment) => assignment.subjectId),
+    )
+    return uniqueSubjects.size > 1
+  })
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">

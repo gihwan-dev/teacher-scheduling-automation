@@ -59,7 +59,10 @@ export function isPlacementValid(
   teacherPolicies?: Array<TeacherPolicy>,
 ): boolean {
   // 1. 교사 충돌 금지: 동일 시간 2개 반 불가
-  if (grid.isTeacherBusy(unit.teacherId, day, period)) {
+  if (
+    unit.subjectType === 'CLASS' &&
+    grid.isTeacherBusy(unit.teacherId, day, period)
+  ) {
     return false
   }
 
@@ -78,7 +81,11 @@ export function isPlacementValid(
   // 4. 교사 일일 최대 시수 제한 (per-teacher override 우선)
   const tp = teacherPolicies?.find((p) => p.teacherId === unit.teacherId)
   const maxDaily = tp?.maxDailyHoursOverride ?? policy.teacherMaxDailyHours
-  if (grid.getTeacherDayHours(unit.teacherId, day) >= maxDaily) {
+  const teacherDayHours =
+    unit.subjectType === 'CLASS'
+      ? grid.getTeacherDayHours(unit.teacherId, day)
+      : grid.getTeacherDayUniqueHours(unit.teacherId, day)
+  if (teacherDayHours >= maxDaily) {
     return false
   }
 

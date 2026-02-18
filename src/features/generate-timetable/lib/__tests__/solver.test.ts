@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { generateTimetable } from '../solver'
 import type { GenerationInput } from '../../model/types'
-import type { SchoolConfig } from '@/entities/school'
-import type { Teacher } from '@/entities/teacher'
-import type { Subject } from '@/entities/subject'
-import type { FixedEvent } from '@/entities/fixed-event'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { FixedEvent } from '@/entities/fixed-event'
+import type { SchoolConfig } from '@/entities/school'
+import type { Subject } from '@/entities/subject'
+import type { Teacher } from '@/entities/teacher'
+import { getTeacherAssignments } from '@/entities/teacher'
 
 function makeSchoolConfig(overrides: Partial<SchoolConfig> = {}): SchoolConfig {
   return {
@@ -164,7 +165,8 @@ describe('generateTimetable', () => {
 
     // 교사별 반별 배정 시수 확인
     for (const teacher of input.teachers) {
-      for (const assignment of teacher.classAssignments) {
+      for (const assignment of getTeacherAssignments(teacher)) {
+        if (assignment.subjectType !== 'CLASS') continue
         const count = cells.filter(
           (c) =>
             c.teacherId === teacher.id &&

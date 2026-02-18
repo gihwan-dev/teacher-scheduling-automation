@@ -132,7 +132,11 @@ export class TimetableGrid {
   }
 
   getTeacherDayHours(teacherId: string, day: DayOfWeek): number {
-    return this.teacherDayHours.get(`${teacherId}-${day}`) ?? 0
+    return this.teacherDayPeriods.get(`${teacherId}-${day}`)?.size ?? 0
+  }
+
+  getTeacherDayUniqueHours(teacherId: string, day: DayOfWeek): number {
+    return this.getTeacherDayHours(teacherId, day)
   }
 
   getTeacherDayPeriods(teacherId: string, day: DayOfWeek): Set<number> {

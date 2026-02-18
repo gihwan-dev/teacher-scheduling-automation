@@ -5,6 +5,7 @@ import type { CellKey, TimetableCell } from '@/entities/timetable'
 import { StatusIndicator } from '@/entities/timetable'
 import { makeCellKey } from '@/features/edit-timetable-cell'
 import { useReplacementStore } from '@/features/find-replacement'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -39,7 +40,8 @@ export function ReplacementGrid({
     removeMultiTarget,
   } = useReplacementStore()
 
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
+  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
   const teacherMap = new Map(teachers.map((t) => [t.id, t]))
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
 
@@ -108,7 +110,7 @@ export function ReplacementGrid({
       </div>
 
       {/* 데이터 행 */}
-      {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((period) => (
+      {Array.from({ length: maxPeriodsPerDay }, (_, i) => i + 1).map((period) => (
         <div
           key={period}
           role="row"
@@ -124,6 +126,16 @@ export function ReplacementGrid({
             {period}
           </div>
           {activeDays.map((day) => {
+            const dayMax = getDayPeriodCount(schoolConfig, day)
+            if (period > dayMax) {
+              return (
+                <div
+                  key={day}
+                  role="gridcell"
+                  className="border-l min-h-16 p-1 bg-muted/40"
+                />
+              )
+            }
             const key = makeCellKey(viewGrade, viewClassNumber, day, period)
             const cell = cellMap.get(key)
             const isFixedOrLocked = cell?.isFixed || cell?.status === 'LOCKED'

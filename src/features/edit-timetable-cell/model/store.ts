@@ -18,6 +18,7 @@ import type {
   TimetableCell,
   TimetableSnapshot,
 } from '@/entities/timetable'
+import { getDayPeriodCount } from '@/entities/school'
 import { validateTimetable } from '@/entities/constraint-policy'
 import {
   buildBlockedSlots,
@@ -180,7 +181,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     const { focusedCell, viewGrade, viewClassNumber, schoolConfig } = get()
     if (!schoolConfig) return
 
-    const { activeDays, periodsPerDay } = schoolConfig
+    const { activeDays } = schoolConfig
     const dayIndex = focusedCell
       ? activeDays.indexOf(parseCellKey(focusedCell).day)
       : 0
@@ -194,7 +195,10 @@ export const useEditStore = create<EditState>((set, get) => ({
         newPeriod = Math.max(1, period - 1)
         break
       case 'down':
-        newPeriod = Math.min(periodsPerDay, period + 1)
+        newPeriod = Math.min(
+          getDayPeriodCount(schoolConfig, activeDays[dayIndex]),
+          period + 1,
+        )
         break
       case 'left':
         newDayIndex = Math.max(0, dayIndex - 1)
@@ -203,6 +207,9 @@ export const useEditStore = create<EditState>((set, get) => ({
         newDayIndex = Math.min(activeDays.length - 1, dayIndex + 1)
         break
     }
+
+    const nextDay = activeDays[newDayIndex]
+    newPeriod = Math.min(newPeriod, getDayPeriodCount(schoolConfig, nextDay))
 
     const newKey = makeCellKey(
       viewGrade,
@@ -295,6 +302,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     const newCell: TimetableCell = {
       teacherId: editDraft.teacherId,
       subjectId: editDraft.subjectId,
+      subjectType: 'CLASS',
       grade,
       classNumber,
       day,

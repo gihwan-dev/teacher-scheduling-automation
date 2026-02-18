@@ -9,6 +9,7 @@ import {
   getCellStatusClasses,
   getStatusLabel,
 } from '@/entities/timetable'
+import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import { makeCellKey, useEditStore } from '@/features/edit-timetable-cell'
 import { useGridKeyboard } from '@/features/edit-timetable-cell/lib/use-grid-keyboard'
@@ -40,7 +41,8 @@ export function EditableTimetableGrid({
     startEdit,
   } = useEditStore()
 
-  const { activeDays, periodsPerDay } = schoolConfig
+  const { activeDays } = schoolConfig
+  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
   const teacherMap = new Map(teachers.map((t) => [t.id, t]))
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
 
@@ -79,7 +81,7 @@ export function EditableTimetableGrid({
       </div>
 
       {/* 데이터 행 */}
-      {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((period) => (
+      {Array.from({ length: maxPeriodsPerDay }, (_, i) => i + 1).map((period) => (
         <div
           key={period}
           role="row"
@@ -95,6 +97,16 @@ export function EditableTimetableGrid({
             {period}
           </div>
           {activeDays.map((day) => {
+            const dayMax = getDayPeriodCount(schoolConfig, day)
+            if (period > dayMax) {
+              return (
+                <div
+                  key={day}
+                  role="gridcell"
+                  className="border-l min-h-16 p-1 bg-muted/40"
+                />
+              )
+            }
             const key = makeCellKey(viewGrade, viewClassNumber, day, period)
             const cell = cellMap.get(key)
             const isFocused = focusedCell === key

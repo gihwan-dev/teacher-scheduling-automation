@@ -29,6 +29,7 @@ function makeUnit(overrides: Partial<AssignmentUnit> = {}): AssignmentUnit {
   return {
     teacherId: 't-1',
     subjectId: 'sub-1',
+    subjectType: 'CLASS',
     grade: 1,
     classNumber: 1,
     totalHours: 3,
