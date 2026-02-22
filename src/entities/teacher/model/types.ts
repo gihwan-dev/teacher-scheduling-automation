@@ -9,17 +9,25 @@ export interface TeachingAssignment {
   hoursPerWeek: number
 }
 
+export interface ClassHoursAssignment {
+  grade: number
+  classNumber: number
+  hoursPerWeek: number
+}
+
+export interface HomeroomAssignment {
+  grade: number
+  classNumber: number
+}
+
 export interface Teacher {
   id: string
   name: string
-  subjectIds?: Array<string> // legacy compatibility
+  subjectIds: Array<string>
   baseHoursPerWeek: number
   assignments?: Array<TeachingAssignment>
-  classAssignments?: Array<{
-    grade: number
-    classNumber: number
-    hoursPerWeek: number
-  }> // legacy compatibility
+  homeroom: HomeroomAssignment | null
+  classAssignments: Array<ClassHoursAssignment>
   createdAt: string
   updatedAt: string
 }

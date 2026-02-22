@@ -1,17 +1,20 @@
 import { rankCandidate } from './candidate-ranker'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { FixedEvent } from '@/entities/fixed-event'
+import type { SchoolConfig } from '@/entities/school'
+import type { Subject } from '@/entities/subject'
+import type { Teacher } from '@/entities/teacher'
+import type { CellKey, TimetableCell } from '@/entities/timetable'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { WeekTag } from '@/shared/lib/week-tag'
+import type { DayOfWeek } from '@/shared/lib/types'
 import type {
   RelaxationSuggestion,
   ReplacementCandidate,
   ReplacementSearchConfig,
   ReplacementSearchResult,
 } from '../model/types'
-import type { ConstraintPolicy } from '@/entities/constraint-policy'
-import type { FixedEvent } from '@/entities/fixed-event'
-import type { SchoolConfig } from '@/entities/school'
-import type { CellKey, TimetableCell } from '@/entities/timetable'
-import type { TeacherPolicy } from '@/entities/teacher-policy'
-import type { DayOfWeek } from '@/shared/lib/types'
-import { getDayPeriodCount, getMaxPeriodsPerDay } from '@/entities/school'
 import { makeCellKey } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
 import {
@@ -20,6 +23,7 @@ import {
   expandGradeBlockedSlots,
   isPlacementValid,
 } from '@/features/generate-timetable'
+import { buildAcademicCalendarBlockedSlots } from '@/features/validate-schedule-change'
 import { generateId } from '@/shared/lib/id'
 
 export interface ReplacementFinderContext {
@@ -27,6 +31,10 @@ export interface ReplacementFinderContext {
   constraintPolicy: ConstraintPolicy
   teacherPolicies: Array<TeacherPolicy>
   fixedEvents: Array<FixedEvent>
+  teachers: Array<Teacher>
+  subjects: Array<Subject>
+  weekTag: WeekTag
+  academicCalendarEvents: Array<AcademicCalendarEvent>
 }
 
 /**
@@ -47,13 +55,15 @@ export function findReplacementCandidates(
   if (sourceCell.isFixed || sourceCell.status === 'LOCKED') {
     return emptyResult(startTime)
   }
-  if ((sourceCell.subjectType ?? 'CLASS') !== 'CLASS') {
-    return emptyResult(startTime)
-  }
 
-  const { schoolConfig, constraintPolicy, teacherPolicies, fixedEvents } = ctx
-  const { activeDays } = schoolConfig
-  const maxPeriodsPerDay = getMaxPeriodsPerDay(schoolConfig)
+  const {
+    schoolConfig,
+    constraintPolicy,
+    teacherPolicies,
+    fixedEvents,
+    academicCalendarEvents,
+  } = ctx
+  const { activeDays, periodsPerDay } = schoolConfig
 
   // blocked slots
   let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
@@ -61,6 +71,14 @@ export function findReplacementCandidates(
     blockedSlots,
     schoolConfig.classCountByGrade,
   )
+  const calendarBlockedSlots = buildAcademicCalendarBlockedSlots({
+    schoolConfig,
+    weekTag: ctx.weekTag,
+    academicCalendarEvents,
+  })
+  for (const slotKey of calendarBlockedSlots) {
+    blockedSlots.add(slotKey)
+  }
 
   const candidates: Array<ReplacementCandidate> = []
 
@@ -82,7 +100,6 @@ export function findReplacementCandidates(
       targetCell.subjectId === sourceCell.subjectId
     )
       continue
-    if ((targetCell.subjectType ?? 'CLASS') !== 'CLASS') continue
     if (!isCellEditable(targetCell)) continue
 
     totalExamined++
@@ -95,8 +112,7 @@ export function findReplacementCandidates(
       constraintPolicy,
       teacherPolicies,
       blockedSlots,
-      activeDays,
-      maxPeriodsPerDay,
+      ctx,
       config.includeViolating,
     )
     if (swapCandidate) candidates.push(swapCandidate)
@@ -104,7 +120,7 @@ export function findReplacementCandidates(
 
   // MOVE 후보 탐색 (빈 슬롯으로 이동)
   for (const day of activeDays) {
-    for (let period = 1; period <= getDayPeriodCount(schoolConfig, day); period++) {
+    for (let period = 1; period <= periodsPerDay; period++) {
       if (day === sourceCell.day && period === sourceCell.period) continue
 
       // 해당 슬롯이 비어있는지 확인
@@ -130,8 +146,7 @@ export function findReplacementCandidates(
         constraintPolicy,
         teacherPolicies,
         blockedSlots,
-        activeDays,
-        maxPeriodsPerDay,
+        ctx,
         config.includeViolating,
       )
       if (moveCandidate) candidates.push(moveCandidate)
@@ -169,8 +184,7 @@ function trySwap(
   constraintPolicy: ConstraintPolicy,
   teacherPolicies: Array<TeacherPolicy>,
   blockedSlots: Set<string>,
-  activeDays: Array<DayOfWeek>,
-  maxPeriodsPerDay: number,
+  ctx: ReplacementFinderContext,
   includeViolating: boolean,
 ): ReplacementCandidate | null {
   // 그리드: source와 target 모두 제거
@@ -194,7 +208,6 @@ function trySwap(
   const sourceUnit = {
     teacherId: sourceCell.teacherId,
     subjectId: sourceCell.subjectId,
-    subjectType: 'CLASS' as const,
     grade: sourceCell.grade,
     classNumber: sourceCell.classNumber,
     totalHours: 1,
@@ -215,7 +228,6 @@ function trySwap(
   const targetUnit = {
     teacherId: targetCell.teacherId,
     subjectId: targetCell.subjectId,
-    subjectType: 'CLASS' as const,
     grade: targetCell.grade,
     classNumber: targetCell.classNumber,
     totalHours: 1,
@@ -290,8 +302,11 @@ function trySwap(
       allCells,
       constraintPolicy,
       teacherPolicies,
-      activeDays,
-      periodsPerDay: maxPeriodsPerDay,
+      schoolConfig: ctx.schoolConfig,
+      teachers: ctx.teachers,
+      subjects: ctx.subjects,
+      weekTag: ctx.weekTag,
+      academicCalendarEvents: ctx.academicCalendarEvents,
     },
   )
 
@@ -320,8 +335,7 @@ function tryMove(
   constraintPolicy: ConstraintPolicy,
   teacherPolicies: Array<TeacherPolicy>,
   blockedSlots: Set<string>,
-  activeDays: Array<DayOfWeek>,
-  maxPeriodsPerDay: number,
+  ctx: ReplacementFinderContext,
   includeViolating: boolean,
 ): ReplacementCandidate | null {
   const grid = new TimetableGrid()
@@ -340,7 +354,6 @@ function tryMove(
   const unit = {
     teacherId: sourceCell.teacherId,
     subjectId: sourceCell.subjectId,
-    subjectType: 'CLASS' as const,
     grade: sourceCell.grade,
     classNumber: sourceCell.classNumber,
     totalHours: 1,
@@ -386,8 +399,11 @@ function tryMove(
       allCells,
       constraintPolicy,
       teacherPolicies,
-      activeDays,
-      periodsPerDay: maxPeriodsPerDay,
+      schoolConfig: ctx.schoolConfig,
+      teachers: ctx.teachers,
+      subjects: ctx.subjects,
+      weekTag: ctx.weekTag,
+      academicCalendarEvents: ctx.academicCalendarEvents,
     },
   )
 
@@ -417,6 +433,9 @@ function simulateRelaxations(
     scope: 'SAME_CLASS',
     includeViolating: false,
     maxCandidates: 5,
+    searchMode: 'REPLACEMENT',
+    excludeHomeroomTeachers: false,
+    fairnessWindowWeeks: 4,
   }
 
   // 1. teacherMaxDailyHours + 1

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appliedScopeSchema,
+  appliedScopeTypeSchema,
   cellStatusSchema,
   timetableCellSchema,
   timetableSnapshotSchema,
@@ -105,6 +107,14 @@ describe('timetableSnapshotSchema', () => {
   const validSnapshot = {
     id: 'snapshot-1',
     schoolConfigId: 'config-1',
+    weekTag: '2026-W08',
+    versionNo: 1,
+    baseVersionId: null,
+    appliedScope: {
+      type: 'THIS_WEEK' as const,
+      fromWeek: '2026-W08',
+      toWeek: null,
+    },
     cells: [
       {
         teacherId: 'teacher-1',
@@ -145,6 +155,61 @@ describe('timetableSnapshotSchema', () => {
       timetableSnapshotSchema.safeParse({
         ...validSnapshot,
         generationTimeMs: -1,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('versionNo가 0이면 실패한다', () => {
+    expect(
+      timetableSnapshotSchema.safeParse({
+        ...validSnapshot,
+        versionNo: 0,
+      }).success,
+    ).toBe(false)
+  })
+})
+
+describe('appliedScopeTypeSchema', () => {
+  it('유효한 범위 타입을 통과시킨다', () => {
+    expect(appliedScopeTypeSchema.safeParse('THIS_WEEK').success).toBe(true)
+    expect(appliedScopeTypeSchema.safeParse('FROM_NEXT_WEEK').success).toBe(
+      true,
+    )
+    expect(appliedScopeTypeSchema.safeParse('RANGE').success).toBe(true)
+  })
+
+  it('유효하지 않은 범위 타입을 거부한다', () => {
+    expect(appliedScopeTypeSchema.safeParse('ALL').success).toBe(false)
+  })
+})
+
+describe('appliedScopeSchema', () => {
+  it('THIS_WEEK는 toWeek가 null이면 통과한다', () => {
+    expect(
+      appliedScopeSchema.safeParse({
+        type: 'THIS_WEEK',
+        fromWeek: '2026-W08',
+        toWeek: null,
+      }).success,
+    ).toBe(true)
+  })
+
+  it('RANGE는 toWeek가 필요하다', () => {
+    expect(
+      appliedScopeSchema.safeParse({
+        type: 'RANGE',
+        fromWeek: '2026-W08',
+        toWeek: null,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('RANGE 외 타입에서 toWeek가 있으면 실패한다', () => {
+    expect(
+      appliedScopeSchema.safeParse({
+        type: 'FROM_NEXT_WEEK',
+        fromWeek: '2026-W08',
+        toWeek: '2026-W10',
       }).success,
     ).toBe(false)
   })

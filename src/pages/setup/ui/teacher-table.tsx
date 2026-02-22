@@ -1,11 +1,5 @@
-import { Fragment, useCallback, useMemo, useState } from 'react'
-import type { SubjectType } from '@/shared/lib/types'
-import type { Teacher, TeachingAssignment } from '@/entities/teacher'
-import {
-  getTeacherAssignments,
-  validateHoursConsistency,
-} from '@/entities/teacher'
-import { generateId } from '@/shared/lib/id'
+import { Fragment, useCallback, useState } from 'react'
+import type { ClassHoursAssignment, Teacher } from '@/entities/teacher'
 import {
   Table,
   TableBody,
@@ -17,6 +11,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { useSetupStore } from '@/features/manage-school-setup'
+import { validateHoursConsistency } from '@/entities/teacher'
 import {
   Select,
   SelectContent,
@@ -24,13 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSetupStore } from '@/features/manage-school-setup'
-
-const SUBJECT_TYPE_OPTIONS: Array<{ value: SubjectType; label: string }> = [
-  { value: 'CLASS', label: '반 단위' },
-  { value: 'GRADE', label: '학년 단위' },
-  { value: 'SCHOOL', label: '전교 단위' },
-]
 
 export function TeacherTable() {
   const {
@@ -41,122 +30,75 @@ export function TeacherTable() {
     updateTeacher,
     removeTeacher,
   } = useSetupStore()
-
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [newBaseHours, setNewBaseHours] = useState(18)
 
-  const gradeOptions = useMemo(() => {
-    const gradeCount = schoolConfig?.gradeCount ?? 0
-    return Array.from({ length: gradeCount }, (_, i) => {
-      const grade = i + 1
-      return { value: grade, label: `${grade}학년` }
-    })
-  }, [schoolConfig])
-
-  const handleAddTeacher = () => {
+  const handleAdd = () => {
     if (!newName.trim()) return
     addTeacher({
       name: newName.trim(),
+      subjectIds: [],
       baseHoursPerWeek: newBaseHours,
-      assignments: [],
+      homeroom: null,
+      classAssignments: [],
     })
     setNewName('')
     setNewBaseHours(18)
   }
 
-  const getAssignments = useCallback((teacher: Teacher) => {
-    return getTeacherAssignments(teacher)
-  }, [])
-
-  const updateAssignments = useCallback(
-    (teacher: Teacher, assignments: Array<TeachingAssignment>) => {
-      updateTeacher(teacher.id, {
-        assignments,
-        classAssignments: undefined,
-        subjectIds: undefined,
-      })
+  const toggleSubject = useCallback(
+    (teacher: Teacher, subjectId: string) => {
+      const newIds = teacher.subjectIds.includes(subjectId)
+        ? teacher.subjectIds.filter((id) => id !== subjectId)
+        : [...teacher.subjectIds, subjectId]
+      updateTeacher(teacher.id, { subjectIds: newIds })
     },
     [updateTeacher],
   )
 
-  const handleAssignmentFieldChange = useCallback(
-    (
-      teacher: Teacher,
-      assignmentId: string,
-      updates: Partial<TeachingAssignment>,
-    ) => {
-      const next = getAssignments(teacher).map((assignment) =>
-        assignment.id === assignmentId ? { ...assignment, ...updates } : assignment,
+  const handleAssignmentChange = useCallback(
+    (teacher: Teacher, grade: number, classNumber: number, hours: number) => {
+      if (isNaN(hours) || hours < 0) return
+      const existing = teacher.classAssignments.find(
+        (a) => a.grade === grade && a.classNumber === classNumber,
       )
-      updateAssignments(teacher, next)
-    },
-    [getAssignments, updateAssignments],
-  )
-
-  const handleSubjectTypeChange = useCallback(
-    (teacher: Teacher, assignmentId: string, subjectType: SubjectType) => {
-      if (subjectType === 'CLASS') {
-        handleAssignmentFieldChange(teacher, assignmentId, {
-          subjectType,
-          grade: 1,
-          classNumber: 1,
-        })
+      let newAssignments: Array<ClassHoursAssignment>
+      if (existing) {
+        if (hours === 0) {
+          newAssignments = teacher.classAssignments.filter(
+            (a) => !(a.grade === grade && a.classNumber === classNumber),
+          )
+        } else {
+          newAssignments = teacher.classAssignments.map((a) =>
+            a.grade === grade && a.classNumber === classNumber
+              ? { ...a, hoursPerWeek: hours }
+              : a,
+          )
+        }
+      } else if (hours > 0) {
+        newAssignments = [
+          ...teacher.classAssignments,
+          { grade, classNumber, hoursPerWeek: hours },
+        ]
+      } else {
         return
       }
-
-      if (subjectType === 'GRADE') {
-        handleAssignmentFieldChange(teacher, assignmentId, {
-          subjectType,
-          grade: 1,
-          classNumber: null,
-        })
-        return
-      }
-
-      handleAssignmentFieldChange(teacher, assignmentId, {
-        subjectType,
-        grade: null,
-        classNumber: null,
-      })
+      updateTeacher(teacher.id, { classAssignments: newAssignments })
     },
-    [handleAssignmentFieldChange],
+    [updateTeacher],
   )
 
-  const handleAddAssignment = useCallback(
-    (teacher: Teacher) => {
-      if (!schoolConfig) return
-      const firstSubjectId = subjects[0]?.id ?? ''
-      const next = [
-        ...getAssignments(teacher),
-        {
-          id: generateId(),
-          subjectId: firstSubjectId,
-          subjectType: 'CLASS' as const,
-          grade: 1,
-          classNumber: 1,
-          hoursPerWeek: 1,
-        },
-      ]
-      updateAssignments(teacher, next)
-    },
-    [getAssignments, schoolConfig, subjects, updateAssignments],
-  )
-
-  const handleRemoveAssignment = useCallback(
-    (teacher: Teacher, assignmentId: string) => {
-      const next = getAssignments(teacher).filter((a) => a.id !== assignmentId)
-      updateAssignments(teacher, next)
-    },
-    [getAssignments, updateAssignments],
-  )
-
-  const getClassOptions = (grade: number) => {
-    const classCount = schoolConfig?.classCountByGrade[grade] ?? 0
-    return Array.from({ length: classCount }, (_, i) => {
-      const cls = i + 1
-      return { value: cls, label: `${cls}반` }
-    })
+  const getAssignmentHours = (
+    teacher: Teacher,
+    grade: number,
+    classNumber: number,
+  ) => {
+    return (
+      teacher.classAssignments.find(
+        (a) => a.grade === grade && a.classNumber === classNumber,
+      )?.hoursPerWeek ?? 0
+    )
   }
 
   return (
@@ -166,18 +108,18 @@ export function TeacherTable() {
           <TableRow>
             <TableHead className="w-[40px]" />
             <TableHead className="w-[140px]">이름</TableHead>
+            <TableHead>담당 과목</TableHead>
+            <TableHead className="w-[170px]">담임</TableHead>
             <TableHead className="w-[100px]">기준 시수</TableHead>
             <TableHead className="w-[100px]">배정 합계</TableHead>
             <TableHead className="w-[80px]">상태</TableHead>
-            <TableHead className="w-[100px]">작업</TableHead>
+            <TableHead className="w-[80px]">작업</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {teachers.map((teacher) => {
             const consistency = validateHoursConsistency(teacher)
             const isExpanded = expandedId === teacher.id
-            const assignments = getAssignments(teacher)
-
             return (
               <Fragment key={teacher.id}>
                 <TableRow>
@@ -200,6 +142,133 @@ export function TeacherTable() {
                       }
                       className="h-7"
                     />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {subjects.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleSubject(teacher, s.id)}
+                          className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                            teacher.subjectIds.includes(s.id)
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          {s.abbreviation}
+                        </button>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {!schoolConfig ? (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Select
+                          items={Array.from(
+                            { length: schoolConfig.gradeCount },
+                            (_, index) => ({
+                              value: String(index + 1),
+                              label: `${index + 1}학년`,
+                            }),
+                          )}
+                          value={teacher.homeroom ? String(teacher.homeroom.grade) : ''}
+                          onValueChange={(val) => {
+                            if (!val) {
+                              return
+                            }
+                            const grade = Number(val)
+                            updateTeacher(teacher.id, {
+                              homeroom: { grade, classNumber: 1 },
+                            })
+                          }}
+                        >
+                          <SelectTrigger size="sm" className="w-20">
+                            <SelectValue placeholder="학년" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from(
+                              { length: schoolConfig.gradeCount },
+                              (_, index) => index + 1,
+                            ).map((grade) => (
+                              <SelectItem key={grade} value={String(grade)}>
+                                {grade}학년
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          items={
+                            teacher.homeroom
+                              ? Array.from(
+                                  {
+                                    length:
+                                      schoolConfig.classCountByGrade[
+                                        teacher.homeroom.grade
+                                      ] ?? 0,
+                                  },
+                                  (_, index) => ({
+                                    value: String(index + 1),
+                                    label: `${index + 1}반`,
+                                  }),
+                                )
+                              : []
+                          }
+                          value={
+                            teacher.homeroom
+                              ? String(teacher.homeroom.classNumber)
+                              : ''
+                          }
+                          onValueChange={(val) => {
+                            if (!teacher.homeroom || !val) {
+                              return
+                            }
+                            updateTeacher(teacher.id, {
+                              homeroom: {
+                                ...teacher.homeroom,
+                                classNumber: Number(val),
+                              },
+                            })
+                          }}
+                          disabled={!teacher.homeroom}
+                        >
+                          <SelectTrigger size="sm" className="w-16">
+                            <SelectValue placeholder="반" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teacher.homeroom &&
+                              Array.from(
+                                {
+                                  length:
+                                    schoolConfig.classCountByGrade[
+                                      teacher.homeroom.grade
+                                    ] ?? 0,
+                                },
+                                (_, index) => index + 1,
+                              ).map((classNumber) => (
+                                <SelectItem
+                                  key={classNumber}
+                                  value={String(classNumber)}
+                                >
+                                  {classNumber}반
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() =>
+                            updateTeacher(teacher.id, { homeroom: null })
+                          }
+                          title="담임 해제"
+                        >
+                          x
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Input
@@ -225,205 +294,69 @@ export function TeacherTable() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{assignments.length}행</Badge>
-                      <Button
-                        variant="destructive"
-                        size="xs"
-                        onClick={() => removeTeacher(teacher.id)}
-                      >
-                        삭제
-                      </Button>
-                    </div>
+                    <Button
+                      variant="destructive"
+                      size="xs"
+                      onClick={() => removeTeacher(teacher.id)}
+                    >
+                      삭제
+                    </Button>
                   </TableCell>
                 </TableRow>
-
-                {isExpanded && (
+                {/* 확장 행: 학년/반별 배정 시수 그리드 */}
+                {isExpanded && schoolConfig && (
                   <TableRow>
-                    <TableCell colSpan={6}>
-                      <div className="rounded-lg bg-muted/30 p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">수업 배정</p>
-                          <Button
-                            size="xs"
-                            onClick={() => handleAddAssignment(teacher)}
-                          >
-                            배정 행 추가
-                          </Button>
-                        </div>
-
-                        {assignments.length === 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            배정 행이 없습니다. 과목/수업유형/대상/시수를 추가하세요.
-                          </p>
-                        )}
-
-                        {assignments.map((assignment) => {
-                          const classOptions =
-                            assignment.grade !== null
-                              ? getClassOptions(assignment.grade)
-                              : []
-
-                          return (
-                            <div
-                              key={assignment.id}
-                              className="grid grid-cols-6 gap-2 items-center"
-                            >
-                              <Select
-                                items={subjects.map((subject) => ({
-                                  value: subject.id,
-                                  label: subject.name,
-                                }))}
-                                value={assignment.subjectId}
-                                onValueChange={(value) =>
-                                  value &&
-                                  handleAssignmentFieldChange(
-                                    teacher,
-                                    assignment.id,
-                                    { subjectId: value },
-                                  )
-                                }
-                              >
-                                <SelectTrigger size="sm">
-                                  <SelectValue placeholder="과목" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {subjects.map((subject) => (
-                                    <SelectItem
-                                      key={subject.id}
-                                      value={subject.id}
-                                    >
-                                      {subject.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-
-                              <Select
-                                items={SUBJECT_TYPE_OPTIONS}
-                                value={assignment.subjectType}
-                                onValueChange={(value) =>
-                                  value &&
-                                  handleSubjectTypeChange(
-                                    teacher,
-                                    assignment.id,
-                                    value,
-                                  )
-                                }
-                              >
-                                <SelectTrigger size="sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {SUBJECT_TYPE_OPTIONS.map((option) => (
-                                    <SelectItem
-                                      key={option.value}
-                                      value={option.value}
-                                    >
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-
-                              {assignment.subjectType !== 'SCHOOL' ? (
-                                <Select
-                                  items={gradeOptions}
-                                  value={assignment.grade ?? 1}
-                                  onValueChange={(value) =>
-                                    value !== null &&
-                                    handleAssignmentFieldChange(
-                                      teacher,
-                                      assignment.id,
-                                      { grade: value },
-                                    )
-                                  }
+                    <TableCell colSpan={8}>
+                      <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                        <p className="text-sm font-medium">
+                          학년/반별 배정 시수
+                        </p>
+                        {Array.from(
+                          { length: schoolConfig.gradeCount },
+                          (_, i) => i + 1,
+                        ).map((grade) => (
+                          <div key={grade} className="space-y-1">
+                            <p className="text-xs text-muted-foreground font-medium">
+                              {grade}학년
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {Array.from(
+                                {
+                                  length:
+                                    schoolConfig.classCountByGrade[grade] ?? 0,
+                                },
+                                (_, j) => j + 1,
+                              ).map((cls) => (
+                                <div
+                                  key={cls}
+                                  className="flex items-center gap-1"
                                 >
-                                  <SelectTrigger size="sm">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {gradeOptions.map((option) => (
-                                      <SelectItem
-                                        key={option.value}
-                                        value={option.value}
-                                      >
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <div className="text-xs text-muted-foreground px-2">
-                                  전체
-                                </div>
-                              )}
-
-                              {assignment.subjectType === 'CLASS' &&
-                              assignment.grade !== null ? (
-                                <Select
-                                  items={classOptions}
-                                  value={assignment.classNumber ?? 1}
-                                  onValueChange={(value) =>
-                                    value !== null &&
-                                    handleAssignmentFieldChange(
+                                  <span className="text-xs text-muted-foreground w-6 text-right">
+                                    {cls}반
+                                  </span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={getAssignmentHours(
                                       teacher,
-                                      assignment.id,
-                                      { classNumber: value },
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger size="sm">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {classOptions.map((option) => (
-                                      <SelectItem
-                                        key={option.value}
-                                        value={option.value}
-                                      >
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <div className="text-xs text-muted-foreground px-2">
-                                  {assignment.subjectType === 'GRADE'
-                                    ? '학년 전체'
-                                    : '-'}
-                                </div>
-                              )}
-
-                              <Input
-                                type="number"
-                                min={0}
-                                value={assignment.hoursPerWeek}
-                                onChange={(e) =>
-                                  handleAssignmentFieldChange(
-                                    teacher,
-                                    assignment.id,
-                                    {
-                                      hoursPerWeek:
+                                      grade,
+                                      cls,
+                                    )}
+                                    onChange={(e) =>
+                                      handleAssignmentChange(
+                                        teacher,
+                                        grade,
+                                        cls,
                                         parseInt(e.target.value, 10) || 0,
-                                    },
-                                  )
-                                }
-                                className="h-8"
-                              />
-
-                              <Button
-                                variant="destructive"
-                                size="xs"
-                                onClick={() =>
-                                  handleRemoveAssignment(teacher, assignment.id)
-                                }
-                              >
-                                삭제
-                              </Button>
+                                      )
+                                    }
+                                    className="h-6 w-14 text-xs"
+                                  />
+                                </div>
+                              ))}
                             </div>
-                          )
-                        })}
+                          </div>
+                        ))}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -431,7 +364,7 @@ export function TeacherTable() {
               </Fragment>
             )
           })}
-
+          {/* 새 교사 추가 행 */}
           <TableRow>
             <TableCell />
             <TableCell>
@@ -440,9 +373,11 @@ export function TeacherTable() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 className="h-7"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddTeacher()}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               />
             </TableCell>
+            <TableCell />
+            <TableCell />
             <TableCell>
               <Input
                 type="number"
@@ -457,7 +392,7 @@ export function TeacherTable() {
             <TableCell />
             <TableCell />
             <TableCell>
-              <Button size="xs" onClick={handleAddTeacher}>
+              <Button size="xs" onClick={handleAdd}>
                 추가
               </Button>
             </TableCell>

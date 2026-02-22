@@ -53,6 +53,7 @@ const teachers: Array<Teacher> = [
     name: '김교사',
     subjectIds: ['sub-1', 'sub-3'],
     baseHoursPerWeek: 20,
+    homeroom: null,
     classAssignments: [
       { grade: 1, classNumber: 1, hoursPerWeek: 5 },
       { grade: 1, classNumber: 2, hoursPerWeek: 3 },
@@ -65,6 +66,7 @@ const teachers: Array<Teacher> = [
     name: '이교사',
     subjectIds: ['sub-2'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [{ grade: 2, classNumber: 1, hoursPerWeek: 4 }],
     createdAt: '',
     updatedAt: '',
@@ -74,6 +76,14 @@ const teachers: Array<Teacher> = [
 const snapshot: TimetableSnapshot = {
   id: 'snap-1',
   schoolConfigId: 'sc-1',
+  weekTag: '2024-W24',
+  versionNo: 1,
+  baseVersionId: null,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2024-W24',
+    toWeek: null,
+  },
   cells: [
     {
       teacherId: 'tea-1',
@@ -187,9 +197,7 @@ describe('share round-trip', () => {
     restored.teachers.forEach((t, i) => {
       expect(t.name).toBe(teachers[i].name)
       expect(t.baseHoursPerWeek).toBe(teachers[i].baseHoursPerWeek)
-      expect(t.classAssignments?.length ?? 0).toBe(
-        teachers[i].classAssignments?.length ?? 0,
-      )
+      expect(t.classAssignments.length).toBe(teachers[i].classAssignments.length)
     })
 
     expect(restored.snapshot.cells).toHaveLength(snapshot.cells.length)
@@ -205,6 +213,14 @@ describe('share round-trip', () => {
 
     expect(restored.snapshot.score).toBe(snapshot.score)
     expect(restored.snapshot.generationTimeMs).toBe(snapshot.generationTimeMs)
+    expect(restored.snapshot.weekTag).toMatch(/^\d{4}-W\d{2}$/)
+    expect(restored.snapshot.versionNo).toBe(1)
+    expect(restored.snapshot.baseVersionId).toBeNull()
+    expect(restored.snapshot.appliedScope.type).toBe('THIS_WEEK')
+    expect(restored.snapshot.appliedScope.fromWeek).toBe(
+      restored.snapshot.weekTag,
+    )
+    expect(restored.snapshot.appliedScope.toWeek).toBeNull()
 
     expect(restored.constraintPolicy.studentMaxConsecutiveSameSubject).toBe(2)
     expect(restored.constraintPolicy.teacherMaxConsecutiveHours).toBe(4)

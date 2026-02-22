@@ -23,6 +23,7 @@ function createTeacher(overrides?: Partial<Teacher>): Teacher {
     name: '김교사',
     subjectIds: ['subject-1'],
     baseHoursPerWeek: 10,
+    homeroom: null,
     classAssignments: [
       { grade: 1, classNumber: 1, hoursPerWeek: 5 },
       { grade: 1, classNumber: 2, hoursPerWeek: 5 },

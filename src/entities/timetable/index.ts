@@ -4,11 +4,15 @@ export type {
   CellKey,
   EditAction,
   EditValidationResult,
+  AppliedScopeType,
+  AppliedScope,
   TimetableSnapshot,
 } from './model/types'
 export {
   timetableCellSchema,
   cellStatusSchema,
+  appliedScopeTypeSchema,
+  appliedScopeSchema,
   timetableSnapshotSchema,
 } from './model/schema'
 export {

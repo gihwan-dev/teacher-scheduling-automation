@@ -8,13 +8,13 @@ import {
 } from './constants'
 import type { CompactCell, SharePayload } from './types'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
-import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
-import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
-import { getDayPeriodCount } from '@/entities/school'
-import { getTeacherAssignments } from '@/entities/teacher'
+import type {SchoolConfig} from '@/entities/school';
+import type {Teacher} from '@/entities/teacher';
+import {  getTeacherAssignments } from '@/entities/teacher'
+import {  getDayPeriodCount } from '@/entities/school'
 
 export function buildSharePayload(
   schoolConfig: SchoolConfig,
@@ -55,7 +55,7 @@ export function buildSharePayload(
     teachers: teachers.map((t) => {
       const normalizedAssignments = getTeacherAssignments(t)
       const hasNewAssignments = t.assignments !== undefined
-      const hasAmbiguousLegacySubjects = (t.subjectIds?.length ?? 0) > 1
+      const hasAmbiguousLegacySubjects = t.subjectIds.length > 1
       const assignmentSource =
         hasNewAssignments || !hasAmbiguousLegacySubjects
           ? normalizedAssignments
@@ -63,7 +63,7 @@ export function buildSharePayload(
 
       const subjectIndices = Array.from(
         new Set([
-          ...(t.subjectIds ?? []),
+          ...t.subjectIds,
           ...assignmentSource.map((assignment) => assignment.subjectId),
         ]),
       )
@@ -86,7 +86,7 @@ export function buildSharePayload(
                   number,
                 ],
             )
-        : (t.classAssignments ?? []).map(
+        : t.classAssignments.map(
             (assignment) =>
               [assignment.grade, assignment.classNumber, assignment.hoursPerWeek] as [
                 number,
@@ -115,6 +115,11 @@ export function buildSharePayload(
         n: t.name,
         s: subjectIndices,
         h: t.baseHoursPerWeek,
+        ...(t.homeroom
+          ? {
+              hr: [t.homeroom.grade, t.homeroom.classNumber] as [number, number],
+            }
+          : {}),
         ca: classAssignments,
         as: compactAssignments.length > 0 ? compactAssignments : undefined,
       }

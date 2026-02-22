@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { timetableCellSchema } from '@/entities/timetable'
+import { WEEK_TAG_REGEX } from '@/shared/lib/week-tag'
 
-export const weekTagSchema = z.string().regex(/^\d{4}-W\d{2}$/)
+export const weekTagSchema = z.string().regex(WEEK_TAG_REGEX)
 
 export const changeActionTypeSchema = z.enum([
   'EDIT',
@@ -11,6 +12,13 @@ export const changeActionTypeSchema = z.enum([
   'MOVE',
   'CONFIRM',
   'RECOMPUTE',
+  'VERSION_CLONE',
+  'VERSION_RESTORE',
+  'EXAM_MODE_ENABLED',
+  'INVIGILATION_AUTO_ASSIGN',
+  'SUBSTITUTE_ASSIGN',
+  'TRANSACTION_COMMIT',
+  'TRANSACTION_ROLLBACK',
 ])
 
 export const changeEventSchema = z.object({
@@ -18,9 +26,15 @@ export const changeEventSchema = z.object({
   snapshotId: z.string().min(1),
   weekTag: weekTagSchema,
   actionType: changeActionTypeSchema,
+  actor: z.string().min(1),
   cellKey: z.string().min(1),
   before: timetableCellSchema.nullable(),
   after: timetableCellSchema.nullable(),
+  beforePayload: z.unknown().nullable(),
+  afterPayload: z.unknown().nullable(),
+  impactSummary: z.string().nullable(),
+  conflictDetected: z.boolean(),
+  rollbackRef: z.string().nullable(),
   timestamp: z.number().int().min(0),
   isUndone: z.boolean(),
 })

@@ -42,6 +42,7 @@ const teachers: Array<Teacher> = [
     name: '김교사',
     subjectIds: ['sub-1'],
     baseHoursPerWeek: 20,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 5 }],
     createdAt: '',
     updatedAt: '',
@@ -51,6 +52,7 @@ const teachers: Array<Teacher> = [
     name: '이교사',
     subjectIds: ['sub-2'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 2, hoursPerWeek: 4 }],
     createdAt: '',
     updatedAt: '',
@@ -60,6 +62,14 @@ const teachers: Array<Teacher> = [
 const snapshot: TimetableSnapshot = {
   id: 'snap-1',
   schoolConfigId: 'sc-1',
+  weekTag: '2024-W01',
+  versionNo: 1,
+  baseVersionId: null,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2024-W01',
+    toWeek: null,
+  },
   cells: [
     {
       teacherId: 'tea-1',

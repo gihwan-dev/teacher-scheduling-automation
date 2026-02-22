@@ -1,4 +1,5 @@
 import type { DayOfWeek, SubjectType } from '@/shared/lib/types'
+import type { WeekTag } from '@/shared/lib/week-tag'
 
 // 시간표 개별 셀 (배치 결과 단위)
 export interface TimetableCell {
@@ -39,9 +40,21 @@ export interface EditValidationResult {
 }
 
 // 생성 결과 스냅샷
+export type AppliedScopeType = 'THIS_WEEK' | 'FROM_NEXT_WEEK' | 'RANGE'
+
+export interface AppliedScope {
+  type: AppliedScopeType
+  fromWeek: WeekTag
+  toWeek: WeekTag | null
+}
+
 export interface TimetableSnapshot {
   id: string
   schoolConfigId: string
+  weekTag: WeekTag
+  versionNo: number
+  baseVersionId: string | null
+  appliedScope: AppliedScope
   cells: Array<TimetableCell>
   score: number
   generationTimeMs: number

@@ -44,11 +44,18 @@ export const teachingAssignmentSchema = z
     }
   })
 
-export const legacyClassHoursAssignmentSchema = z.object({
+export const classHoursAssignmentSchema = z.object({
   grade: z.number().int().min(1).max(3),
   classNumber: z.number().int().min(1),
   hoursPerWeek: z.number().int().min(0),
 })
+
+export const homeroomAssignmentSchema = z.object({
+  grade: z.number().int().min(1).max(3),
+  classNumber: z.number().int().min(1),
+})
+
+export const legacyClassHoursAssignmentSchema = classHoursAssignmentSchema
 
 export const teacherSchema = z.object({
   id: z.string().min(1),
@@ -56,7 +63,8 @@ export const teacherSchema = z.object({
   subjectIds: z.array(z.string().min(1)).optional(),
   baseHoursPerWeek: z.number().int().min(0),
   assignments: z.array(teachingAssignmentSchema).optional(),
-  classAssignments: z.array(legacyClassHoursAssignmentSchema).optional(),
+  homeroom: homeroomAssignmentSchema.nullable().optional(),
+  classAssignments: z.array(classHoursAssignmentSchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

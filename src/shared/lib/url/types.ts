@@ -16,6 +16,7 @@ export interface CompactTeacher {
   n: string // name
   s?: Array<number> // subject indices (legacy)
   h: number // baseHoursPerWeek
+  hr?: [number, number] | null // homeroom: [grade, classNumber] (legacy)
   ca?: Array<[number, number, number]> // classAssignments: [grade, classNumber, hoursPerWeek] (legacy)
   as?: Array<[number, number, number, number, number]> // assignments: [subjectIndex, subjectTypeIndex, grade(0=null), classNumber(0=null), hours]
 }

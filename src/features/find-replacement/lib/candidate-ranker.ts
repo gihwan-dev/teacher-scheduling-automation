@@ -1,20 +1,27 @@
 import type {
   ConstraintPolicy,
-  ConstraintViolation,
 } from '@/entities/constraint-policy'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { SchoolConfig } from '@/entities/school'
+import type { Subject } from '@/entities/subject'
+import type { Teacher } from '@/entities/teacher'
 import type { TimetableCell } from '@/entities/timetable'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { DayOfWeek } from '@/shared/lib/types'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import type { CandidateRanking, ReplacementCandidate } from '../model/types'
-import { validateTimetable } from '@/entities/constraint-policy'
 import { TimetableGrid, computeTotalScore } from '@/features/generate-timetable'
+import { validateScheduleChange } from '@/features/validate-schedule-change'
 
 interface RankingContext {
   allCells: Array<TimetableCell>
   constraintPolicy: ConstraintPolicy
   teacherPolicies: Array<TeacherPolicy>
-  activeDays: Array<DayOfWeek>
-  periodsPerDay: number
+  schoolConfig: SchoolConfig
+  teachers: Array<Teacher>
+  subjects: Array<Subject>
+  weekTag: WeekTag
+  academicCalendarEvents: Array<AcademicCalendarEvent>
 }
 
 /**
@@ -26,10 +33,15 @@ export function rankCandidate(
   ctx: RankingContext,
 ): CandidateRanking {
   // 1. 제약 위반 수
-  const violations: Array<ConstraintViolation> = validateTimetable(
-    afterCells,
-    ctx.constraintPolicy,
-  )
+  const violations = validateScheduleChange({
+    cells: afterCells,
+    constraintPolicy: ctx.constraintPolicy,
+    schoolConfig: ctx.schoolConfig,
+    teachers: ctx.teachers,
+    subjects: ctx.subjects,
+    weekTag: ctx.weekTag,
+    academicCalendarEvents: ctx.academicCalendarEvents,
+  })
   const violationCount = violations.filter((v) => v.severity === 'error').length
 
   // 2. 점수 변화량 (before → after)
@@ -38,30 +50,42 @@ export function rankCandidate(
   const beforeScore = computeTotalScore(
     beforeGrid,
     ctx.constraintPolicy,
-    ctx.activeDays,
-    ctx.periodsPerDay,
+    ctx.schoolConfig.activeDays,
+    ctx.schoolConfig.periodsPerDay,
     ctx.teacherPolicies,
   )
   const afterScore = computeTotalScore(
     afterGrid,
     ctx.constraintPolicy,
-    ctx.activeDays,
-    ctx.periodsPerDay,
+    ctx.schoolConfig.activeDays,
+    ctx.schoolConfig.periodsPerDay,
     ctx.teacherPolicies,
   )
   const scoreDelta = Math.round((afterScore - beforeScore) * 100) / 100
 
   // 3. 유사도: MOVE(1셀 변경) > SWAP(2셀 변경)
   const totalCells = ctx.allCells.length || 1
-  const changedCells = candidate.type === 'MOVE' ? 1 : 2
+  const changedCells =
+    candidate.type === 'SWAP'
+      ? 2
+      : 1
   const similarityScore = Math.round((1 - changedCells / totalCells) * 100)
 
   // 4. 공강 최소화 점수
   const idleMinimizationScore = computeIdleScore(
     afterCells,
-    ctx.activeDays,
-    ctx.periodsPerDay,
+    ctx.schoolConfig.activeDays,
+    ctx.schoolConfig.periodsPerDay,
   )
+
+  const fairnessScore = 100
+  const candidateReasons: Array<string> = []
+  if (violationCount === 0) {
+    candidateReasons.push('필수 제약 위반 0건')
+  }
+  if (scoreDelta >= 0) {
+    candidateReasons.push(`점수 변화 ${scoreDelta > 0 ? '+' : ''}${scoreDelta.toFixed(1)}`)
+  }
 
   // 5. 종합 점수
   const totalRank =
@@ -76,6 +100,8 @@ export function rankCandidate(
     scoreDelta,
     similarityScore,
     idleMinimizationScore,
+    fairnessScore,
+    candidateReasons,
     totalRank: Math.round(totalRank * 100) / 100,
   }
 }

@@ -67,14 +67,6 @@ export async function seedSampleData(): Promise<void> {
     gradeCount: 2,
     classCountByGrade: { 1: 2, 2: 2 },
     activeDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-    periodsByDay: {
-      MON: 7,
-      TUE: 7,
-      WED: 7,
-      THU: 7,
-      FRI: 7,
-      SAT: 1,
-    },
     periodsPerDay: 7,
     createdAt: now,
     updatedAt: now,
@@ -106,11 +98,10 @@ export async function seedSampleData(): Promise<void> {
     return {
       id: generateId(),
       name: td.name,
+      subjectIds: [subjects[td.subjectIndex].id],
       baseHoursPerWeek: hours * classes.length,
-      assignments: classes.map((c) => ({
-        id: generateId(),
-        subjectId: subjects[td.subjectIndex].id,
-        subjectType: 'CLASS' as const,
+      homeroom: null,
+      classAssignments: classes.map((c) => ({
         grade: c.grade,
         classNumber: c.classNumber,
         hoursPerWeek: hours,
@@ -128,7 +119,6 @@ export async function seedSampleData(): Promise<void> {
       description: '1-1 체육 (운동장 배정)',
       teacherId: teachers[5].id, // 한동윤 (체육)
       subjectId: subjects[5].id, // 체육
-      subjectType: 'CLASS',
       grade: 1,
       classNumber: 1,
       day: 'WED',
@@ -142,7 +132,6 @@ export async function seedSampleData(): Promise<void> {
       description: '이서연 교사 연수',
       teacherId: teachers[1].id, // 이서연 (수학)
       subjectId: null,
-      subjectType: null,
       grade: null,
       classNumber: null,
       day: 'FRI',
@@ -156,7 +145,6 @@ export async function seedSampleData(): Promise<void> {
       description: '전교 조회',
       teacherId: null,
       subjectId: null,
-      subjectType: null,
       grade: null,
       classNumber: null,
       day: 'MON',

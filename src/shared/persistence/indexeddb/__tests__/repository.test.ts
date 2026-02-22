@@ -1,21 +1,61 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../database'
 import {
+  commitScheduleTransactionAtomically,
+  createScheduleTransactionDraft,
+  loadAcademicCalendarEvents,
+  loadAcademicCalendarEventsByRange,
   loadAllSetupData,
+  loadChangeEventsByWeek,
+  loadExamModeWeekState,
+  loadExamSlotsByWeek,
   loadFixedEvents,
+  loadImpactAnalysisReport,
+  loadImpactAnalysisReportsBySnapshot,
+  loadInvigilationAssignmentsByWeek,
+  loadLatestSnapshotByWeek,
+  loadScheduleTransaction,
   loadSchoolConfig,
+  loadSnapshotBySelection,
+  loadSnapshotVersion,
+  loadSnapshotWeeks,
+  loadSnapshotsByWeek,
   loadSubjects,
+  loadSubstituteAssignmentsByRange,
+  loadSubstituteAssignmentsByWeek,
   loadTeachers,
+  rollbackScheduleTransaction,
+  saveAcademicCalendarEvents,
   saveAllSetupData,
+  saveChangeEvent,
+  saveExamModeWeekState,
+  saveExamSlots,
   saveFixedEvents,
+  saveImpactAnalysisReport,
+  saveInvigilationAssignments,
+  saveNextSnapshotVersion,
+  saveScheduleTransaction,
   saveSchoolConfig,
   saveSubjects,
+  saveSubstituteAssignments,
   saveTeachers,
+  saveTimetableSnapshot,
+  updateScheduleTransaction,
 } from '../repository'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { SchoolConfig } from '@/entities/school'
+import type { ScheduleTransaction } from '@/entities/schedule-transaction'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
+import type {
+  ExamModeWeekState,
+  ExamSlot,
+  InvigilationAssignment,
+} from '@/entities/exam-mode'
+import type { SubstituteAssignment } from '@/entities/substitute-assignment'
+import type { TimetableSnapshot } from '@/entities/timetable'
 
 const ts = '2024-01-01T00:00:00.000Z'
 
@@ -54,6 +94,7 @@ const sampleTeachers: Array<Teacher> = [
     name: '김교사',
     subjectIds: ['sub-1'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
     createdAt: ts,
     updatedAt: ts,
@@ -76,12 +117,193 @@ const sampleFixedEvents: Array<FixedEvent> = [
   },
 ]
 
+const sampleSnapshotV1: TimetableSnapshot = {
+  id: 'snapshot-1',
+  schoolConfigId: 'config-1',
+  weekTag: '2026-W08',
+  versionNo: 1,
+  baseVersionId: null,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2026-W08',
+    toWeek: null,
+  },
+  cells: [],
+  score: 80,
+  generationTimeMs: 1200,
+  createdAt: ts,
+}
+
+const sampleSnapshotV2: TimetableSnapshot = {
+  ...sampleSnapshotV1,
+  id: 'snapshot-2',
+  versionNo: 2,
+  baseVersionId: 'snapshot-1',
+}
+
+const sampleSnapshotOtherWeek: TimetableSnapshot = {
+  ...sampleSnapshotV1,
+  id: 'snapshot-3',
+  weekTag: '2026-W10',
+  versionNo: 1,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2026-W10',
+    toWeek: null,
+  },
+}
+
+const sampleCalendarEvents: Array<AcademicCalendarEvent> = [
+  {
+    id: 'ac-1',
+    eventType: 'HOLIDAY',
+    startDate: '2026-03-01',
+    endDate: '2026-03-01',
+    scopeType: 'SCHOOL',
+    scopeValue: null,
+    periodOverride: null,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+  {
+    id: 'ac-2',
+    eventType: 'GRADE_EVENT',
+    startDate: '2026-03-03',
+    endDate: '2026-03-05',
+    scopeType: 'GRADE',
+    scopeValue: '2',
+    periodOverride: null,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+]
+
+const sampleTransaction: ScheduleTransaction = {
+  draftId: 'draft-1',
+  targetWeeks: ['2026-W08', '2026-W09'],
+  validationResult: {
+    passed: true,
+    violations: [],
+  },
+  impactReportId: 'impact-1',
+  status: 'DRAFT',
+  createdAt: ts,
+  updatedAt: ts,
+}
+
+const sampleImpactReport: ImpactAnalysisReport = {
+  id: 'impact-1',
+  snapshotId: 'snapshot-1',
+  weekTag: '2026-W08',
+  affectedTeachers: [{ teacherName: '김교사', summary: '배치 변경 1건' }],
+  affectedClasses: [{ grade: 1, classNumber: 1, summary: '변경 슬롯 2건' }],
+  hourDelta: [{ target: '김교사(월)', delta: 1 }],
+  riskLevel: 'MEDIUM',
+  alternatives: ['화 3교시 이동 +0.1점 / 위반 0건'],
+  createdAt: ts,
+}
+
+const sampleExamModeState: ExamModeWeekState = {
+  weekTag: '2026-W08',
+  isEnabled: true,
+  enabledAt: ts,
+  enabledBy: 'LOCAL_OPERATOR',
+  createdAt: ts,
+  updatedAt: ts,
+}
+
+const sampleExamSlots: Array<ExamSlot> = [
+  {
+    id: 'exam-slot-1',
+    weekTag: '2026-W08',
+    date: '2026-02-23',
+    day: 'MON',
+    period: 1,
+    grade: 1,
+    classNumber: 1,
+    subjectId: 'sub-1',
+    subjectName: '수학',
+    durationMinutes: 50,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+]
+
+const sampleInvigilationAssignments: Array<InvigilationAssignment> = [
+  {
+    id: 'invigilation-1',
+    weekTag: '2026-W08',
+    slotId: 'exam-slot-1',
+    teacherId: 'teacher-1',
+    status: 'ASSIGNED',
+    isManual: false,
+    reason: null,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+]
+
+const sampleSubstituteAssignments: Array<SubstituteAssignment> = [
+  {
+    id: 'substitute-1',
+    weekTag: '2026-W07',
+    date: '2026-02-16',
+    day: 'MON',
+    period: 2,
+    grade: 1,
+    classNumber: 1,
+    subjectId: 'sub-1',
+    absentTeacherId: 'teacher-1',
+    substituteTeacherId: 'teacher-2',
+    source: 'REPLACEMENT',
+    reason: '대강 테스트',
+    createdAt: ts,
+  },
+  {
+    id: 'substitute-2',
+    weekTag: '2026-W08',
+    date: '2026-02-23',
+    day: 'MON',
+    period: 3,
+    grade: 1,
+    classNumber: 1,
+    subjectId: 'sub-1',
+    absentTeacherId: 'teacher-1',
+    substituteTeacherId: 'teacher-3',
+    source: 'REPLACEMENT',
+    reason: '대강 테스트',
+    createdAt: ts,
+  },
+]
+
+const sampleChangedCells = [
+  {
+    teacherId: 'teacher-1',
+    subjectId: 'sub-1',
+    grade: 1,
+    classNumber: 1,
+    day: 'MON' as const,
+    period: 1,
+    isFixed: false,
+    status: 'CONFIRMED_MODIFIED' as const,
+  },
+]
+
 beforeEach(async () => {
   await db.schoolConfigs.clear()
   await db.subjects.clear()
   await db.teachers.clear()
   await db.fixedEvents.clear()
   await db.setupSnapshots.clear()
+  await db.timetableSnapshots.clear()
+  await db.changeEvents.clear()
+  await db.academicCalendarEvents.clear()
+  await db.scheduleTransactions.clear()
+  await db.impactAnalysisReports.clear()
+  await db.examModeWeeks.clear()
+  await db.examSlots.clear()
+  await db.invigilationAssignments.clear()
+  await db.substituteAssignments.clear()
 })
 
 describe('SchoolConfig persistence', () => {
@@ -166,5 +388,390 @@ describe('Full setup round-trip', () => {
     expect(loaded.subjects).toHaveLength(1)
     expect(loaded.teachers).toHaveLength(0)
     expect(loaded.fixedEvents).toHaveLength(0)
+  })
+})
+
+describe('TimetableSnapshot persistence', () => {
+  it('주차별 버전을 조회할 수 있다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotV2)
+
+    const byWeek = await loadSnapshotsByWeek('2026-W08')
+    expect(byWeek).toHaveLength(2)
+    expect(byWeek[0].versionNo).toBe(1)
+    expect(byWeek[1].versionNo).toBe(2)
+
+    const latest = await loadLatestSnapshotByWeek('2026-W08')
+    expect(latest?.id).toBe('snapshot-2')
+
+    const version = await loadSnapshotVersion('2026-W08', 1)
+    expect(version?.id).toBe('snapshot-1')
+  })
+
+  it('주차 목록을 역순으로 조회할 수 있다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotOtherWeek)
+
+    const weeks = await loadSnapshotWeeks()
+    expect(weeks).toEqual(['2026-W10', '2026-W08'])
+  })
+
+  it('주차/버전 선택으로 스냅샷을 조회한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotV2)
+
+    const latestByWeek = await loadSnapshotBySelection({
+      weekTag: '2026-W08',
+    })
+    expect(latestByWeek?.id).toBe('snapshot-2')
+
+    const exact = await loadSnapshotBySelection({
+      weekTag: '2026-W08',
+      versionNo: 1,
+    })
+    expect(exact?.id).toBe('snapshot-1')
+
+    const fallback = await loadSnapshotBySelection({
+      weekTag: '2026-W08',
+      versionNo: 999,
+    })
+    expect(fallback?.id).toBe('snapshot-2')
+  })
+
+  it('다음 버전을 append-only로 저장한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotV2)
+
+    const next = await saveNextSnapshotVersion({
+      sourceSnapshot: sampleSnapshotV1,
+      cells: [
+        {
+          teacherId: 'teacher-1',
+          subjectId: 'sub-1',
+          grade: 1,
+          classNumber: 1,
+          day: 'MON',
+          period: 1,
+          isFixed: false,
+          status: 'CONFIRMED_MODIFIED',
+        },
+      ],
+    })
+
+    expect(next.id).not.toBe(sampleSnapshotV1.id)
+    expect(next.weekTag).toBe('2026-W08')
+    expect(next.versionNo).toBe(3)
+    expect(next.baseVersionId).toBe(sampleSnapshotV1.id)
+    expect(next.cells).toHaveLength(1)
+  })
+
+  it('주차 첫 버전은 versionNo=1로 시작한다', async () => {
+    const next = await saveNextSnapshotVersion({
+      sourceSnapshot: sampleSnapshotV1,
+      cells: [],
+      overrideWeekTag: '2026-W11',
+    })
+
+    expect(next.weekTag).toBe('2026-W11')
+    expect(next.versionNo).toBe(1)
+    expect(next.baseVersionId).toBeNull()
+  })
+
+  it('appliedScopeOverride를 우선 반영한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+
+    const next = await saveNextSnapshotVersion({
+      sourceSnapshot: sampleSnapshotV1,
+      cells: [],
+      appliedScopeOverride: {
+        type: 'RANGE',
+        fromWeek: '2026-W08',
+        toWeek: '2026-W10',
+      },
+    })
+
+    expect(next.appliedScope).toEqual({
+      type: 'RANGE',
+      fromWeek: '2026-W08',
+      toWeek: '2026-W10',
+    })
+  })
+})
+
+describe('AcademicCalendarEvents persistence', () => {
+  it('기간 범위로 이벤트를 조회할 수 있다', async () => {
+    await saveAcademicCalendarEvents(sampleCalendarEvents)
+
+    const events = await loadAcademicCalendarEventsByRange(
+      '2026-03-02',
+      '2026-03-05',
+    )
+    expect(events.map((event) => event.id)).toEqual(['ac-2'])
+  })
+
+  it('전체 이벤트를 시작일 순서로 조회할 수 있다', async () => {
+    await saveAcademicCalendarEvents([sampleCalendarEvents[1], sampleCalendarEvents[0]])
+
+    const events = await loadAcademicCalendarEvents()
+    expect(events.map((event) => event.id)).toEqual(['ac-1', 'ac-2'])
+  })
+})
+
+describe('Exam mode persistence', () => {
+  it('시험 모드 주차 상태를 저장/조회한다', async () => {
+    await saveExamModeWeekState(sampleExamModeState)
+
+    const loaded = await loadExamModeWeekState('2026-W08')
+    expect(loaded).toEqual(sampleExamModeState)
+  })
+
+  it('시험 슬롯과 감독 배정을 주차별로 저장/조회한다', async () => {
+    await saveExamSlots('2026-W08', sampleExamSlots)
+    await saveInvigilationAssignments('2026-W08', sampleInvigilationAssignments)
+
+    const loadedSlots = await loadExamSlotsByWeek('2026-W08')
+    const loadedAssignments = await loadInvigilationAssignmentsByWeek('2026-W08')
+
+    expect(loadedSlots).toEqual(sampleExamSlots)
+    expect(loadedAssignments).toEqual(sampleInvigilationAssignments)
+  })
+})
+
+describe('Substitute assignment persistence', () => {
+  it('대강 배정을 주차 범위로 조회한다', async () => {
+    await saveSubstituteAssignments(sampleSubstituteAssignments)
+
+    const rows = await loadSubstituteAssignmentsByRange({
+      fromWeekTag: '2026-W08',
+      toWeekTag: '2026-W08',
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('substitute-2')
+  })
+
+  it('주차별 대강 배정 조회를 지원한다', async () => {
+    await saveSubstituteAssignments(sampleSubstituteAssignments)
+
+    const rows = await loadSubstituteAssignmentsByWeek('2026-W07')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('substitute-1')
+  })
+})
+
+describe('ScheduleTransaction persistence', () => {
+  it('저장 후 업데이트를 반영한다', async () => {
+    await saveScheduleTransaction(sampleTransaction)
+
+    await updateScheduleTransaction({
+      ...sampleTransaction,
+      status: 'COMMITTED',
+      updatedAt: '2026-02-22T10:00:00.000Z',
+    })
+
+    const stored = await db.scheduleTransactions.get('draft-1')
+    expect(stored?.status).toBe('COMMITTED')
+  })
+
+  it('draft 생성 후 조회할 수 있다', async () => {
+    const created = await createScheduleTransactionDraft({
+      targetWeeks: ['2026-W08', '2026-W08'],
+      validationResult: {
+        passed: true,
+        violations: [],
+      },
+      impactReportId: 'impact-1',
+    })
+
+    const loaded = await loadScheduleTransaction(created.draftId)
+    expect(loaded?.status).toBe('DRAFT')
+    expect(loaded?.targetWeeks).toEqual(['2026-W08'])
+  })
+
+  it('commitScheduleTransactionAtomically는 스냅샷/리포트/이력을 원자적으로 저장한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    const draft = await createScheduleTransactionDraft({
+      targetWeeks: ['2026-W08'],
+      validationResult: {
+        passed: true,
+        violations: [],
+      },
+      impactReportId: sampleImpactReport.id,
+    })
+
+    const committed = await commitScheduleTransactionAtomically({
+      transaction: draft,
+      plans: [
+        {
+          weekTag: '2026-W08',
+          sourceSnapshot: sampleSnapshotV1,
+          nextCells: sampleChangedCells,
+          appliedScope: sampleSnapshotV1.appliedScope,
+        },
+      ],
+      impactReports: [sampleImpactReport],
+      actor: 'LOCAL_OPERATOR',
+      actionType: 'TRANSACTION_COMMIT',
+      impactSummary: '편집 저장 트랜잭션 확정',
+    })
+
+    expect(committed.transaction.status).toBe('COMMITTED')
+    expect(committed.savedSnapshots).toHaveLength(1)
+    expect(committed.savedSnapshots[0].versionNo).toBe(2)
+
+    const storedTx = await loadScheduleTransaction(draft.draftId)
+    expect(storedTx?.status).toBe('COMMITTED')
+
+    const storedReport = await loadImpactAnalysisReport(sampleImpactReport.id)
+    expect(storedReport?.id).toBe(sampleImpactReport.id)
+
+    const weekEvents = await loadChangeEventsByWeek('2026-W08')
+    expect(
+      weekEvents.some((event) => event.actionType === 'TRANSACTION_COMMIT'),
+    ).toBe(true)
+  })
+
+  it('rollbackScheduleTransaction은 rollbackRef를 포함한 이력을 남긴다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    const draft = await createScheduleTransactionDraft({
+      targetWeeks: ['2026-W08'],
+      validationResult: {
+        passed: false,
+        violations: [],
+      },
+      impactReportId: 'impact-1',
+    })
+
+    const rolledBack = await rollbackScheduleTransaction({
+      transaction: draft,
+      actor: 'LOCAL_OPERATOR',
+      reason: '검증 오류',
+      weekTag: '2026-W08',
+      snapshotId: sampleSnapshotV1.id,
+      conflictDetected: true,
+    })
+
+    expect(rolledBack.status).toBe('ROLLED_BACK')
+    const events = await loadChangeEventsByWeek('2026-W08')
+    const rollbackEvent = events.find(
+      (event) => event.actionType === 'TRANSACTION_ROLLBACK',
+    )
+    expect(rollbackEvent?.rollbackRef).toBe(draft.draftId)
+    expect(rollbackEvent?.conflictDetected).toBe(true)
+  })
+
+  it('커밋 실패 시 부분 저장이 발생하지 않는다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    const committedTx = {
+      ...sampleTransaction,
+      status: 'COMMITTED' as const,
+    }
+    await saveScheduleTransaction(committedTx)
+
+    const beforeSnapshotCount = (await loadSnapshotsByWeek('2026-W08')).length
+    const beforeEvents = (await loadChangeEventsByWeek('2026-W08')).length
+
+    await expect(
+      commitScheduleTransactionAtomically({
+        transaction: committedTx,
+        plans: [
+          {
+            weekTag: '2026-W08',
+            sourceSnapshot: sampleSnapshotV1,
+            nextCells: sampleChangedCells,
+            appliedScope: sampleSnapshotV1.appliedScope,
+          },
+        ],
+        impactReports: [sampleImpactReport],
+        actor: 'LOCAL_OPERATOR',
+        actionType: 'TRANSACTION_COMMIT',
+        impactSummary: 'invalid',
+      }),
+    ).rejects.toThrow()
+
+    const afterSnapshotCount = (await loadSnapshotsByWeek('2026-W08')).length
+    const afterEvents = (await loadChangeEventsByWeek('2026-W08')).length
+    expect(afterSnapshotCount).toBe(beforeSnapshotCount)
+    expect(afterEvents).toBe(beforeEvents)
+  })
+})
+
+describe('ImpactAnalysisReport persistence', () => {
+  it('리포트를 저장하고 id로 조회할 수 있다', async () => {
+    await saveImpactAnalysisReport(sampleImpactReport)
+
+    const loaded = await loadImpactAnalysisReport('impact-1')
+    expect(loaded).toEqual(sampleImpactReport)
+  })
+
+  it('snapshot 기준으로 리포트 목록을 조회할 수 있다', async () => {
+    await saveImpactAnalysisReport(sampleImpactReport)
+    await saveImpactAnalysisReport({
+      ...sampleImpactReport,
+      id: 'impact-2',
+      createdAt: '2024-01-01T00:01:00.000Z',
+    })
+
+    const reports = await loadImpactAnalysisReportsBySnapshot('snapshot-1')
+    expect(reports.map((report) => report.id)).toEqual(['impact-1', 'impact-2'])
+  })
+})
+
+describe('ChangeEvents persistence', () => {
+  it('주차 기준으로 이력을 조회할 수 있다', async () => {
+    await saveChangeEvent({
+      id: 'event-1',
+      snapshotId: 'snapshot-1',
+      weekTag: '2026-W08',
+      actionType: 'EDIT',
+      actor: 'LOCAL_OPERATOR',
+      cellKey: '1-1-MON-1',
+      before: null,
+      after: null,
+      beforePayload: null,
+      afterPayload: null,
+      impactSummary: null,
+      conflictDetected: false,
+      rollbackRef: null,
+      timestamp: 10,
+      isUndone: false,
+    })
+    await saveChangeEvent({
+      id: 'event-2',
+      snapshotId: 'snapshot-2',
+      weekTag: '2026-W08',
+      actionType: 'RECOMPUTE',
+      actor: 'LOCAL_OPERATOR',
+      cellKey: '1-1-MON-1',
+      before: null,
+      after: null,
+      beforePayload: null,
+      afterPayload: null,
+      impactSummary: null,
+      conflictDetected: false,
+      rollbackRef: null,
+      timestamp: 20,
+      isUndone: false,
+    })
+    await saveChangeEvent({
+      id: 'event-3',
+      snapshotId: 'snapshot-3',
+      weekTag: '2026-W10',
+      actionType: 'LOCK',
+      actor: 'LOCAL_OPERATOR',
+      cellKey: '1-1-MON-1',
+      before: null,
+      after: null,
+      beforePayload: null,
+      afterPayload: null,
+      impactSummary: null,
+      conflictDetected: false,
+      rollbackRef: null,
+      timestamp: 30,
+      isUndone: false,
+    })
+
+    const weekEvents = await loadChangeEventsByWeek('2026-W08')
+    expect(weekEvents.map((event) => event.id)).toEqual(['event-1', 'event-2'])
   })
 })

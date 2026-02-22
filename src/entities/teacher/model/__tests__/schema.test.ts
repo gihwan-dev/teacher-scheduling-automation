@@ -5,16 +5,12 @@ describe('teacherSchema', () => {
   const validTeacher = {
     id: 'teacher-1',
     name: '김교사',
+    subjectIds: ['sub-1'],
     baseHoursPerWeek: 18,
-    assignments: [
-      {
-        id: 'assign-1',
-        subjectId: 'sub-1',
-        subjectType: 'CLASS' as const,
-        grade: 1,
-        classNumber: 1,
-        hoursPerWeek: 3,
-      },
+    homeroom: null,
+    classAssignments: [
+      { grade: 1, classNumber: 1, hoursPerWeek: 3 },
+      { grade: 1, classNumber: 2, hoursPerWeek: 3 },
     ],
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
@@ -30,16 +26,31 @@ describe('teacherSchema', () => {
     )
   })
 
-  it('subjectIds가 비어있어도 통과한다', () => {
+  it('subjectIds가 비어있으면 실패한다', () => {
     expect(
       teacherSchema.safeParse({ ...validTeacher, subjectIds: [] }).success,
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('classAssignments가 비어있어도 통과한다', () => {
     expect(
       teacherSchema.safeParse({ ...validTeacher, classAssignments: [] })
         .success,
+    ).toBe(true)
+  })
+
+  it('homeroom이 null이면 통과한다', () => {
+    expect(
+      teacherSchema.safeParse({ ...validTeacher, homeroom: null }).success,
+    ).toBe(true)
+  })
+
+  it('homeroom 형식이 올바르면 통과한다', () => {
+    expect(
+      teacherSchema.safeParse({
+        ...validTeacher,
+        homeroom: { grade: 1, classNumber: 1 },
+      }).success,
     ).toBe(true)
   })
 
@@ -50,56 +61,20 @@ describe('teacherSchema', () => {
     ).toBe(false)
   })
 
-  it('CLASS assignment의 grade가 없으면 실패한다', () => {
+  it('classAssignment의 grade가 0이면 실패한다', () => {
     expect(
       teacherSchema.safeParse({
         ...validTeacher,
-        assignments: [
-          {
-            id: 'assign-1',
-            subjectId: 'sub-1',
-            subjectType: 'CLASS',
-            grade: null,
-            classNumber: 1,
-            hoursPerWeek: 3,
-          },
-        ],
+        classAssignments: [{ grade: 0, classNumber: 1, hoursPerWeek: 3 }],
       }).success,
     ).toBe(false)
   })
 
-  it('GRADE assignment에 classNumber가 있으면 실패한다', () => {
+  it('classAssignment의 grade가 4이면 실패한다', () => {
     expect(
       teacherSchema.safeParse({
         ...validTeacher,
-        assignments: [
-          {
-            id: 'assign-1',
-            subjectId: 'sub-1',
-            subjectType: 'GRADE',
-            grade: 1,
-            classNumber: 1,
-            hoursPerWeek: 3,
-          },
-        ],
-      }).success,
-    ).toBe(false)
-  })
-
-  it('SCHOOL assignment에 grade/classNumber가 있으면 실패한다', () => {
-    expect(
-      teacherSchema.safeParse({
-        ...validTeacher,
-        assignments: [
-          {
-            id: 'assign-1',
-            subjectId: 'sub-1',
-            subjectType: 'SCHOOL',
-            grade: 1,
-            classNumber: null,
-            hoursPerWeek: 3,
-          },
-        ],
+        classAssignments: [{ grade: 4, classNumber: 1, hoursPerWeek: 3 }],
       }).success,
     ).toBe(false)
   })

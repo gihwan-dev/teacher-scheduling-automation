@@ -1,8 +1,9 @@
-import type { ConstraintViolation } from '@/entities/constraint-policy'
+import type { ValidationViolation } from '@/entities/schedule-transaction'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ValidationViolationList } from '@/components/ui/validation-violation-list'
 
 interface EditValidationPanelProps {
-  violations: Array<ConstraintViolation>
+  violations: Array<ValidationViolation>
 }
 
 export function EditValidationPanel({ violations }: EditValidationPanelProps) {
@@ -34,23 +35,7 @@ export function EditValidationPanel({ violations }: EditValidationPanelProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-1.5">
-          {violations.map((v, i) => (
-            <li key={i} className="flex items-start gap-2 text-xs">
-              <span
-                className={
-                  v.severity === 'error'
-                    ? 'text-destructive'
-                    : 'text-yellow-600 dark:text-yellow-400'
-                }
-                aria-label={v.severity === 'error' ? '오류' : '경고'}
-              >
-                {v.severity === 'error' ? '●' : '▲'}
-              </span>
-              <span>{v.message}</span>
-            </li>
-          ))}
-        </ul>
+        <ValidationViolationList violations={violations} />
       </CardContent>
     </Card>
   )

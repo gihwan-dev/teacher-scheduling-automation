@@ -1,40 +1,111 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { PlayIcon } from '@hugeicons/core-free-icons'
 import { ConstraintConfigForm } from './constraint-config-form'
 import { GenerationResultPanel } from './generation-result-panel'
 import { TimetableView } from './timetable-view'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
+import { WeekVersionSelector } from '@/components/ui/week-version-selector'
 import { useGenerateStore } from '@/features/generate-timetable/model/store'
-import { getTeacherAssignments } from '@/entities/teacher'
+import { loadAcademicCalendarEventsByRange } from '@/shared/persistence/indexeddb/repository'
+import {
+  buildForwardWeekWindow,
+  computeWeekTagFromTimestamp,
+  getWeekDateRange,
+} from '@/shared/lib/week-tag'
 
 export function GeneratePage() {
+  const search = useSearch({ from: '/generate' })
+  const navigate = useNavigate({ from: '/generate' })
   const {
     schoolConfig,
     teachers,
     subjects,
     fixedEvents,
+    targetWeekTag,
+    availableWeekTags,
     result,
     isGenerating,
     isLoading,
     setupLoaded,
     loadSetupData,
+    setTargetWeekTag,
     generate,
   } = useGenerateStore()
+  const [isExamWeek, setIsExamWeek] = useState(false)
+
+  const weekOptions = useMemo(() => {
+    const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
+    const weeks = new Set(buildForwardWeekWindow(currentWeekTag, 3))
+    for (const week of availableWeekTags) {
+      weeks.add(week)
+    }
+    if (search.week) {
+      weeks.add(search.week)
+    }
+    return [...weeks]
+      .sort((a, b) => a.localeCompare(b))
+      .map((week) => ({ value: week, label: week }))
+  }, [availableWeekTags, search.week])
 
   useEffect(() => {
     loadSetupData()
   }, [loadSetupData])
 
+  useEffect(() => {
+    if (!search.week) return
+    if (search.week === targetWeekTag) return
+    setTargetWeekTag(search.week)
+  }, [search.week, setTargetWeekTag, targetWeekTag])
+
+  useEffect(() => {
+    if (search.week) return
+    navigate({
+      search: () => ({
+        week: targetWeekTag,
+      }),
+      replace: true,
+    })
+  }, [navigate, search.week, targetWeekTag])
+
+  useEffect(() => {
+    if (!schoolConfig) {
+      setIsExamWeek(false)
+      return
+    }
+
+    void (async () => {
+      const { startDate, endDate } = getWeekDateRange(
+        targetWeekTag,
+        schoolConfig.activeDays,
+      )
+      const events = await loadAcademicCalendarEventsByRange(startDate, endDate)
+      setIsExamWeek(events.some((event) => event.eventType === 'EXAM_PERIOD'))
+    })()
+  }, [schoolConfig, targetWeekTag])
+
   const handleGenerate = async () => {
     await generate()
-    toast.success('시간표 생성이 완료되었습니다')
+    toast.success(`${targetWeekTag} 시간표 생성이 완료되었습니다`)
+  }
+
+  const handleWeekChange = (week: WeekTag) => {
+    setTargetWeekTag(week)
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        week,
+      }),
+      replace: true,
+    })
   }
 
   if (isLoading || !setupLoaded) {
@@ -56,12 +127,7 @@ export function GeneratePage() {
     (s, c) => s + c,
     0,
   )
-  const multiSubjectTeachers = teachers.filter((teacher) => {
-    const uniqueSubjects = new Set(
-      getTeacherAssignments(teacher).map((assignment) => assignment.subjectId),
-    )
-    return uniqueSubjects.size > 1
-  })
+  const multiSubjectTeachers = teachers.filter((t) => t.subjectIds.length > 1)
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -70,23 +136,56 @@ export function GeneratePage() {
         <div>
           <h1 className="text-2xl font-bold">시간표 생성</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            설정 데이터를 기반으로 시간표를 자동 생성합니다.
+            설정 데이터를 기반으로 선택 주차의 시간표를 생성합니다.
           </p>
         </div>
-        <Button onClick={handleGenerate} disabled={isGenerating}>
-          {isGenerating ? (
-            <>
-              <Spinner size="sm" />
-              생성 중...
-            </>
-          ) : (
-            <>
-              <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
-              생성
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <WeekVersionSelector
+            weekOptions={weekOptions}
+            selectedWeek={targetWeekTag}
+            onWeekChange={handleWeekChange}
+            versionOptions={[]}
+            disabled={isGenerating}
+          />
+          <Button onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? (
+              <>
+                <Spinner size="sm" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
+                생성
+              </>
+            )}
+          </Button>
+        </div>
       </div>
+
+      {isExamWeek && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <p className="font-medium text-destructive">
+            시험주차 감지: 일반 수업 생성 결과는 HC-04로 제한될 수 있습니다.
+          </p>
+          <p className="text-muted-foreground mt-1">
+            시험 시간표/감독 배정은 `시험` 페이지에서 진행해 주세요.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2"
+            onClick={() =>
+              navigate({
+                to: '/exam',
+                search: () => ({ week: targetWeekTag }),
+              })
+            }
+          >
+            시험 페이지로 이동
+          </Button>
+        </div>
+      )}
 
       {/* 설정 요약 */}
       <Card>

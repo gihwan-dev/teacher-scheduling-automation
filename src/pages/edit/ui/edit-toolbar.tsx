@@ -36,8 +36,12 @@ export function EditToolbar() {
   ).length
 
   const handleSave = async () => {
-    await saveSnapshot()
-    toast.success('스냅샷을 저장했습니다')
+    const saved = await saveSnapshot()
+    if (saved) {
+      toast.success('스냅샷을 저장했습니다')
+      return
+    }
+    toast.error('트랜잭션 저장에 실패했습니다. 검증 결과를 확인하세요.')
   }
 
   const handleRecompute = async () => {

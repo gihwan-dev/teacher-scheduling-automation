@@ -1,6 +1,5 @@
 import type { CellKey, TimetableCell } from '@/entities/timetable'
-
-export type WeekTag = `${number}-W${string}` // "2026-W07"
+import type { WeekTag } from '@/shared/lib/week-tag'
 
 export type ChangeActionType =
   | 'EDIT'
@@ -10,15 +9,28 @@ export type ChangeActionType =
   | 'MOVE'
   | 'CONFIRM'
   | 'RECOMPUTE'
+  | 'VERSION_CLONE'
+  | 'VERSION_RESTORE'
+  | 'EXAM_MODE_ENABLED'
+  | 'INVIGILATION_AUTO_ASSIGN'
+  | 'SUBSTITUTE_ASSIGN'
+  | 'TRANSACTION_COMMIT'
+  | 'TRANSACTION_ROLLBACK'
 
 export interface ChangeEvent {
   id: string
   snapshotId: string
   weekTag: WeekTag
   actionType: ChangeActionType
-  cellKey: CellKey
+  actor: string
+  cellKey: CellKey | 'VERSION'
   before: TimetableCell | null
   after: TimetableCell | null
+  beforePayload: unknown | null
+  afterPayload: unknown | null
+  impactSummary: string | null
+  conflictDetected: boolean
+  rollbackRef: string | null
   timestamp: number
   isUndone: boolean
 }

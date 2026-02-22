@@ -1,186 +1,354 @@
-# 프로젝트 개발 마일스톤
+# 프로젝트 개발 마일스톤 (학사일정 강연동 개편)
 
-> 기반 문서: `SPEC.md`, `plan.md`
+> 기반 문서: `/Users/choegihwan/Documents/Projects/scheduling-automation/PRD-academic-calendar-linked-timetable.md`
 > 실행 라벨: `[SEQUENTIAL]`(순차), `[PARALLEL:PG-n]`(같은 그룹끼리 병렬)
-> 요구사항 범위: `F0~F9` + 공유 URL 조회/복원
+> 분해 기준: 컨텍스트 윈도우 친화 단위(한 번의 구현/검증 세션에서 완료 가능한 크기)
+> 1차 릴리스 범위: 핵심 5요소(학사일정 하드 제약, 사전 검증, 영향 분석, 주차 버전, 롤백)
 
 ## 병렬 실행 그룹 요약
 
-- `PG-1`: 자동 생성(F1)과 교사 정책 관리(F2) 병렬 개발
-- `PG-2`: 편집/재계산(F3/F4), 교체 후보(F5), 공유 URL 기능 병렬 개발
+- `PG-1`: 사전 검증 엔진(Phase 2)과 영향 분석/시수 예측(Phase 3) 병렬 진행
+- `PG-2`: 주차 버전 관리(Phase 4)와 적용 범위 교체 플로우(Phase 5) 병렬 진행
 
-## Phase 1. [SEQUENTIAL] 운영 기반 및 공통 규칙 확정 (F0)
+## Phase 1. [SEQUENTIAL] 도메인 계약 및 상태 모델 고정
 
-- [x] **학교 운영 데이터 입력 UI 및 저장소 완성**
-  - 목표: `/setup` 화면에서 학교 구조(학년/반/요일/교시), 교사(이름/담당 과목/기준 시수/반별 배정 시수), 과목, 고정 수업/출장 데이터를 폼/테이블 UI로 입력·수정·삭제·저장할 수 있다.
-  - 포함: 시수 합계 정합성 검증, 교사-과목 미배정 경고, 필수 필드 누락 차단.
-  - 검증: 샘플 학교 데이터 1세트를 UI로 입력 후 저장하고, 브라우저 재실행 후 동일하게 복원된다.
+- [x] **학사일정/주차 버전/트랜잭션 공통 계약 확정**
+  - 목표: 운영 규칙의 기준 모델(`AcademicCalendarEvent`, 확장 `TimetableSnapshot`, `ScheduleTransaction`)을 확정해 이후 기능의 의사결정을 제거한다.
+  - 검증: 핵심 타입 계약이 문서화되고 용어 충돌이 제거된다.
+  - 검증: 상태 전이(`DRAFT -> COMMITTED/ROLLED_BACK`)와 예외 정책이 명시된다.
+  - 검증: 주차 적용 범위 타입(`THIS_WEEK`, `FROM_NEXT_WEEK`, `RANGE`)이 합의된다.
 
-## Phase 2. [PARALLEL:PG-1] 핵심 기능 개발 - 기초 자동 생성 (F1, F6)
+## Phase 2. [PARALLEL:PG-1] 사전 검증 엔진 구축
 
-- [x] **기초 시간표 자동 생성 기능 구현**
-  - 목표: 필수 제약 100% 충족을 보장하면서 선호 제약 점수 기반으로 배치를 생성한다.
-  - 포함: 생성 실패 시 원인 제약 목록과 완화 후보를 제시한다.
-  - 검증: 샘플 학교 데이터 기준 필수 제약 위반 0건, 실패 케이스에서 원인 안내 확인.
+- [x] **교사/학급/교실/연강/일일시수 검증 규칙 구현**
+  - 목표: 편집/교체/생성 요청 전에 운영 핵심 충돌을 즉시 탐지하고 차단한다.
+  - 검증: 교사/학급/교실 중복 및 연강/일일시수 위반이 저장 전 차단된다.
+  - 검증: 검증 결과가 일관된 `ValidationViolation` 형식으로 반환된다.
 
-## Phase 3. [PARALLEL:PG-1] 핵심 기능 개발 - 교사 배치 조건 관리 (F2)
+- [x] **학사일정 위반 검증 및 메시지 UX 표준화**
+  - 목표: 공휴일/행사/시험기간/단축수업 위반을 실시간 검증하고 사람이 이해 가능한 메시지를 제공한다.
+  - 검증: 학사일정 위반이 하드 차단으로 동작한다.
+  - 검증: 오류 메시지에서 UUID/내부 식별자 노출이 제거된다.
 
-- [x] **교사 선호/회피/연강 조건 관리 기능 구현**
-  - 목표: 교사별 조건을 입력·수정·저장하고 상충 조건은 저장 전에 차단한다.
-  - 검증: 전체 회피 등 상충 입력 시 저장 실패 및 수정 가이드 노출, 정상 입력은 생성/재계산에 반영된다.
+## Phase 3. [PARALLEL:PG-1] 영향 분석 및 시수 예측
 
-## Phase 4. [PARALLEL:PG-2] 핵심 기능 개발 - 수동 편집/잠금/부분 재계산 (F3, F4, F6)
+- [x] **변경 전 영향 분석 리포트 구현**
+  - 목표: 승인 전에 교사/학급/연강/공강 변화 정보를 리포트로 제공한다.
+  - 검증: 최소 한 개 이상의 교체 시나리오에서 영향 리포트가 사전 출력된다.
+  - 검증: 리포트에 위험도(`LOW/MEDIUM/HIGH`)와 대안 목록이 포함된다.
 
-- [x] **교시 단위 편집과 잠금 기반 재계산 구현**
-  - 목표: 셀 편집/이동/잠금 후 비잠금 영역만 재계산한다.
-  - 검증: 잠금 셀은 변경되지 않고, 충돌 편집은 즉시 거부되며 사유가 표시된다.
+- [x] **학사일정 변경 기반 시수 부족 예측 및 보강 추천 구현**
+  - 목표: 행사/휴업/단축수업 변경 시 부족 시수를 자동 계산하고 보강 후보를 제시한다.
+  - 검증: 학년/학급 단위 부족 시수가 자동 계산된다.
+  - 검증: 보강 추천 결과가 리포트 형태로 제공된다.
 
-- [x] **키보드 중심 편집 플로우 완성**
-  - 목표: 이동/편집/잠금/확정/취소/되돌리기 단축키가 일관되게 동작한다.
-  - 검증: 키보드만으로 선택 -> 수정 -> 잠금 -> 재계산 시나리오를 완료할 수 있다.
+## Phase 4. [PARALLEL:PG-2] 주차 버전 관리 체계 구현
 
-## Phase 5. [PARALLEL:PG-2] 핵심 기능 개발 - 학기 중 교체 후보 탐색 (F5)
+- [x] **주차 조회와 독립 버전 생성 기능 구현**
+  - 목표: 현재 주 + 다음 2~3주 동시 조회, 과거 주 조회, 특정 주차 수정이 가능하도록 한다.
+  - 검증: 특정 주차를 수정해도 비대상 주차는 변경되지 않는다.
+  - 검증: 주차별 버전 번호가 독립적으로 증가한다.
 
-- [x] **교체 후보 탐색 및 확정 기능 구현**
-  - 목표: 교체 대상 셀 선택 시 충돌/연강/일일 제한/고정 조건을 만족하는 후보만 제시한다.
-  - 검증: 후보 0건이면 제약 완화 시뮬레이션이 제공되고, 후보 확정 시 시간표가 일관되게 갱신된다.
+- [x] **주차 복제/복원 및 버전 로그 연결 구현**
+  - 목표: 기존 주차를 복제해 새 버전을 만들고, 특정 버전으로 복원 가능하게 한다.
+  - 검증: 복제 후 버전 간 추적 링크(`base_version_id`)가 유지된다.
+  - 검증: 복원 시 변경 전후 비교 정보가 감사 로그와 연결된다.
 
-## Phase 6. [PARALLEL:PG-2] 핵심 기능 개발 - 공유 URL 조회/복원
+## Phase 5. [PARALLEL:PG-2] 적용 범위 교체 플로우 구현
 
-- [x] **상태 공유 링크 생성/복원 기능 구현**
-  - 목표: 시간표/잠금/정책 핵심 상태를 링크로 공유하고 다른 환경에서 동일 상태를 복원한다.
-  - 검증: 링크 round-trip 후 동일 뷰가 재현되고, 손상된 링크는 안전하게 복원 실패 안내를 제공한다.
+- [x] **적용 범위 선택형 교체 워크플로우 구현**
+  - 목표: 교체 시 `이번 주만`, `다음 주부터 학기말`, `특정 주차 범위` 선택을 지원한다.
+  - 검증: 선택한 범위 외 주차는 변경되지 않는다.
+  - 검증: 범위별 적용 결과가 UI에서 명확히 구분된다.
 
-## Phase 7. [SEQUENTIAL] 화면 통합 및 운영 안정화 (F7, F8)
+- [x] **범위 적용 후 재검증 및 대안 제시 구현**
+  - 목표: 선택 범위 전체 재검증을 수행하고 충돌 발생 시 대안을 제공한다.
+  - 검증: 충돌 발생 시 확정 이전 단계에서 차단된다.
+  - 검증: 대안 후보가 영향도와 함께 제시된다.
 
-- [x] **변경 이력 타임라인 및 상태 시각화 구현**
-  - 목표: `BASE -> TEMP_MODIFIED -> CONFIRMED_MODIFIED`와 `LOCKED` 상태를 시간표/교사표/학급표에 일관되게 표시한다.
-  - 검증: 동일 이벤트가 모든 뷰에서 동일한 색상/아이콘/텍스트 규칙으로 표시된다.
+## Phase 6. [SEQUENTIAL] 트랜잭션 커밋/롤백 및 감사 로그 완성
 
-- [x] **Undo/Redo와 확정 플로우 통합**
-  - 목표: 되돌리기/앞으로 가기 후에도 제약 검증 결과와 이력 상태가 동기화된다.
-  - 검증: 연속 Undo/Redo 이후 최종 데이터 상태와 이력 포인터가 일치한다.
+- [x] **수정 트랜잭션 파이프라인 구현**
+  - 목표: 임시 상태 생성 -> 전체 검증 -> 영향 분석 -> 승인 Commit / 실패 Rollback 흐름을 완성한다.
+  - 검증: 실패 시 데이터가 원자적으로 롤백된다.
+  - 검증: 승인 전에는 본 스냅샷이 변하지 않는다.
 
-## Phase 8. [SEQUENTIAL] 고급 기능 및 릴리스 준비 (F9 + 품질 게이트)
+- [x] **감사 로그 기반 복원 흐름 구현**
+  - 목표: 수정자/시각/전후 내용/적용 주차/충돌 여부를 기록하고 복원에 사용한다.
+  - 검증: 특정 버전 복원 시 감사 로그로 추적 가능한 이력이 유지된다.
+  - 검증: 롤백 참조(`rollback_ref`)가 이력에서 확인된다.
 
-- [x] **다중 교체 탐색 기능 구현 (F9)**
-  - 목표: 복수 슬롯 연계 교체 후보를 제한 시간 내 계산해 상위안을 제시한다.
-  - 검증: 기준 데이터셋에서 시간 상한 내 결과 반환, 단일 교체 기능 품질 대비 퇴행이 없다.
+## Phase 7. [SEQUENTIAL] 1차 릴리스 품질 게이트
 
-- [x] **공유 링크 읽기 전용 뷰 개선**
-  - 목표: 공유 링크를 열면 시간표 그리드가 읽기 전용으로 바로 표시된다.
-  - 검증: ReadOnlyTimetableView 위젯 추출, share-restore-panel에서 컴팩트 정보 바 + 시간표 그리드 표시.
+- [x] **핵심 5요소 E2E 인수 검증 완료**
+  - 목표: 학사일정 제약, 사전 검증, 영향 분석, 주차 버전, 롤백의 종단 시나리오를 통과한다.
+  - 검증: PRD 인수 시나리오 10개가 모두 통과된다.
+  - 검증: 회귀 테스트에서 기존 시간표 핵심 기능 퇴행이 없다.
 
-- [x] **릴리스 품질 게이트 통과**
-  - 목표: 핵심 시나리오(생성/수정/교체/공유/복원) 테스트와 정적 검사를 모두 통과한다.
-  - 검증: `lint`, `typecheck`, 핵심 테스트 성공 및 Must 요구사항(`F1~F6`) 인수 조건 충족 확인.
+- [x] **운영 인수 기준 및 배포 준비 완료**
+  - 목표: 운영자 관점 체크리스트와 장애 대응 기준을 고정한다.
+  - 검증: 운영 체크리스트가 문서화되고 승인된다.
+  - 검증: 릴리스 후보 버전에서 치명 결함이 0건이다.
+
+## Phase 8. [SEQUENTIAL] 2차 확장 (후속 릴리스)
+
+- [x] **시험 모드 및 감독 배정 확장**
+  - 목표: 시험 시간표 별도 관리, 감독 중복 방지, 감독 통계 기능을 추가한다.
+  - 검증: 시험기간 일반 수업 차단과 시험 모드 전환이 일관되게 동작한다.
+  - 검증: 감독 배정 중복이 차단된다.
+
+- [x] **대강 자동 추천 고도화**
+  - 목표: 결강 입력 시 공강/과목 적합/누적 공정성을 반영한 대강 추천을 제공한다.
+  - 검증: 대강 추천 결과가 우선순위와 근거를 함께 제공한다.
+  - 검증: 담임 제외 등 운영 옵션이 반영된다.
+
+## Phase 9. [SEQUENTIAL] 테스트 안정화 및 CI 릴리스 게이트 자동화
+
+- [x] **테스트 러너 구성 분리 및 종료 경고 제거**
+  - 목표: 앱 빌드 설정과 Vitest 설정을 분리해 테스트 종료 지연 경고를 제거한다.
+  - 검증: `vite.config.ts`에서 테스트 설정이 제거되고 `vitest.config.ts`가 신규 추가된다.
+  - 검증: `pnpm run test:unit` 실행 시 `close timed out`/`something prevents Vite server from exiting` 경고가 발생하지 않는다.
+  - 검증: `pnpm run test:unit:diagnose` 실행 시 hanging-process 경고가 발생하지 않는다.
+
+- [x] **CI 릴리스 게이트 자동화**
+  - 목표: PR/기본 브랜치 push에서 `release:gate`를 자동 실행해 품질 게이트를 고정한다.
+  - 검증: `.github/workflows/release-gate.yml`이 추가되고 `pull_request`, `push(main)` 트리거가 설정된다.
+  - 검증: CI 절차가 `checkout -> node/pnpm setup -> pnpm install --frozen-lockfile -> pnpm run release:gate` 순서를 따른다.
 
 ---
 
-## 참고 노트
+## 운영 노트
 
-**[2026-02-14] 세션 요약**:
-
-- 완료: Phase 1 전체 구현 (엔터티 4종, IndexedDB 영속 저장소, Zustand 스토어, /setup 탭 UI, 교차 검증, 라우트)
-- 발견된 이슈: base-ui Select의 `onValueChange`가 `T | null` 시그니처로 null 가드 필요, Vitest 종료 시 Dexie/fake-indexeddb 프로세스 hang (기능 무관)
-- 아키텍처 결정: FSD 레이어 구조 (entities → shared/persistence → features → pages → routes), ESLint 규칙에 따라 `Array<T>` 제네릭 형식 사용
-- 다음 페이즈 영향: Phase 2(자동 생성)와 Phase 3(교사 정책)은 이번에 정의한 엔터티/스토어를 그대로 활용 가능
-
-**[2026-02-14] Phase 2 세션 요약**:
-
-- 완료: Phase 2 전체 구현 — 기초 시간표 자동 생성 (F1, F6)
-- 구현 내용:
-  - `entities/timetable`: TimetableCell, TimetableSnapshot, CellStatus 모델 + Zod 스키마 + 테스트
-  - `entities/constraint-policy`: ConstraintPolicy, ConstraintViolation 모델 + validator (교사충돌/학생연강/교사연강/일일시수) + 테스트
-  - `features/generate-timetable`: Greedy + Backtracking(depth=3) + Hill-climbing 3단계 알고리즘, TimetableGrid(O(1) 인덱스), scorer(4종 가중 점수), failure-analyzer(원인 분류 + 완화 제안)
-  - IndexedDB v2 (timetableSnapshots, constraintPolicies 테이블 추가), Zustand store
-  - `/generate` 페이지 UI: 설정 요약, 제약 설정 폼, 결과 패널, 학년/반 선택 시간표 그리드
-- 테스트: 10 파일 79 테스트 전체 통과, 3학년 5반 규모(15교사) 생성 성공 확인
-- 검증: typecheck, lint, test:unit 모두 통과
-
-**[2026-02-14] Phase 3 세션 요약**:
-
-- 완료: Phase 3 전체 구현 — 교사 선호/회피/연강 조건 관리 (F2)
-- 구현 내용:
-  - `entities/teacher-policy`: TeacherPolicy, AvoidanceSlot, TimePreference 모델 + Zod 스키마 + validator(5가지 검증 규칙) + 테스트 15건
-  - `features/manage-teacher-policy`: Zustand 스토어 (토글 회피, 선호 시간대, override 설정, 검증 연동, DB 저장)
-  - IndexedDB v3 (teacherPolicies 테이블 추가), repository save/load 함수
-  - `/policy` 페이지 UI: 교사 목록 사이드바(정책/오류 Badge) + 회피 그리드(요일×교시 매트릭스) + 선호 시간대 Select + 연강/일일 시수 override Input + 검증 결과 패널
-  - 생성 엔진 통합: buildBlockedSlots에 교사 회피 슬롯 추가, isPlacementValid/findCandidateSlots에 per-teacher daily override, scorer에 timePreference 점수(15%) + per-teacher consecutive override, solver 전체 함수에 teacherPolicies 전달
-  - 네비게이션: "설정"과 "생성" 사이에 "교사 조건" 링크 추가
-- 신규 파일 12개, 수정 파일 7개
-- 테스트: 11 파일 94 테스트 전체 통과 (기존 79 + 신규 15)
-- 검증: typecheck, lint, test:unit 모두 통과
-
-**[2026-02-14] Phase 4 세션 요약**:
-
-- 완료: Phase 4 전체 구현 — 수동 편집/잠금/부분 재계산 + 키보드 편집 (F3, F4, F6)
-- 구현 내용:
-  - Layer 1: TimetableCell에 `status` 필드 추가, CellKey/EditAction/EditValidationResult 타입, DB v4 마이그레이션, repository 확장
-  - Layer 2: solver에서 `runPlacementPipeline` + `buildAssignmentUnitsFromCells` 추출, generate-timetable index에 Grid/constraint-checker export 추가, edit-validator(isCellEditable/validateCellEdit/validateCellMove), cell-key 유틸(makeCellKey/parseCellKey/buildCellMap)
-  - Layer 3: `recompute-timetable` feature — 잠긴/고정 셀 보존 + 미잠금 재배치 partial-solver
-  - Layer 4: `edit-timetable-cell` Zustand store — 로드/포커스/선택/편집(CRUD)/잠금/undo·redo/재계산/저장
-  - Layer 5: use-grid-keyboard(Arrow/Enter/Esc/Space/Ctrl+L/Ctrl+Z/Delete), EditableTimetableGrid(상태별 시각화), CellEditorInline, EditToolbar, EditValidationPanel, KeyboardShortcutsPanel
-  - Layer 6: `/edit` 라우트 + EditPage 조립 + 네비게이션 링크 추가
-- 신규 파일 16개, 수정 파일 8개, 테스트 파일 5개(신규 4 + 기존 수정 1)
-- 테스트: 14 파일 129 테스트 전체 통과 (기존 99 + 신규 30)
-- 검증: typecheck, lint, test:unit 모두 통과
-- 핵심 설계 결정: status를 TimetableCell에 직접 추가, isFixed와 LOCKED 독립 개념, Command 패턴 Undo/Redo, 재계산 시 undo 스택 초기화, Roving tabindex 접근성 패턴
-
-**[2026-02-14] Phase 5 세션 요약**:
-
-- 완료: Phase 5 전체 구현 — 교체 후보 탐색 및 확정 (F5)
-- 구현 내용:
-  - Layer 1: ReplacementCandidate, CandidateRanking, ReplacementSearchConfig 등 타입 정의, generate-timetable에 scorer/failure-analyzer export 추가
-  - Layer 2: replacement-finder (SWAP/MOVE 후보 탐색, isPlacementValid 기반 검증, 재귀 방지 완화 시뮬레이션), candidate-ranker (위반 최소 → 유사도 → 점수 변화 → 공강 최소화 가중 랭킹)
-  - Layer 3: find-replacement Zustand store (loadSnapshot, selectTargetCell, search, selectCandidate, confirmReplacement)
-  - Layer 4: /replacement 페이지 UI — ReplacementGrid(셀 선택/후보 하이라이트), CandidateListPanel(순위/Badge/AlertDialog 확정), ReplacementPreview(before/after 테이블), RelaxationPanel(완화 제안)
-  - Layer 5: `/replacement` 라우트 + 네비게이션 "교체" 링크 추가
-- 재사용: TimetableGrid, isPlacementValid, buildBlockedSlots, expandGradeBlockedSlots, computeTotalScore, validateTimetable, isCellEditable, makeCellKey, buildCellMap
-- 신규 파일 12개, 수정 파일 2개 (generate-timetable/index.ts, \_\_root.tsx)
-- 테스트: 16 파일 143 테스트 전체 통과 (기존 129 + 신규 14)
-- 검증: typecheck, lint, test:unit 모두 통과
-- 핵심 설계 결정: 완화 시뮬레이션 재귀 방지를 위한 \_skipRelaxation 플래그, SWAP은 양쪽 배치 검증 후 grid 원복, base-ui AlertDialog에 render prop 패턴 사용
-
-**[2026-02-14] Phase 6 세션 요약**:
-
-- 완료: Phase 6 전체 구현 — 상태 공유 링크 생성/복원 기능
-- 구현 내용:
-  - Layer 0: lz-string 의존성 설치
-  - Layer 1: `shared/lib/url` — constants(enum↔숫자 매핑), types(SharePayload/CompactCell 등), encoder(buildSharePayload, computeFlatIndex), decoder(restoreFromPayload, UUID 재생성), compress(lz-string 래퍼), index(재수출)
-  - Layer 2: `entities/share-state` — Zod 스키마 (superRefine으로 인덱스 범위 검증), 타입 재수출
-  - Layer 3: `features/share-by-url` — Zustand store(생성/복원 워크플로우), share-builder(DB→payload→압축URL), share-restorer(hash→검증→복원→임포트)
-  - Layer 4: `/share` 페이지 UI — SharePage(hash 유무로 생성/복원 모드 자동 전환), ShareGeneratePanel(URL 생성/표시/복사/길이 Badge), ShareRestorePanel(프리뷰+가져오기), 라우트, 네비게이션 "공유" 링크
-  - Layer 5: 테스트 5파일 — compress round-trip, encoder(flatIndex/flags), decoder(UUID 매핑/셀 위치), schema(인덱스 범위/버전), round-trip(전체 파이프라인 동치성)
-- 핵심 설계 결정: UUID 제거 인덱스 기반 컴팩트 인코딩, flags bitfield(3비트: status<<1|isFixed), URL hash fragment(서버 전송 없음), 복원 시 새 UUID 생성
-- 신규 파일 19개, 수정 파일 2개 (package.json, \_\_root.tsx)
-- 테스트: 21 파일 188 테스트 전체 통과 (기존 143 + 신규 45)
-- 검증: typecheck, lint, test:unit 모두 통과
-
-**[2026-02-14] Phase 7 세션 요약**:
-
-- 완료: Phase 7 전체 구현 — 변경 이력 시각화 + Undo/Redo 확정 플로우 통합 (F7, F8)
-- 구현 내용:
-  - Layer 1: `entities/change-history` — ChangeEvent/WeekTag/ChangeActionType 모델, Zod 스키마, week-utils(ISO 8601 주차 계산), 테스트 20건
-  - Layer 1-B: `entities/timetable/lib/cell-status` — getCellStatusStyle/getCellStatusClasses/getStatusLabel/getStatusIcon 통합 유틸, StatusIndicator/StatusLegend 공유 컴포넌트
-  - Layer 2: IndexedDB v5 (changeEvents 테이블 추가), repository에 saveChangeEvent/loadChangeEvents/updateChangeEvent/deleteChangeEventsBySnapshot 추가
-  - Layer 3: `features/track-change-history` — Zustand 스토어 (loadEvents/appendEvent/markLastUndone/markLastRedone/appendRecomputeEvent/confirmTempModified)
-  - Layer 4: `edit-timetable-cell` 스토어 수정 — confirmEdit가 TEMP_MODIFIED로 설정, confirmChanges() 신규 액션 (TEMP→CONFIRMED 일괄 전환), 모든 편집 액션에 이력 기록, undo/redo 이력 동기화, recompute 이력 기록, loadSnapshot 시 이력 로드
-  - Layer 5: 기존 3개 페이지(edit/generate/replacement) 상태 시각화 통일(공유 cell-status 유틸 사용), edit-toolbar에 "확정" 버튼 추가, edit-page에 StatusLegend 추가, /history 페이지 신규 생성 (필터바 + 주차별 그룹핑 타임라인)
-  - Layer 6: `/history` 라우트 + 네비게이션 "이력" 링크 추가
-- 핵심 설계 결정: confirmEdit()가 TEMP_MODIFIED로 설정 후 별도 confirmChanges()로 CONFIRMED_MODIFIED 전환, ISO 8601 주차 기반 이벤트 그룹핑, ChangeEvent.isUndone soft flag로 감사 추적, cell-status를 CellStatus Record로 타입 안전하게 매핑
-- 신규 파일 17개, 수정 파일 10개
-- 테스트: 23 파일 208 테스트 전체 통과 (기존 188 + 신규 20)
-- 검증: typecheck, lint, test:unit 모두 통과
-
-**[2026-02-14] Phase 8 세션 요약**:
-
-- 완료: Phase 8 전체 구현 — 다중 교체 탐색(F9) + 공유 뷰 개선 + 릴리스 품질 게이트
-- 구현 내용:
-  - WI-1 공유 뷰 개선: `widgets/readonly-timetable-view` 추출(TimetableView→ReadOnlyTimetableView 위임), share-page 제목/설명 갱신, share-restore-panel을 컴팩트 정보 바 + 읽기 전용 시간표 그리드 레이아웃으로 재구성
-  - WI-2 다중 교체(F9): MultiReplacementCandidate/CombinedRanking/MultiReplacementSearchResult 타입, multi-replacement-finder(카테시안 곱 + 슬롯 충돌/교사 충돌 호환성 검증 + 2초 시간 예산), find-replacement 스토어 확장(isMultiMode/multiTargetCellKeys/searchMulti/confirmMultiReplacement), replacement-page 모드 토글, replacement-grid 다중 선택(색상 링 + 번호 뱃지), multi-candidate-list-panel, multi-replacement-preview
-  - WI-3 품질 게이트: typecheck 0 에러, lint(src/) 0 신규 에러, 전체 테스트 통과
-- 핵심 설계 결정: FSD widgets 레이어로 ReadOnlyTimetableView 추출(pages 간 import 금지 준수), 카테시안 곱 기반 조합 생성 + performance.now() 시간 예산, isCombinationCompatible로 슬롯 중복 + 교사 동시 배치 검증
-- 신규 파일 6개, 수정 파일 7개, 테스트 파일 1개(7건)
-- 테스트: 24 파일 215 테스트 전체 통과 (기존 208 + 신규 7)
-- 검증: typecheck, lint, test:unit 모두 통과
+- 본 문서는 학사일정 강연동 개편의 기본 실행 마일스톤(`milestone.md`)으로 통합되었다.
+- 1차 릴리스 완료 후 2차(시험 모드/대강 추천) 범위를 재평가한다.
+- [2026-02-22] Phase 1 세션 요약:
+  - 완료: 도메인 계약 및 상태 모델 고정(학사일정/주차 버전/트랜잭션)
+  - 확정 계약:
+    - `entities/academic-calendar`: `AcademicCalendarEvent` 타입/스키마 추가
+    - `entities/schedule-transaction`: `ScheduleTransaction`/`ValidationViolation` 타입, 상태머신(`DRAFT -> COMMITTED|ROLLED_BACK`) 추가
+    - `entities/timetable`: `TimetableSnapshot` 확장(`weekTag`, `versionNo`, `baseVersionId`, `appliedScope`) 및 범위 타입 강제
+    - `entities/change-history`: 감사 필드(`actor`, `beforePayload`, `afterPayload`, `impactSummary`, `conflictDetected`, `rollbackRef`) required 적용
+  - 저장소/마이그레이션:
+    - IndexedDB v6 추가 (`academicCalendarEvents`, `scheduleTransactions` 테이블)
+    - v5 -> v6 기본값 마이그레이션 정책 코드화 및 테스트 추가
+    - repository API 확장(`loadSnapshotsByWeek`, `loadSnapshotVersion`, `loadLatestSnapshotByWeek`, `saveScheduleTransaction`, `updateScheduleTransaction`, `saveAcademicCalendarEvents`, `loadAcademicCalendarEventsByRange`)
+  - 문서화: `academic-calendar-contracts.md` 생성(스네이크/카멜 매핑, 상태 전이 규칙, 기본값 정책 포함)
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run test:unit`: 28 files, 253 tests 통과 (종료 지연 경고는 기존과 동일)
+    - `pnpm exec eslint src`: 통과
+  - 다음 미완료 Phase: **Phase 2 (사전 검증 엔진 구축)**
+- [2026-02-22] Phase 2 세션 요약:
+  - 완료: 사전 검증 엔진 구축(교사/학급/연강/일일시수 + 학사일정 하드 제약)
+  - 구현 내용:
+    - `features/validate-schedule-change` 신규 추가:
+      - `validateScheduleChange(input) -> ValidationViolation[]`
+      - `buildAcademicCalendarBlockedSlots`(주차+학사일정 기반 차단 슬롯 계산)
+    - `shared/lib/week-tag` 확장:
+      - weekTag -> 주 시작일/요일별 날짜/주차 범위 유틸 추가
+    - Generate/Edit/Replacement/Recompute 전 경로에 공통 pre-validation 연동
+    - 검증 결과 타입을 `ValidationViolation` 중심으로 통일하고 UI 메시지를 `humanMessage` 기반으로 표준화
+    - 학사일정 스키마 강화:
+      - `GRADE` scopeValue 숫자 문자열 검증
+      - `CLASS` scopeValue `"{grade}-{classNumber}"` 형식 검증
+    - 마일스톤 파일 전환:
+      - 기존 `milestone.md` 제거
+      - `milestone-academic-calendar-linked-timetable.md`를 `milestone.md`로 통합
+      - PRD/운영 노트 문구 정합성 갱신
+  - 테스트:
+    - `features/validate-schedule-change` 테스트 2파일 신규 추가
+    - `shared/lib/week-tag` 테스트 신규 추가
+    - 기존 generate/edit/replacement/recompute 테스트 컨텍스트 갱신
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit`: 31 files, 266 tests 통과 (종료 지연 경고는 기존과 동일)
+  - 다음 미완료 Phase: **Phase 3 (영향 분석 및 시수 예측)**
+- [2026-02-22] Phase 3 세션 요약:
+  - 완료: 영향 분석 및 시수 예측(교체 사전 리포트 + 학사일정 기반 부족 시수/보강 추천)
+  - 구현 내용:
+    - `entities/impact-analysis` 신규 추가:
+      - `ImpactRiskLevel`, `ImpactAnalysisReport`, `HourShortagePredictionReport` 타입/스키마
+    - IndexedDB v7 확장:
+      - `impactAnalysisReports` 테이블 추가
+      - repository API 확장
+        - `saveImpactAnalysisReport`
+        - `loadImpactAnalysisReport`
+        - `loadImpactAnalysisReportsBySnapshot`
+        - `loadAcademicCalendarEvents`
+    - `features/analyze-schedule-impact` 신규 추가:
+      - `analyzeReplacementImpact` / `analyzeMultiReplacementImpact`
+      - `predictHourShortageFromCalendarChange`
+    - 교체 플로우 반영:
+      - 후보 선택 즉시 영향 분석 -> 리포트 저장 -> 상태 반영
+      - 리포트 없으면 단일/다중 교체 확정 차단
+      - `ImpactAnalysisPanel` 추가 및 확정 다이얼로그에 리스크 요약 노출
+    - 설정 플로우 반영:
+      - Setup에 `학사일정` 탭 추가(`AcademicCalendarTable`)
+      - `academicCalendarEvents`/`baselineAcademicCalendarEvents` 분리 상태 관리
+      - `HourShortageReport` 추가(현재 주 기준 부족 시수 증가 및 보강 추천 표시)
+  - 테스트:
+    - `entities/impact-analysis` 스키마 테스트 신규 추가
+    - 영향 분석/시수 예측 엔진 테스트 신규 추가
+    - 교체 스토어 영향 리포트 게이트 테스트 신규 추가
+    - 시수 예측 재계산(스토어 상태 변경) 테스트 신규 추가
+    - repository 영향 리포트/학사일정 전체 조회 테스트 확장
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit src/features/analyze-schedule-impact/lib/__tests__/analyze-replacement-impact.test.ts src/features/analyze-schedule-impact/lib/__tests__/predict-hour-shortage.test.ts`: 통과
+    - `pnpm run test:unit src/features/find-replacement/lib/__tests__/candidate-ranker.test.ts src/features/find-replacement/lib/__tests__/replacement-finder.test.ts src/features/find-replacement/lib/__tests__/multi-replacement-finder.test.ts`: 통과
+    - `pnpm run test:unit src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
+  - 다음 미완료 Phase: **Phase 4 (주차 버전 관리 체계 구현)**
+- [2026-02-22] Phase 4 세션 요약:
+  - 완료: 주차 버전 관리 체계 구현(조회/독립 버전/복제/복원/버전 로그 연결)
+  - 구현 내용:
+    - 주차 유틸 확장:
+      - `shiftWeekTag`, `buildForwardWeekWindow` 추가
+    - repository API 확장:
+      - `loadSnapshotWeeks`, `loadSnapshotBySelection`, `saveNextSnapshotVersion`, `loadChangeEventsByWeek`
+    - 라우트 search 계약 추가:
+      - `/generate`: `week`
+      - `/edit`, `/replacement`, `/history`: `week`, `version`
+    - 공통 UI 추가:
+      - `components/ui/week-version-selector` (주차/버전 선택 공통 컴포넌트)
+    - 생성/편집/교체 플로우를 append-only 버전 저장으로 전환:
+      - 저장/확정 시 항상 새 버전 생성(`versionNo` 독립 증가, `baseVersionId` 연결)
+      - 선택 주차/버전 로드 지원 및 URL 컨텍스트 동기화
+    - 이력 페이지 확장:
+      - 주차/버전 선택 기반 타임라인 조회
+      - 동일 주차 내 `복제`/`복원` 액션 추가
+      - `VERSION_CLONE`, `VERSION_RESTORE` 감사 이벤트 및 요약 payload 기록
+  - 테스트:
+    - `shared/lib/week-tag` 테스트 확장
+    - repository 테스트 확장(주차 목록/선택 조회/다음 버전 저장/주차별 이력 조회)
+    - replacement store 영향 테스트 갱신
+    - change-history schema 테스트 확장
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit src/shared/lib/__tests__/week-tag.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
+    - `pnpm run test:unit src/features/find-replacement/model/__tests__/store-impact.test.ts src/entities/change-history/model/__tests__/schema.test.ts`: 통과
+  - 다음 미완료 Phase: **Phase 5 (적용 범위 교체 플로우 구현)**
+- [2026-02-22] Phase 5 세션 요약:
+  - 완료: 적용 범위 교체 플로우 구현(범위 선택 + 범위 재검증 + 실패 주차 대안 제시)
+  - 구현 내용:
+    - `shared/lib/week-tag` 확장:
+      - `compareWeekTag`, `listWeekTagsBetween` 추가
+    - `features/find-replacement/lib/apply-replacement-scope` 신규 추가:
+      - `resolveReplacementScopeTargetWeeks`(THIS_WEEK/FROM_NEXT_WEEK/RANGE 계산)
+      - 슬롯 기반 단일/다중 재적용(`applySingleCandidateToWeekCells`, `applyMultiCandidateToWeekCells`)
+      - 주차별 학사일정 필터링/재검증/대안 후보 생성 유틸 추가
+    - `shared/persistence/indexeddb/repository` 확장:
+      - `saveNextSnapshotVersion`에 `appliedScopeOverride` 지원 추가
+    - 교체 스토어/페이지 반영:
+      - 범위 상태(`THIS_WEEK`, `FROM_NEXT_WEEK`, `RANGE`) 및 결과 요약 상태(`IDLE/BLOCKED/APPLIED`) 추가
+      - 확정 흐름을 `범위 검증 -> 전주차 통과 시 일괄 저장`으로 전환(원자성 보장)
+      - 범위 내 누락 스냅샷/전제조건 실패/검증 오류 발생 시 확정 차단 및 주차별 대안 Top3 노출
+      - `ReplacementScopePanel` 신규 추가(범위 선택, 대상 주차 미리보기, 차단 사유/대안 표시)
+      - 단일/다중 후보 확정 다이얼로그에 적용 범위/대상 주차 수 노출 및 차단 토스트 분리
+  - 테스트:
+    - `features/find-replacement/lib/__tests__/apply-replacement-scope.test.ts` 신규 추가
+    - `features/find-replacement/model/__tests__/store-impact.test.ts` 범위 적용 경로 갱신
+    - `shared/lib/__tests__/week-tag.test.ts` 비교/범위 생성 케이스 추가
+    - `shared/persistence/indexeddb/__tests__/repository.test.ts` `appliedScopeOverride` 반영 케이스 추가
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src/features/find-replacement src/pages/replacement src/shared/persistence/indexeddb src/shared/lib/week-tag.ts`: 통과
+    - `pnpm run test:unit src/features/find-replacement/lib/__tests__/apply-replacement-scope.test.ts src/features/find-replacement/model/__tests__/store-impact.test.ts src/shared/lib/__tests__/week-tag.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
+    - `pnpm run test:unit`: 37 files, 306 tests 통과 (Vitest 종료 지연 경고는 기존과 동일)
+  - 다음 미완료 Phase: **Phase 6 (트랜잭션 커밋/롤백 및 감사 로그 완성)**
+- [2026-02-22] Phase 6 세션 요약:
+  - 완료: 트랜잭션 커밋/롤백 및 감사 로그 완성(편집 저장/교체 확정/버전 복원 경로 통합)
+  - 구현 내용:
+    - `features/apply-schedule-transaction` 신규 추가:
+      - `applyScheduleTransaction(input)` 오케스트레이션 API
+      - `DRAFT -> COMMITTED/ROLLED_BACK` 전이 기반 자동 커밋/롤백 처리
+    - `shared/persistence/indexeddb/repository` 확장:
+      - `createScheduleTransactionDraft`
+      - `loadScheduleTransaction`
+      - `commitScheduleTransactionAtomically`
+      - `rollbackScheduleTransaction`
+      - 원자 커밋 대상 테이블 통합(`timetableSnapshots`, `scheduleTransactions`, `impactAnalysisReports`, `changeEvents`)
+    - `entities/change-history` 액션 확장:
+      - `TRANSACTION_COMMIT`, `TRANSACTION_ROLLBACK` 타입/스키마 반영
+    - 복원/저장 경로 연동:
+      - `features/edit-timetable-cell` 저장 경로를 트랜잭션 API로 전환
+      - `features/find-replacement` 범위 확정 경로를 트랜잭션 API로 전환
+      - `pages/history` 복원 버튼은 유지하고 내부 저장만 트랜잭션 API로 전환
+    - 감사 로그 가시성 확장:
+      - `pages/history` 필터에 트랜잭션 액션 추가
+      - 카드에 `impactSummary`, `conflictDetected`, `rollbackRef` 노출
+    - 공통 영향 분석 유틸 추가:
+      - `analyzeSnapshotDiffImpact` (before/after diff 기반 요약)
+  - 테스트:
+    - `features/apply-schedule-transaction` 테스트 신규 추가
+    - `features/analyze-schedule-impact` diff 분석 테스트 신규 추가
+    - `shared/persistence/indexeddb` 트랜잭션 원자성/롤백 테스트 확장
+    - `features/find-replacement` 저장 경로 테스트를 트랜잭션 API 기준으로 갱신
+    - `entities/change-history` 스키마 테스트 액션 목록 확장
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src/features/apply-schedule-transaction src/features/edit-timetable-cell src/features/find-replacement src/pages/history src/entities/change-history src/shared/persistence/indexeddb`: 통과
+    - `pnpm run test:unit src/features/apply-schedule-transaction/lib/__tests__/apply-schedule-transaction.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts src/features/find-replacement/model/__tests__/store-impact.test.ts src/entities/change-history/model/__tests__/schema.test.ts src/features/analyze-schedule-impact/lib/__tests__/analyze-snapshot-diff-impact.test.ts`: 통과
+    - `pnpm run test:unit`: 39 files, 315 tests 통과 (Vitest 종료 지연 경고는 기존과 동일)
+  - 다음 미완료 Phase: **Phase 7 (1차 릴리스 품질 게이트)**
+- [2026-02-22] Phase 7 세션 요약:
+  - 완료: 1차 릴리스 품질 게이트(인수 시나리오 10건 자동화 + 운영 인수 문서/게이트 고정)
+  - 구현 내용:
+    - `features/release-gate/lib/__tests__/phase7-acceptance.test.ts` 신규 추가
+      - PRD 8.2 인수 시나리오를 `[ACCEPT-01]`~`[ACCEPT-10]` 테스트로 고정
+      - 시험 모드는 Phase 8 범위로 유지하고 `HC-04` 차단 검증만 자동 인수
+    - `features/release-gate/lib/__tests__/phase7-acceptance-fixtures.ts` 신규 추가
+      - 도메인 통합 인수 테스트용 공통 fixture/DB reset 유틸 제공
+    - `package.json` 스크립트 확장
+      - `test:acceptance`
+      - `release:gate` (`typecheck -> lint src -> acceptance -> unit`)
+    - `release-gate-phase7.md` 신규 작성
+      - 범위/비범위, 자동 게이트 기준, 수동 스모크 체크리스트, critical 정의, rollback 절차 문서화
+    - `CLAUDE.md` 명령어 섹션에 `test:acceptance`, `release:gate` 반영
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:acceptance`: 통과
+    - `pnpm run test:unit`: 통과 (Vitest 종료 지연 경고는 기존과 동일)
+    - `pnpm run release:gate`: 통과
+  - 잔여 리스크:
+    - Vitest 종료 지연 경고(`Tests closed successfully but something prevents Vite server from exiting`)는 기존과 동일하게 지속됨
+  - 다음 미완료 Phase: **Phase 8 (2차 확장: 시험 모드/대강 자동 추천 고도화)**
+- [2026-02-22] Phase 8 세션 요약:
+  - 완료: 시험 모드/감독 배정 + 대강 추천 고도화 전체 구현
+  - 구현 범위:
+    - `Teacher.homeroom` 계약/스키마/UI/URL 인코딩 동기화 및 v8 마이그레이션 기본값(`null`) 반영
+    - IndexedDB v8 저장소 확장(`examModeWeeks`, `examSlots`, `invigilationAssignments`, `substituteAssignments`) 및 repository API 추가
+    - `/exam` 전용 페이지/스토어/자동 감독 배정/충돌 검증/통계/수동 조정/저장 플로우 구현
+    - `/replacement`에 `교체/대강` 모드 분리, 담임 제외 옵션, 최근 4주 공정성 랭킹/근거 노출, 확정 시 대강 로그 + 이력(`SUBSTITUTE_ASSIGN`) 저장
+    - `/generate`, `/edit`, `/replacement` 시험주차 가이드 배너 및 `/exam` 이동 게이트 반영
+    - change-history 액션 확장(`EXAM_MODE_ENABLED`, `INVIGILATION_AUTO_ASSIGN`, `SUBSTITUTE_ASSIGN`) 및 이력 필터 연동
+  - 테스트/검증:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit`: 통과 (47 files, 346 tests)
+  - 잔여 리스크:
+    - Vitest 종료 지연 경고는 기존과 동일하게 지속되며 기능 검증 자체는 통과
+- [2026-02-22] Phase 9 세션 요약:
+  - 완료: 테스트 안정화 및 CI 릴리스 게이트 자동화
+  - 구현 내용:
+    - `vite.config.ts`에서 `test` 설정 제거(앱 번들 설정만 유지)
+    - `vitest.config.ts` 신규 추가(앱 플러그인 제외, 절대 alias/테스트 설정 분리)
+    - `package.json` 스크립트 갱신:
+      - `test:unit`/`test:acceptance`에 `--config vitest.config.ts` 강제
+      - `test:unit:diagnose` 신규 추가(`hanging-process` 리포터)
+    - `.github/workflows/release-gate.yml` 신규 추가:
+      - `pull_request`, `push(main)` 트리거
+      - `pnpm install --frozen-lockfile` 후 `pnpm run release:gate` 실행
+    - 문서 동기화:
+      - `release-gate-phase7.md` 통과 기준(종료 경고 제거 + 진단 명령) 갱신
+      - `PRD-academic-calendar-linked-timetable.md` 8.2 인수 체크박스 `[x]` 동기화
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:acceptance`: 통과
+    - `pnpm run test:unit`: 통과 (48 files, 349 tests, 종료 지연 경고 없음)
+    - `pnpm run test:unit:diagnose`: 통과 (hanging-process 경고 없음)
+- 모든 마일스톤 완료: Phase 1~9 체크리스트가 모두 `[x]` 상태로 마감됨.

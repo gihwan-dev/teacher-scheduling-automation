@@ -30,6 +30,13 @@ describe('changeActionTypeSchema', () => {
       'MOVE',
       'CONFIRM',
       'RECOMPUTE',
+      'VERSION_CLONE',
+      'VERSION_RESTORE',
+      'EXAM_MODE_ENABLED',
+      'INVIGILATION_AUTO_ASSIGN',
+      'SUBSTITUTE_ASSIGN',
+      'TRANSACTION_COMMIT',
+      'TRANSACTION_ROLLBACK',
     ]) {
       expect(changeActionTypeSchema.safeParse(type).success).toBe(true)
     }
@@ -47,6 +54,7 @@ describe('changeEventSchema', () => {
     snapshotId: 'snapshot-1',
     weekTag: '2026-W07',
     actionType: 'EDIT' as const,
+    actor: 'LOCAL_OPERATOR',
     cellKey: '1-1-MON-1',
     before: null,
     after: {
@@ -59,6 +67,14 @@ describe('changeEventSchema', () => {
       isFixed: false,
       status: 'TEMP_MODIFIED' as const,
     },
+    beforePayload: null,
+    afterPayload: {
+      teacherId: 'teacher-1',
+      subjectId: 'subject-1',
+    },
+    impactSummary: null,
+    conflictDetected: false,
+    rollbackRef: null,
     timestamp: 1707300000000,
     isUndone: false,
   }
@@ -98,6 +114,12 @@ describe('changeEventSchema', () => {
   it('잘못된 weekTag 형식이면 실패한다', () => {
     expect(
       changeEventSchema.safeParse({ ...validEvent, weekTag: '2026-7' }).success,
+    ).toBe(false)
+  })
+
+  it('actor가 비어있으면 실패한다', () => {
+    expect(
+      changeEventSchema.safeParse({ ...validEvent, actor: '' }).success,
     ).toBe(false)
   })
 })

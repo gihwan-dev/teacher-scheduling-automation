@@ -1,7 +1,10 @@
-import type { ConstraintViolation } from '@/entities/constraint-policy'
+import type { ValidationViolation } from '@/entities/schedule-transaction'
 import type { CellKey, TimetableCell } from '@/entities/timetable'
+import type { ImpactRiskLevel } from '@/entities/impact-analysis'
+import type { WeekTag } from '@/shared/lib/week-tag'
 
-export type ReplacementType = 'SWAP' | 'MOVE'
+export type ReplacementType = 'SWAP' | 'MOVE' | 'SUBSTITUTE'
+export type ReplacementSearchMode = 'REPLACEMENT' | 'SUBSTITUTE'
 
 export interface ReplacementCandidate {
   id: string
@@ -12,15 +15,18 @@ export interface ReplacementCandidate {
   targetCell: TimetableCell | null // SWAP=셀, MOVE=null
   resultSourceCell: TimetableCell | null // SWAP=상대셀이 이동, MOVE=null(빈)
   resultTargetCell: TimetableCell // 소스셀이 이동한 결과
+  substituteTeacherId?: string
   ranking: CandidateRanking
 }
 
 export interface CandidateRanking {
   violationCount: number
-  violations: Array<ConstraintViolation>
+  violations: Array<ValidationViolation>
   scoreDelta: number
   similarityScore: number
   idleMinimizationScore: number
+  fairnessScore: number
+  candidateReasons: Array<string>
   totalRank: number
 }
 
@@ -28,6 +34,9 @@ export interface ReplacementSearchConfig {
   scope: 'SAME_CLASS'
   includeViolating: boolean
   maxCandidates: number
+  searchMode: ReplacementSearchMode
+  excludeHomeroomTeachers: boolean
+  fairnessWindowWeeks: number
 }
 
 export interface ReplacementSearchResult {
@@ -77,4 +86,44 @@ export interface MultiReplacementSearchResult {
     sourceKey: CellKey
     result: ReplacementSearchResult
   }>
+}
+
+export type ScopeBlockingReason =
+  | 'MISSING_SEMESTER_END'
+  | 'INVALID_RANGE'
+  | 'MISSING_WEEK_SNAPSHOT'
+  | 'SOURCE_CELL_NOT_FOUND'
+  | 'SOURCE_CELL_NOT_EDITABLE'
+  | 'TARGET_CELL_NOT_FOUND'
+  | 'TARGET_CELL_NOT_EDITABLE'
+  | 'TARGET_SLOT_OCCUPIED'
+  | 'VALIDATION_FAILED'
+
+export interface ScopedAlternativeCandidate {
+  id: string
+  weekTag: WeekTag
+  label: string
+  riskLevel: ImpactRiskLevel
+  scoreDelta: number
+  violationCount: number
+}
+
+export interface ScopeValidationIssue {
+  weekTag: WeekTag
+  reason: ScopeBlockingReason
+  message: string
+  violations: Array<ValidationViolation>
+  alternatives: Array<ScopedAlternativeCandidate>
+}
+
+export interface ScopeValidationSummary {
+  status: 'IDLE' | 'BLOCKED' | 'APPLIED'
+  targetWeeks: Array<WeekTag>
+  issues: Array<ScopeValidationIssue>
+}
+
+export interface ReplacementApplyScopeState {
+  type: 'THIS_WEEK' | 'FROM_NEXT_WEEK' | 'RANGE'
+  fromWeek: WeekTag | null
+  toWeek: WeekTag | null
 }

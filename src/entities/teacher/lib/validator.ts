@@ -17,8 +17,8 @@ export function getTeacherAssignments(teacher: Teacher): Array<{
     return teacher.assignments
   }
 
-  const legacySubjectId = teacher.subjectIds?.[0]
-  if (!legacySubjectId || !teacher.classAssignments) return []
+  const legacySubjectId = teacher.subjectIds[0]
+  if (!legacySubjectId) return []
 
   return teacher.classAssignments.map((assignment, index) => ({
     id: `legacy-${teacher.id}-${index}`,
@@ -125,7 +125,7 @@ export function findUnassignedSubjects(
       assignedSubjectIds.add(assignment.subjectId)
     }
 
-    if (assignments.length === 0 && teacher.subjectIds) {
+    if (assignments.length === 0) {
       for (const subjectId of teacher.subjectIds) {
         assignedSubjectIds.add(subjectId)
       }

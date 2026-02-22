@@ -5,6 +5,7 @@ import type { GenerationResult } from '@/features/generate-timetable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ValidationViolationList } from '@/components/ui/validation-violation-list'
 import { useGenerateStore } from '@/features/generate-timetable/model/store'
 
 interface GenerationResultPanelProps {
@@ -63,21 +64,7 @@ export function GenerationResultPanel({ result }: GenerationResultPanelProps) {
             <CardTitle>제약 위반</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              {result.violations.map((v, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm">
-                  <Badge
-                    variant={
-                      v.severity === 'error' ? 'destructive' : 'secondary'
-                    }
-                    className="mt-0.5 shrink-0"
-                  >
-                    {v.severity === 'error' ? '오류' : '경고'}
-                  </Badge>
-                  <span>{v.message}</span>
-                </li>
-              ))}
-            </ul>
+            <ValidationViolationList violations={result.violations} />
           </CardContent>
         </Card>
       )}

@@ -17,6 +17,18 @@ const ACTION_CONFIG: Record<
   MOVE: { label: '이동', icon: '↔️', variant: 'outline' },
   CONFIRM: { label: '확정', icon: '✓', variant: 'default' },
   RECOMPUTE: { label: '재계산', icon: '🔄', variant: 'outline' },
+  VERSION_CLONE: { label: '버전 복제', icon: '🧾', variant: 'secondary' },
+  VERSION_RESTORE: { label: '버전 복원', icon: '⟲', variant: 'default' },
+  TRANSACTION_COMMIT: {
+    label: '트랜잭션 확정',
+    icon: '✔',
+    variant: 'default',
+  },
+  TRANSACTION_ROLLBACK: {
+    label: '트랜잭션 롤백',
+    icon: '↺',
+    variant: 'destructive',
+  },
 }
 
 interface HistoryEventCardProps {
@@ -60,6 +72,11 @@ export function HistoryEventCard({ event }: HistoryEventCardProps) {
               취소됨
             </Badge>
           )}
+          {event.conflictDetected && (
+            <Badge variant="destructive" className="text-[10px]">
+              충돌
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
           <span>{time}</span>
@@ -74,6 +91,14 @@ export function HistoryEventCard({ event }: HistoryEventCardProps) {
             </span>
           )}
         </div>
+        {(event.impactSummary || event.rollbackRef) && (
+          <div className="space-y-1 text-[11px] text-muted-foreground">
+            {event.impactSummary && <p>{event.impactSummary}</p>}
+            {event.rollbackRef && (
+              <p className="font-mono text-[10px]">rollbackRef: {event.rollbackRef}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

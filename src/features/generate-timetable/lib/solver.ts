@@ -7,38 +7,26 @@ import {
 import { diagnoseFailure, suggestRelaxations } from './failure-analyzer'
 import { TimetableGrid } from './grid'
 import { computeTotalScore, scoreSlot } from './scorer'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
+import type { FixedEvent } from '@/entities/fixed-event'
+import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { TimetableCell } from '@/entities/timetable'
+import type { DayOfWeek } from '@/shared/lib/types'
 import type {
   AssignmentUnit,
   GenerationInput,
   GenerationResult,
   UnplacedAssignment,
 } from '../model/types'
-import type { ConstraintPolicy } from '@/entities/constraint-policy'
-import type { FixedEvent } from '@/entities/fixed-event'
-import type { TeacherPolicy } from '@/entities/teacher-policy'
-import type { TimetableCell } from '@/entities/timetable'
-import type { DayOfWeek } from '@/shared/lib/types'
-import { validateTimetable } from '@/entities/constraint-policy'
-import {
-  calculateSlotsPerClass,
-  getDayPeriodCount,
-  getMaxPeriodsPerDay,
-} from '@/entities/school'
-import { getTeacherAssignments } from '@/entities/teacher'
+import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
 import { generateId } from '@/shared/lib/id'
+import {
+  buildAcademicCalendarBlockedSlots,
+  validateScheduleChange,
+} from '@/features/validate-schedule-change'
 
 const MAX_HILL_CLIMBING_ITERATIONS = 1000
 const BACKTRACK_DEPTH_LIMIT = 3
-
-interface SynchronizedAssignment {
-  teacherId: string
-  subjectId: string
-  subjectType: 'GRADE' | 'SCHOOL'
-  grade: number | null
-  totalHours: number
-  remainingHours: number
-  targetClasses: Array<{ grade: number; classNumber: number }>
-}
 
 /**
  * 배치 파이프라인: MRV 정렬 → 탐욕 배치 + 백트래킹 → Hill-climbing
@@ -129,7 +117,6 @@ export function runPlacementPipeline(
       const cell: TimetableCell = {
         teacherId: unit.teacherId,
         subjectId: unit.subjectId,
-        subjectType: unit.subjectType,
         grade: unit.grade,
         classNumber: unit.classNumber,
         day: best.day,
@@ -158,17 +145,19 @@ export function runPlacementPipeline(
  * 잠긴 셀의 시수를 차감한 배정 단위 생성
  */
 export function buildAssignmentUnitsFromCells(
-  teachers: GenerationInput['teachers'],
+  teachers: Array<{
+    id: string
+    subjectIds: Array<string>
+    classAssignments: Array<{
+      grade: number
+      classNumber: number
+      hoursPerWeek: number
+    }>
+  }>,
   subjectMap: Map<string, { id: string }>,
   prePlacedCells: Array<TimetableCell>,
-  schoolConfig: GenerationInput['schoolConfig'],
 ): Array<AssignmentUnit> {
-  return buildAssignmentUnits(
-    teachers,
-    subjectMap,
-    prePlacedCells,
-    schoolConfig,
-  ).classUnits
+  return buildAssignmentUnits(teachers, subjectMap, prePlacedCells)
 }
 
 /**
@@ -188,12 +177,15 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
     fixedEvents,
     constraintPolicy,
     teacherPolicies,
+    targetWeekTag,
+    academicCalendarEvents = [],
   } = input
+  const createdAt = new Date().toISOString()
+  const weekTag = targetWeekTag ?? computeWeekTagFromIso(createdAt)
 
   // === 전처리 ===
   const grid = new TimetableGrid()
-  const { activeDays } = schoolConfig
-  const periodsPerDay = getMaxPeriodsPerDay(schoolConfig)
+  const { activeDays, periodsPerDay } = schoolConfig
 
   // 차단 슬롯 구축 (교사 회피 슬롯 포함)
   let blockedSlots = buildBlockedSlots(fixedEvents, teacherPolicies)
@@ -201,48 +193,39 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
     blockedSlots,
     schoolConfig.classCountByGrade,
   )
-  blockedSlots = expandOutOfRangeSlots(blockedSlots, schoolConfig, periodsPerDay)
+  const calendarBlockedSlots = buildAcademicCalendarBlockedSlots({
+    schoolConfig,
+    weekTag,
+    academicCalendarEvents,
+  })
+  for (const slotKey of calendarBlockedSlots) {
+    blockedSlots.add(slotKey)
+  }
 
   // 고정 이벤트 배치
-  const fixedCells = placeFixedEvents(fixedEvents, subjects, grid, schoolConfig)
+  const fixedCells = placeFixedEvents(fixedEvents, subjects, grid)
 
   // 배정 단위 생성 (교사-과목-반 매핑)
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
-  const { classUnits, synchronizedUnits } = buildAssignmentUnits(
-    teachers,
-    subjectMap,
-    fixedCells,
-    schoolConfig,
-  )
+  const assignments = buildAssignmentUnits(teachers, subjectMap, fixedCells)
 
   // 총 슬롯 수 계산
   const totalClasses = Object.values(schoolConfig.classCountByGrade).reduce(
     (s, c) => s + c,
     0,
   )
-  const totalSlots = totalClasses * calculateSlotsPerClass(schoolConfig)
-
-  // 학년/전교 단위 배정 먼저 처리 (동일 시간 동기 배치)
-  const synchronizedUnplaced = placeSynchronizedAssignments(
-    grid,
-    synchronizedUnits,
-    schoolConfig,
-    constraintPolicy,
-    blockedSlots,
-    teacherPolicies,
-  )
+  const totalSlots = totalClasses * activeDays.length * periodsPerDay
 
   // === 배치 파이프라인 ===
-  const { unplaced: classUnplaced } = runPlacementPipeline(
+  const { unplaced } = runPlacementPipeline(
     grid,
-    classUnits,
+    assignments,
     activeDays,
     periodsPerDay,
     constraintPolicy,
     blockedSlots,
     teacherPolicies,
   )
-  const unplaced = [...synchronizedUnplaced, ...classUnplaced]
 
   // === 결과 빌드 ===
   const endTime = performance.now()
@@ -255,21 +238,39 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
     periodsPerDay,
     teacherPolicies,
   )
-  const violations = validateTimetable(cells, constraintPolicy)
+  const violations = validateScheduleChange({
+    cells,
+    constraintPolicy,
+    schoolConfig,
+    teachers,
+    subjects,
+    weekTag,
+    academicCalendarEvents,
+  })
   const suggestions = suggestRelaxations(unplaced, constraintPolicy)
 
   const hardViolations = violations.filter((v) => v.severity === 'error')
   const success = unplaced.length === 0 && hardViolations.length === 0
 
   const snapshot = success
-    ? {
-        id: generateId(),
-        schoolConfigId: schoolConfig.id,
-        cells,
-        score,
-        generationTimeMs,
-        createdAt: new Date().toISOString(),
-      }
+    ? (() => {
+        return {
+          id: generateId(),
+          schoolConfigId: schoolConfig.id,
+          weekTag,
+          versionNo: 1,
+          baseVersionId: null,
+          appliedScope: {
+            type: 'THIS_WEEK' as const,
+            fromWeek: weekTag,
+            toWeek: null,
+          },
+          cells,
+          score,
+          generationTimeMs,
+          createdAt,
+        }
+      })()
     : null
 
   return {
@@ -294,7 +295,6 @@ function placeFixedEvents(
   fixedEvents: Array<FixedEvent>,
   _subjects: Array<{ id: string }>,
   grid: TimetableGrid,
-  schoolConfig: GenerationInput['schoolConfig'],
 ): Array<TimetableCell> {
   const fixedCells: Array<TimetableCell> = []
 
@@ -303,42 +303,12 @@ function placeFixedEvents(
       event.type === 'FIXED_CLASS' &&
       event.teacherId &&
       event.subjectId &&
-      event.subjectType
-    ) {
-      const targets = resolveTargetsForSubjectType(
-        event.subjectType,
-        event.grade ?? null,
-        event.classNumber ?? null,
-        schoolConfig,
-      )
-      for (const target of targets) {
-        const status = event.subjectType === 'CLASS' ? 'BASE' : 'LOCKED'
-        const cell: TimetableCell = {
-          teacherId: event.teacherId,
-          subjectId: event.subjectId,
-          subjectType: event.subjectType,
-          grade: target.grade,
-          classNumber: target.classNumber,
-          day: event.day,
-          period: event.period,
-          isFixed: true,
-          status,
-        }
-        grid.placeCell(cell)
-        fixedCells.push(cell)
-      }
-    } else if (
-      event.type === 'FIXED_CLASS' &&
-      event.teacherId &&
-      event.subjectId &&
       event.grade !== null &&
       event.classNumber !== null
     ) {
-      // legacy compatibility
       const cell: TimetableCell = {
         teacherId: event.teacherId,
         subjectId: event.subjectId,
-        subjectType: 'CLASS',
         grade: event.grade,
         classNumber: event.classNumber,
         day: event.day,
@@ -359,232 +329,51 @@ function placeFixedEvents(
  * ClassHoursAssignment에 subjectId가 없으므로 교사의 subjectIds로 추론
  */
 function buildAssignmentUnits(
-  teachers: GenerationInput['teachers'],
+  teachers: Array<{
+    id: string
+    subjectIds: Array<string>
+    classAssignments: Array<{
+      grade: number
+      classNumber: number
+      hoursPerWeek: number
+    }>
+  }>,
   subjectMap: Map<string, { id: string }>,
   fixedCells: Array<TimetableCell>,
-  schoolConfig: GenerationInput['schoolConfig'],
-): { classUnits: Array<AssignmentUnit>; synchronizedUnits: Array<SynchronizedAssignment> } {
-  const classUnits: Array<AssignmentUnit> = []
-  const synchronizedUnits: Array<SynchronizedAssignment> = []
+): Array<AssignmentUnit> {
+  const units: Array<AssignmentUnit> = []
 
   // 고정 셀에서 이미 배치된 시수 계산
   const fixedHoursMap = new Map<string, number>()
   for (const cell of fixedCells) {
-    const key = `${cell.teacherId}-${cell.subjectId}-${cell.subjectType ?? 'CLASS'}-${cell.grade}-${cell.classNumber}`
+    const key = `${cell.teacherId}-${cell.grade}-${cell.classNumber}`
     fixedHoursMap.set(key, (fixedHoursMap.get(key) ?? 0) + 1)
   }
 
   for (const teacher of teachers) {
-    for (const assignment of getTeacherAssignments(teacher)) {
-      if (!subjectMap.has(assignment.subjectId)) continue
+    // subjectId 결정: 단일 과목이면 자동 매핑, 다중이면 첫 번째 사용
+    const subjectId = teacher.subjectIds[0]
+    if (!subjectId || !subjectMap.has(subjectId)) continue
 
-      const subjectType = assignment.subjectType
-      const targets = resolveTargetsForSubjectType(
-        subjectType,
-        assignment.grade ?? null,
-        assignment.classNumber ?? null,
-        schoolConfig,
-      )
-      if (targets.length === 0) continue
-
-      const fixedKey = `${teacher.id}-${assignment.subjectId}-${subjectType}-${targets[0].grade}-${targets[0].classNumber}`
+    for (const assignment of teacher.classAssignments) {
+      const fixedKey = `${teacher.id}-${assignment.grade}-${assignment.classNumber}`
       const fixedHours = fixedHoursMap.get(fixedKey) ?? 0
       const remaining = assignment.hoursPerWeek - fixedHours
 
-      if (remaining <= 0) continue
-
-      if (subjectType === 'CLASS') {
-        const target = targets[0]
-        classUnits.push({
+      if (remaining > 0) {
+        units.push({
           teacherId: teacher.id,
-          subjectId: assignment.subjectId,
-          subjectType,
-          grade: target.grade,
-          classNumber: target.classNumber,
+          subjectId,
+          grade: assignment.grade,
+          classNumber: assignment.classNumber,
           totalHours: assignment.hoursPerWeek,
           remainingHours: remaining,
         })
-        continue
-      }
-
-      synchronizedUnits.push({
-        teacherId: teacher.id,
-        subjectId: assignment.subjectId,
-        subjectType,
-        grade: assignment.grade ?? null,
-        totalHours: assignment.hoursPerWeek,
-        remainingHours: remaining,
-        targetClasses: targets,
-      })
-    }
-  }
-
-  return { classUnits, synchronizedUnits }
-}
-
-function resolveTargetsForSubjectType(
-  subjectType: 'CLASS' | 'GRADE' | 'SCHOOL',
-  grade: number | null,
-  classNumber: number | null,
-  schoolConfig: GenerationInput['schoolConfig'],
-): Array<{ grade: number; classNumber: number }> {
-  if (subjectType === 'CLASS') {
-    if (grade === null || classNumber === null) return []
-    return [{ grade, classNumber }]
-  }
-
-  if (subjectType === 'GRADE') {
-    if (grade === null) return []
-    const classCount = schoolConfig.classCountByGrade[grade] ?? 0
-    return Array.from({ length: classCount }, (_, i) => ({
-      grade,
-      classNumber: i + 1,
-    }))
-  }
-
-  const targets: Array<{ grade: number; classNumber: number }> = []
-  for (let g = 1; g <= schoolConfig.gradeCount; g++) {
-    const classCount = schoolConfig.classCountByGrade[g] ?? 0
-    for (let cls = 1; cls <= classCount; cls++) {
-      targets.push({ grade: g, classNumber: cls })
-    }
-  }
-  return targets
-}
-
-function expandOutOfRangeSlots(
-  blockedSlots: Set<string>,
-  schoolConfig: GenerationInput['schoolConfig'],
-  maxPeriodsPerDay: number,
-): Set<string> {
-  const expanded = new Set(blockedSlots)
-  for (let grade = 1; grade <= schoolConfig.gradeCount; grade++) {
-    const classCount = schoolConfig.classCountByGrade[grade] ?? 0
-    for (let cls = 1; cls <= classCount; cls++) {
-      for (const day of schoolConfig.activeDays) {
-        const dayMax = getDayPeriodCount(schoolConfig, day)
-        for (let period = dayMax + 1; period <= maxPeriodsPerDay; period++) {
-          expanded.add(`class-${grade}-${cls}-${day}-${period}`)
-        }
       }
     }
   }
-  return expanded
-}
 
-function placeSynchronizedAssignments(
-  grid: TimetableGrid,
-  units: Array<SynchronizedAssignment>,
-  schoolConfig: GenerationInput['schoolConfig'],
-  constraintPolicy: ConstraintPolicy,
-  blockedSlots: Set<string>,
-  teacherPolicies?: Array<TeacherPolicy>,
-): Array<UnplacedAssignment> {
-  const unplaced: Array<UnplacedAssignment> = []
-  const periodsPerDay = getMaxPeriodsPerDay(schoolConfig)
-  const { activeDays } = schoolConfig
-
-  for (const unit of units) {
-    const primaryClass = unit.targetClasses.at(0)
-    if (!primaryClass) continue
-
-    while (unit.remainingHours > 0) {
-      const candidates: Array<{ day: DayOfWeek; period: number; score: number }> = []
-
-      for (const day of activeDays) {
-        const maxPeriodOnDay = getDayPeriodCount(schoolConfig, day)
-        for (let period = 1; period <= maxPeriodOnDay; period++) {
-          const teacherBlockKey = `teacher-${unit.teacherId}-${day}-${period}`
-          if (blockedSlots.has(teacherBlockKey)) continue
-
-          const tp = teacherPolicies?.find((policy) => policy.teacherId === unit.teacherId)
-          const maxDaily = tp?.maxDailyHoursOverride ?? constraintPolicy.teacherMaxDailyHours
-          if (grid.getTeacherDayHours(unit.teacherId, day) >= maxDaily) continue
-
-          const allTargetsAvailable = unit.targetClasses.every((target) => {
-            const classBlocked = blockedSlots.has(
-              `class-${target.grade}-${target.classNumber}-${day}-${period}`,
-            )
-            if (classBlocked) return false
-            return !grid.isClassSlotFilled(target.grade, target.classNumber, day, period)
-          })
-
-          if (!allTargetsAvailable) continue
-
-          const unitForScoring: AssignmentUnit = {
-            teacherId: unit.teacherId,
-            subjectId: unit.subjectId,
-            subjectType: unit.subjectType,
-            grade: primaryClass.grade,
-            classNumber: primaryClass.classNumber,
-            totalHours: 1,
-            remainingHours: 1,
-          }
-          const score = scoreSlot(
-            grid,
-            unitForScoring,
-            day,
-            period,
-            constraintPolicy,
-            activeDays,
-            teacherPolicies,
-            periodsPerDay,
-          )
-
-          candidates.push({ day, period, score })
-        }
-      }
-
-      if (candidates.length === 0) {
-        const reasonUnit: AssignmentUnit = {
-          teacherId: unit.teacherId,
-          subjectId: unit.subjectId,
-          subjectType: unit.subjectType,
-          grade: primaryClass.grade,
-          classNumber: primaryClass.classNumber,
-          totalHours: unit.totalHours,
-          remainingHours: unit.remainingHours,
-        }
-
-        unplaced.push({
-          teacherId: unit.teacherId,
-          subjectId: unit.subjectId,
-          grade: primaryClass.grade,
-          classNumber: primaryClass.classNumber,
-          remainingHours: unit.remainingHours,
-          reason: diagnoseFailure(
-            grid,
-            reasonUnit,
-            activeDays,
-            periodsPerDay,
-            constraintPolicy,
-            blockedSlots,
-          ),
-        })
-        break
-      }
-
-      candidates.sort((a, b) => b.score - a.score)
-      const best = candidates[0]
-      for (const target of unit.targetClasses) {
-        const cell: TimetableCell = {
-          teacherId: unit.teacherId,
-          subjectId: unit.subjectId,
-          subjectType: unit.subjectType,
-          grade: target.grade,
-          classNumber: target.classNumber,
-          day: best.day,
-          period: best.period,
-          isFixed: false,
-          status: 'LOCKED',
-        }
-        grid.placeCell(cell)
-      }
-      unit.remainingHours--
-    }
-  }
-
-  return unplaced
+  return units
 }
 
 /**
@@ -682,7 +471,6 @@ function tryBacktrack(
           const newCell: TimetableCell = {
             teacherId: unit.teacherId,
             subjectId: unit.subjectId,
-            subjectType: unit.subjectType,
             grade: unit.grade,
             classNumber: unit.classNumber,
             day,
@@ -697,7 +485,6 @@ function tryBacktrack(
           const displacedUnit: AssignmentUnit = {
             teacherId: occupyingCell.teacherId,
             subjectId: occupyingCell.subjectId,
-            subjectType: occupyingCell.subjectType ?? 'CLASS',
             grade: occupyingCell.grade,
             classNumber: occupyingCell.classNumber,
             totalHours: 1,
@@ -737,7 +524,6 @@ function tryBacktrack(
             const displacedCell: TimetableCell = {
               teacherId: displacedUnit.teacherId,
               subjectId: displacedUnit.subjectId,
-              subjectType: displacedUnit.subjectType,
               grade: displacedUnit.grade,
               classNumber: displacedUnit.classNumber,
               day: bestCandidate.day,
@@ -802,14 +588,7 @@ function hillClimb(
     iterations++
     let improved = false
 
-    const nonFixedCells = grid
-      .getAllCells()
-      .filter(
-        (c) =>
-          !c.isFixed &&
-          c.status !== 'LOCKED' &&
-          (c.subjectType ?? 'CLASS') === 'CLASS',
-      )
+    const nonFixedCells = grid.getAllCells().filter((c) => !c.isFixed)
     if (nonFixedCells.length < 2) break
 
     // 랜덤 셀 쌍 스왑 시도
@@ -834,7 +613,6 @@ function hillClimb(
         const unitA: AssignmentUnit = {
           teacherId: cellA.teacherId,
           subjectId: cellA.subjectId,
-          subjectType: cellA.subjectType ?? 'CLASS',
           grade: cellA.grade,
           classNumber: cellA.classNumber,
           totalHours: 1,
@@ -843,7 +621,6 @@ function hillClimb(
         const unitB: AssignmentUnit = {
           teacherId: cellB.teacherId,
           subjectId: cellB.subjectId,
-          subjectType: cellB.subjectType ?? 'CLASS',
           grade: cellB.grade,
           classNumber: cellB.classNumber,
           totalHours: 1,
