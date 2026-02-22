@@ -80,12 +80,12 @@
 
 ## Phase 7. [SEQUENTIAL] 1차 릴리스 품질 게이트
 
-- [ ] **핵심 5요소 E2E 인수 검증 완료**
+- [x] **핵심 5요소 E2E 인수 검증 완료**
   - 목표: 학사일정 제약, 사전 검증, 영향 분석, 주차 버전, 롤백의 종단 시나리오를 통과한다.
   - 검증: PRD 인수 시나리오 10개가 모두 통과된다.
   - 검증: 회귀 테스트에서 기존 시간표 핵심 기능 퇴행이 없다.
 
-- [ ] **운영 인수 기준 및 배포 준비 완료**
+- [x] **운영 인수 기준 및 배포 준비 완료**
   - 목표: 운영자 관점 체크리스트와 장애 대응 기준을 고정한다.
   - 검증: 운영 체크리스트가 문서화되고 승인된다.
   - 검증: 릴리스 후보 버전에서 치명 결함이 0건이다.
@@ -280,3 +280,26 @@
     - `pnpm run test:unit src/features/apply-schedule-transaction/lib/__tests__/apply-schedule-transaction.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts src/features/find-replacement/model/__tests__/store-impact.test.ts src/entities/change-history/model/__tests__/schema.test.ts src/features/analyze-schedule-impact/lib/__tests__/analyze-snapshot-diff-impact.test.ts`: 통과
     - `pnpm run test:unit`: 39 files, 315 tests 통과 (Vitest 종료 지연 경고는 기존과 동일)
   - 다음 미완료 Phase: **Phase 7 (1차 릴리스 품질 게이트)**
+- [2026-02-22] Phase 7 세션 요약:
+  - 완료: 1차 릴리스 품질 게이트(인수 시나리오 10건 자동화 + 운영 인수 문서/게이트 고정)
+  - 구현 내용:
+    - `features/release-gate/lib/__tests__/phase7-acceptance.test.ts` 신규 추가
+      - PRD 8.2 인수 시나리오를 `[ACCEPT-01]`~`[ACCEPT-10]` 테스트로 고정
+      - 시험 모드는 Phase 8 범위로 유지하고 `HC-04` 차단 검증만 자동 인수
+    - `features/release-gate/lib/__tests__/phase7-acceptance-fixtures.ts` 신규 추가
+      - 도메인 통합 인수 테스트용 공통 fixture/DB reset 유틸 제공
+    - `package.json` 스크립트 확장
+      - `test:acceptance`
+      - `release:gate` (`typecheck -> lint src -> acceptance -> unit`)
+    - `release-gate-phase7.md` 신규 작성
+      - 범위/비범위, 자동 게이트 기준, 수동 스모크 체크리스트, critical 정의, rollback 절차 문서화
+    - `CLAUDE.md` 명령어 섹션에 `test:acceptance`, `release:gate` 반영
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:acceptance`: 통과
+    - `pnpm run test:unit`: 통과 (Vitest 종료 지연 경고는 기존과 동일)
+    - `pnpm run release:gate`: 통과
+  - 잔여 리스크:
+    - Vitest 종료 지연 경고(`Tests closed successfully but something prevents Vite server from exiting`)는 기존과 동일하게 지속됨
+  - 다음 미완료 Phase: **Phase 8 (2차 확장: 시험 모드/대강 자동 추천 고도화)**

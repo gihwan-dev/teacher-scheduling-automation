@@ -8,8 +8,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:unit": "vitest run",
+    "test:acceptance": "vitest run src/features/release-gate/lib/__tests__/phase7-acceptance.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
+    "release:gate": "pnpm run typecheck && pnpm run lint src && pnpm run test:acceptance && pnpm run test:unit",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix"
   },

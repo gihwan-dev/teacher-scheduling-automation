@@ -13,8 +13,10 @@ pnpm dev          # 개발 서버 (port 3000)
 pnpm build        # 프로덕션 빌드
 pnpm test         # 전체 테스트 (vitest run)
 pnpm test:unit    # 단위 테스트 (= pnpm test)
+pnpm test:acceptance # Phase 7 인수 테스트 (ACCEPT-01~10)
 pnpm typecheck    # tsc --noEmit
 pnpm lint         # eslint
+pnpm release:gate # typecheck + lint + acceptance + unit
 pnpm check        # prettier --write . && eslint --fix
 ```
 
