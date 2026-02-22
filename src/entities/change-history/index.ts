@@ -1,4 +1,5 @@
-export type { ChangeEvent, ChangeActionType, WeekTag } from './model/types'
+export type { ChangeEvent, ChangeActionType } from './model/types'
+export type { WeekTag } from '@/shared/lib/week-tag'
 export {
   changeEventSchema,
   changeActionTypeSchema,

@@ -8,6 +8,9 @@ import type { TimetableSnapshot } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { ChangeEvent } from '@/entities/change-history'
+import type { WeekTag } from '@/shared/lib/week-tag'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ScheduleTransaction } from '@/entities/schedule-transaction'
 
 // SchoolConfig
 export async function saveSchoolConfig(config: SchoolConfig): Promise<void> {
@@ -125,6 +128,29 @@ export async function loadTimetableSnapshotById(
   return db.timetableSnapshots.get(id)
 }
 
+export async function loadSnapshotsByWeek(
+  weekTag: WeekTag,
+): Promise<Array<TimetableSnapshot>> {
+  return db.timetableSnapshots.where('weekTag').equals(weekTag).sortBy('versionNo')
+}
+
+export async function loadLatestSnapshotByWeek(
+  weekTag: WeekTag,
+): Promise<TimetableSnapshot | undefined> {
+  const snapshots = await loadSnapshotsByWeek(weekTag)
+  return snapshots.at(-1)
+}
+
+export async function loadSnapshotVersion(
+  weekTag: WeekTag,
+  versionNo: number,
+): Promise<TimetableSnapshot | undefined> {
+  return db.timetableSnapshots
+    .where('[weekTag+versionNo]')
+    .equals([weekTag, versionNo])
+    .first()
+}
+
 export async function updateTimetableSnapshot(
   snapshot: TimetableSnapshot,
 ): Promise<void> {
@@ -186,4 +212,41 @@ export async function deleteChangeEventsBySnapshot(
   snapshotId: string,
 ): Promise<void> {
   await db.changeEvents.where('snapshotId').equals(snapshotId).delete()
+}
+
+// AcademicCalendarEvents
+export async function saveAcademicCalendarEvents(
+  events: Array<AcademicCalendarEvent>,
+): Promise<void> {
+  await db.transaction('rw', db.academicCalendarEvents, async () => {
+    await db.academicCalendarEvents.clear()
+    await db.academicCalendarEvents.bulkPut(events)
+  })
+}
+
+export async function loadAcademicCalendarEventsByRange(
+  startDate: string,
+  endDate: string,
+): Promise<Array<AcademicCalendarEvent>> {
+  const candidates = await db.academicCalendarEvents
+    .where('startDate')
+    .belowOrEqual(endDate)
+    .toArray()
+
+  return candidates
+    .filter((event) => event.endDate >= startDate)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+}
+
+// ScheduleTransactions
+export async function saveScheduleTransaction(
+  transaction: ScheduleTransaction,
+): Promise<void> {
+  await db.scheduleTransactions.put(transaction)
+}
+
+export async function updateScheduleTransaction(
+  transaction: ScheduleTransaction,
+): Promise<void> {
+  await db.scheduleTransactions.put(transaction)
 }

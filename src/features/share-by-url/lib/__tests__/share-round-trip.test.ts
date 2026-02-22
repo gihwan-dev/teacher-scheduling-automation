@@ -74,6 +74,14 @@ const teachers: Array<Teacher> = [
 const snapshot: TimetableSnapshot = {
   id: 'snap-1',
   schoolConfigId: 'sc-1',
+  weekTag: '2024-W24',
+  versionNo: 1,
+  baseVersionId: null,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2024-W24',
+    toWeek: null,
+  },
   cells: [
     {
       teacherId: 'tea-1',
@@ -205,6 +213,14 @@ describe('share round-trip', () => {
 
     expect(restored.snapshot.score).toBe(snapshot.score)
     expect(restored.snapshot.generationTimeMs).toBe(snapshot.generationTimeMs)
+    expect(restored.snapshot.weekTag).toMatch(/^\d{4}-W\d{2}$/)
+    expect(restored.snapshot.versionNo).toBe(1)
+    expect(restored.snapshot.baseVersionId).toBeNull()
+    expect(restored.snapshot.appliedScope.type).toBe('THIS_WEEK')
+    expect(restored.snapshot.appliedScope.fromWeek).toBe(
+      restored.snapshot.weekTag,
+    )
+    expect(restored.snapshot.appliedScope.toWeek).toBeNull()
 
     expect(restored.constraintPolicy.studentMaxConsecutiveSameSubject).toBe(2)
     expect(restored.constraintPolicy.teacherMaxConsecutiveHours).toBe(4)

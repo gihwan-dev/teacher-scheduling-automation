@@ -60,6 +60,14 @@ const teachers: Array<Teacher> = [
 const snapshot: TimetableSnapshot = {
   id: 'snap-1',
   schoolConfigId: 'sc-1',
+  weekTag: '2024-W01',
+  versionNo: 1,
+  baseVersionId: null,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2024-W01',
+    toWeek: null,
+  },
   cells: [
     {
       teacherId: 'tea-1',

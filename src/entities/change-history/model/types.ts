@@ -1,6 +1,5 @@
 import type { CellKey, TimetableCell } from '@/entities/timetable'
-
-export type WeekTag = `${number}-W${string}` // "2026-W07"
+import type { WeekTag } from '@/shared/lib/week-tag'
 
 export type ChangeActionType =
   | 'EDIT'
@@ -16,9 +15,15 @@ export interface ChangeEvent {
   snapshotId: string
   weekTag: WeekTag
   actionType: ChangeActionType
+  actor: string
   cellKey: CellKey
   before: TimetableCell | null
   after: TimetableCell | null
+  beforePayload: unknown | null
+  afterPayload: unknown | null
+  impactSummary: string | null
+  conflictDetected: boolean
+  rollbackRef: string | null
   timestamp: number
   isUndone: boolean
 }

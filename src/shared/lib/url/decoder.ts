@@ -13,6 +13,7 @@ import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { SharePayload } from './types'
 import type { DayOfWeek } from '@/shared/lib/types'
 import { generateId } from '@/shared/lib/id'
+import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
 
 export interface RestoredState {
   schoolConfig: SchoolConfig
@@ -97,9 +98,18 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
     }
   })
 
+  const weekTag = computeWeekTagFromIso(payload.meta.ts)
   const snapshot: TimetableSnapshot = {
     id: generateId(),
     schoolConfigId,
+    weekTag,
+    versionNo: 1,
+    baseVersionId: null,
+    appliedScope: {
+      type: 'THIS_WEEK',
+      fromWeek: weekTag,
+      toWeek: null,
+    },
     cells,
     score: payload.meta.score,
     generationTimeMs: payload.meta.genMs,

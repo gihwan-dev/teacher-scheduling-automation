@@ -275,6 +275,21 @@ describe('generateTimetable', () => {
     expect(result.stats.generationTimeMs).toBeGreaterThanOrEqual(0)
   })
 
+  it('생성된 스냅샷에 주차 버전 기본 필드를 채운다', () => {
+    const input = makeInput()
+    const result = generateTimetable(input)
+
+    expect(result.snapshot).not.toBeNull()
+    expect(result.snapshot!.weekTag).toMatch(/^\d{4}-W\d{2}$/)
+    expect(result.snapshot!.versionNo).toBe(1)
+    expect(result.snapshot!.baseVersionId).toBeNull()
+    expect(result.snapshot!.appliedScope).toEqual({
+      type: 'THIS_WEEK',
+      fromWeek: result.snapshot!.weekTag,
+      toWeek: null,
+    })
+  })
+
   it('3학년 5반 규모에서도 생성 성공한다', () => {
     const subjects = [
       makeSubject('sub-math', '수학'),

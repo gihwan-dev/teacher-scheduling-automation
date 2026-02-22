@@ -12,13 +12,13 @@ import type { FixedEvent } from '@/entities/fixed-event'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableCell } from '@/entities/timetable'
 import type { DayOfWeek } from '@/shared/lib/types'
-
 import type {
   AssignmentUnit,
   GenerationInput,
   GenerationResult,
   UnplacedAssignment,
 } from '../model/types'
+import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
 
 import { generateId } from '@/shared/lib/id'
 import { validateTimetable } from '@/entities/constraint-policy'
@@ -231,14 +231,27 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
   const success = unplaced.length === 0 && hardViolations.length === 0
 
   const snapshot = success
-    ? {
-        id: generateId(),
-        schoolConfigId: schoolConfig.id,
-        cells,
-        score,
-        generationTimeMs,
-        createdAt: new Date().toISOString(),
-      }
+    ? (() => {
+        const createdAt = new Date().toISOString()
+        const weekTag = computeWeekTagFromIso(createdAt)
+
+        return {
+          id: generateId(),
+          schoolConfigId: schoolConfig.id,
+          weekTag,
+          versionNo: 1,
+          baseVersionId: null,
+          appliedScope: {
+            type: 'THIS_WEEK' as const,
+            fromWeek: weekTag,
+            toWeek: null,
+          },
+          cells,
+          score,
+          generationTimeMs,
+          createdAt,
+        }
+      })()
     : null
 
   return {

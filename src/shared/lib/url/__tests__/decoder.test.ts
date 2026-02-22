@@ -104,4 +104,16 @@ describe('restoreFromPayload', () => {
     const result = restoreFromPayload(emptyPayload)
     expect(result.snapshot.cells).toHaveLength(0)
   })
+
+  it('스냅샷 주차/버전 기본 필드를 복원한다', () => {
+    const result = restoreFromPayload(validPayload)
+    expect(result.snapshot.weekTag).toMatch(/^\d{4}-W\d{2}$/)
+    expect(result.snapshot.versionNo).toBe(1)
+    expect(result.snapshot.baseVersionId).toBeNull()
+    expect(result.snapshot.appliedScope).toEqual({
+      type: 'THIS_WEEK',
+      fromWeek: result.snapshot.weekTag,
+      toWeek: null,
+    })
+  })
 })
