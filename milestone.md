@@ -102,6 +102,19 @@
   - 검증: 대강 추천 결과가 우선순위와 근거를 함께 제공한다.
   - 검증: 담임 제외 등 운영 옵션이 반영된다.
 
+## Phase 9. [SEQUENTIAL] 테스트 안정화 및 CI 릴리스 게이트 자동화
+
+- [x] **테스트 러너 구성 분리 및 종료 경고 제거**
+  - 목표: 앱 빌드 설정과 Vitest 설정을 분리해 테스트 종료 지연 경고를 제거한다.
+  - 검증: `vite.config.ts`에서 테스트 설정이 제거되고 `vitest.config.ts`가 신규 추가된다.
+  - 검증: `pnpm run test:unit` 실행 시 `close timed out`/`something prevents Vite server from exiting` 경고가 발생하지 않는다.
+  - 검증: `pnpm run test:unit:diagnose` 실행 시 hanging-process 경고가 발생하지 않는다.
+
+- [x] **CI 릴리스 게이트 자동화**
+  - 목표: PR/기본 브랜치 push에서 `release:gate`를 자동 실행해 품질 게이트를 고정한다.
+  - 검증: `.github/workflows/release-gate.yml`이 추가되고 `pull_request`, `push(main)` 트리거가 설정된다.
+  - 검증: CI 절차가 `checkout -> node/pnpm setup -> pnpm install --frozen-lockfile -> pnpm run release:gate` 순서를 따른다.
+
 ---
 
 ## 운영 노트
@@ -318,4 +331,24 @@
     - `pnpm run test:unit`: 통과 (47 files, 346 tests)
   - 잔여 리스크:
     - Vitest 종료 지연 경고는 기존과 동일하게 지속되며 기능 검증 자체는 통과
-- 모든 마일스톤 완료: Phase 1~8 체크리스트가 모두 `[x]` 상태로 마감됨.
+- [2026-02-22] Phase 9 세션 요약:
+  - 완료: 테스트 안정화 및 CI 릴리스 게이트 자동화
+  - 구현 내용:
+    - `vite.config.ts`에서 `test` 설정 제거(앱 번들 설정만 유지)
+    - `vitest.config.ts` 신규 추가(앱 플러그인 제외, 절대 alias/테스트 설정 분리)
+    - `package.json` 스크립트 갱신:
+      - `test:unit`/`test:acceptance`에 `--config vitest.config.ts` 강제
+      - `test:unit:diagnose` 신규 추가(`hanging-process` 리포터)
+    - `.github/workflows/release-gate.yml` 신규 추가:
+      - `pull_request`, `push(main)` 트리거
+      - `pnpm install --frozen-lockfile` 후 `pnpm run release:gate` 실행
+    - 문서 동기화:
+      - `release-gate-phase7.md` 통과 기준(종료 경고 제거 + 진단 명령) 갱신
+      - `PRD-academic-calendar-linked-timetable.md` 8.2 인수 체크박스 `[x]` 동기화
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:acceptance`: 통과
+    - `pnpm run test:unit`: 통과 (48 files, 349 tests, 종료 지연 경고 없음)
+    - `pnpm run test:unit:diagnose`: 통과 (hanging-process 경고 없음)
+- 모든 마일스톤 완료: Phase 1~9 체크리스트가 모두 `[x]` 상태로 마감됨.

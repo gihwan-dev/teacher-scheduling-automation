@@ -6,6 +6,8 @@
 
 - 핵심 5요소 인수 시나리오 10건 자동 검증 (`ACCEPT-01` ~ `ACCEPT-10`)
 - 로컬 릴리스 게이트 명령 고정 (`pnpm run release:gate`)
+- Vitest 전용 설정 분리(`vitest.config.ts`) 및 종료 지연 경고 제거
+- CI 릴리스 게이트 자동 실행(`.github/workflows/release-gate.yml`)
 - 운영 인수 체크리스트 및 장애 대응 절차 문서화
 
 ### 비범위 (Phase 8 이후)
@@ -31,11 +33,18 @@ pnpm run release:gate
 3. `pnpm run test:acceptance`
 4. `pnpm run test:unit`
 
+진단 명령:
+
+```bash
+pnpm run test:unit:diagnose
+```
+
 ### 통과 기준
 
 - 위 4개 명령이 모두 종료 코드 `0`으로 완료된다.
 - `test:acceptance`에서 `ACCEPT-01`~`ACCEPT-10` 전부 통과한다.
-- Vitest 종료 지연 경고는 기존 알려진 경고로 간주하며 실패로 판정하지 않는다.
+- `test:unit` 실행 로그에 Vitest 종료 지연 경고가 없어야 한다.
+- `test:unit:diagnose` 실행 시 hanging-process 경고가 없어야 한다.
 
 ## 3. 수동 운영 스모크 체크리스트
 
@@ -72,10 +81,10 @@ pnpm run release:gate
 ### Go
 
 - 자동 게이트 통과
+- GitHub Actions `Release Gate` 워크플로우(pull_request / push-main) 통과
 - 수동 스모크 전 항목 통과
 - critical 결함 0건
 
 ### No-Go
 
 - 자동 게이트 실패 또는 critical 결함 1건 이상
-
