@@ -9,6 +9,7 @@ import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { ChangeEvent } from '@/entities/change-history'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { ScheduleTransaction } from '@/entities/schedule-transaction'
 import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
 
@@ -34,6 +35,7 @@ class SchedulingDatabase extends Dexie {
   teacherPolicies!: EntityTable<TeacherPolicy, 'id'>
   changeEvents!: EntityTable<ChangeEvent, 'id'>
   academicCalendarEvents!: EntityTable<AcademicCalendarEvent, 'id'>
+  impactAnalysisReports!: EntityTable<ImpactAnalysisReport, 'id'>
   scheduleTransactions!: EntityTable<ScheduleTransaction, 'draftId'>
 
   constructor() {
@@ -118,6 +120,22 @@ class SchedulingDatabase extends Dexie {
             applyV6ChangeEventDefaults(event)
           })
       })
+    this.version(7).stores({
+      schoolConfigs: 'id, updatedAt',
+      subjects: 'id, name',
+      teachers: 'id, name',
+      fixedEvents: 'id, type, teacherId',
+      setupSnapshots: 'id, name, updatedAt',
+      timetableSnapshots:
+        'id, schoolConfigId, weekTag, versionNo, [weekTag+versionNo], createdAt',
+      constraintPolicies: 'id, updatedAt',
+      teacherPolicies: 'id, teacherId, updatedAt',
+      changeEvents: 'id, snapshotId, weekTag, actionType, timestamp',
+      academicCalendarEvents:
+        'id, eventType, startDate, endDate, scopeType, scopeValue',
+      scheduleTransactions: 'draftId, status, updatedAt, *targetWeeks',
+      impactAnalysisReports: 'id, snapshotId, weekTag, riskLevel, createdAt',
+    })
   }
 }
 

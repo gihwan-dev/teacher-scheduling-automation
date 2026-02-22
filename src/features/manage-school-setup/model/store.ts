@@ -2,22 +2,35 @@ import { create } from 'zustand'
 import { runFullValidation } from './validation'
 import type { ValidationMessage } from './validation'
 import type { SchoolConfig } from '@/entities/school'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
+import type { TimetableSnapshot } from '@/entities/timetable'
 import {
+  loadAcademicCalendarEvents,
   loadAllSetupData,
+  loadLatestTimetableSnapshot,
+  saveAcademicCalendarEvents,
   saveAllSetupData,
 } from '@/shared/persistence/indexeddb/repository'
 import { generateId } from '@/shared/lib/id'
 
-export type SetupTab = 'school' | 'subjects' | 'teachers' | 'fixedEvents'
+export type SetupTab =
+  | 'school'
+  | 'subjects'
+  | 'teachers'
+  | 'fixedEvents'
+  | 'academicCalendar'
 
 interface SetupState {
   schoolConfig: SchoolConfig | null
   subjects: Array<Subject>
   teachers: Array<Teacher>
   fixedEvents: Array<FixedEvent>
+  academicCalendarEvents: Array<AcademicCalendarEvent>
+  baselineAcademicCalendarEvents: Array<AcademicCalendarEvent>
+  latestSnapshot: TimetableSnapshot | null
   activeTab: SetupTab
   isDirty: boolean
   validationMessages: Array<ValidationMessage>
@@ -46,6 +59,16 @@ interface SetupState {
   updateFixedEvent: (id: string, updates: Partial<FixedEvent>) => void
   removeFixedEvent: (id: string) => void
 
+  // AcademicCalendarEvents
+  addAcademicCalendarEvent: (
+    event: Omit<AcademicCalendarEvent, 'id' | 'createdAt' | 'updatedAt'>,
+  ) => void
+  updateAcademicCalendarEvent: (
+    id: string,
+    updates: Partial<AcademicCalendarEvent>,
+  ) => void
+  removeAcademicCalendarEvent: (id: string) => void
+
   // Persistence
   loadFromDB: () => Promise<void>
   saveToDB: () => Promise<void>
@@ -63,6 +86,9 @@ export const useSetupStore = create<SetupState>((set, get) => ({
   subjects: [],
   teachers: [],
   fixedEvents: [],
+  academicCalendarEvents: [],
+  baselineAcademicCalendarEvents: [],
+  latestSnapshot: null,
   activeTab: 'school',
   isDirty: false,
   validationMessages: [],
@@ -152,25 +178,75 @@ export const useSetupStore = create<SetupState>((set, get) => ({
       isDirty: true,
     })),
 
+  // AcademicCalendarEvents
+  addAcademicCalendarEvent: (data) => {
+    const timestamp = now()
+    const event: AcademicCalendarEvent = {
+      ...data,
+      id: generateId(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    set((s) => ({
+      academicCalendarEvents: [...s.academicCalendarEvents, event],
+      isDirty: true,
+    }))
+  },
+
+  updateAcademicCalendarEvent: (id, updates) =>
+    set((s) => ({
+      academicCalendarEvents: s.academicCalendarEvents.map((event) =>
+        event.id === id ? { ...event, ...updates, updatedAt: now() } : event,
+      ),
+      isDirty: true,
+    })),
+
+  removeAcademicCalendarEvent: (id) =>
+    set((s) => ({
+      academicCalendarEvents: s.academicCalendarEvents.filter(
+        (event) => event.id !== id,
+      ),
+      isDirty: true,
+    })),
+
   // Persistence
   loadFromDB: async () => {
     set({ isLoading: true })
-    const data = await loadAllSetupData()
+    const [data, academicCalendarEvents, latestSnapshot] = await Promise.all([
+      loadAllSetupData(),
+      loadAcademicCalendarEvents(),
+      loadLatestTimetableSnapshot(),
+    ])
     set({
       schoolConfig: data.schoolConfig ?? null,
       subjects: data.subjects,
       teachers: data.teachers,
       fixedEvents: data.fixedEvents,
+      academicCalendarEvents,
+      baselineAcademicCalendarEvents: academicCalendarEvents,
+      latestSnapshot: latestSnapshot ?? null,
       isDirty: false,
       isLoading: false,
     })
   },
 
   saveToDB: async () => {
-    const { schoolConfig, subjects, teachers, fixedEvents } = get()
+    const {
+      schoolConfig,
+      subjects,
+      teachers,
+      fixedEvents,
+      academicCalendarEvents,
+    } = get()
     if (!schoolConfig) return
-    await saveAllSetupData({ schoolConfig, subjects, teachers, fixedEvents })
-    set({ isDirty: false })
+    await Promise.all([
+      saveAllSetupData({ schoolConfig, subjects, teachers, fixedEvents }),
+      saveAcademicCalendarEvents(academicCalendarEvents),
+    ])
+    set({
+      baselineAcademicCalendarEvents: academicCalendarEvents,
+      isDirty: false,
+    })
   },
 
   // Validation

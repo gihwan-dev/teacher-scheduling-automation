@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../database'
 import {
+  loadAcademicCalendarEvents,
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadFixedEvents,
+  loadImpactAnalysisReport,
+  loadImpactAnalysisReportsBySnapshot,
   loadLatestSnapshotByWeek,
   loadSchoolConfig,
   loadSnapshotVersion,
@@ -13,6 +16,7 @@ import {
   saveAcademicCalendarEvents,
   saveAllSetupData,
   saveFixedEvents,
+  saveImpactAnalysisReport,
   saveScheduleTransaction,
   saveSchoolConfig,
   saveSubjects,
@@ -21,6 +25,7 @@ import {
   updateScheduleTransaction,
 } from '../repository'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { SchoolConfig } from '@/entities/school'
 import type { ScheduleTransaction } from '@/entities/schedule-transaction'
 import type { Subject } from '@/entities/subject'
@@ -149,6 +154,18 @@ const sampleTransaction: ScheduleTransaction = {
   updatedAt: ts,
 }
 
+const sampleImpactReport: ImpactAnalysisReport = {
+  id: 'impact-1',
+  snapshotId: 'snapshot-1',
+  weekTag: '2026-W08',
+  affectedTeachers: [{ teacherName: '김교사', summary: '배치 변경 1건' }],
+  affectedClasses: [{ grade: 1, classNumber: 1, summary: '변경 슬롯 2건' }],
+  hourDelta: [{ target: '김교사(월)', delta: 1 }],
+  riskLevel: 'MEDIUM',
+  alternatives: ['화 3교시 이동 +0.1점 / 위반 0건'],
+  createdAt: ts,
+}
+
 beforeEach(async () => {
   await db.schoolConfigs.clear()
   await db.subjects.clear()
@@ -159,6 +176,7 @@ beforeEach(async () => {
   await db.changeEvents.clear()
   await db.academicCalendarEvents.clear()
   await db.scheduleTransactions.clear()
+  await db.impactAnalysisReports.clear()
 })
 
 describe('SchoolConfig persistence', () => {
@@ -274,6 +292,13 @@ describe('AcademicCalendarEvents persistence', () => {
     )
     expect(events.map((event) => event.id)).toEqual(['ac-2'])
   })
+
+  it('전체 이벤트를 시작일 순서로 조회할 수 있다', async () => {
+    await saveAcademicCalendarEvents([sampleCalendarEvents[1], sampleCalendarEvents[0]])
+
+    const events = await loadAcademicCalendarEvents()
+    expect(events.map((event) => event.id)).toEqual(['ac-1', 'ac-2'])
+  })
 })
 
 describe('ScheduleTransaction persistence', () => {
@@ -288,5 +313,26 @@ describe('ScheduleTransaction persistence', () => {
 
     const stored = await db.scheduleTransactions.get('draft-1')
     expect(stored?.status).toBe('COMMITTED')
+  })
+})
+
+describe('ImpactAnalysisReport persistence', () => {
+  it('리포트를 저장하고 id로 조회할 수 있다', async () => {
+    await saveImpactAnalysisReport(sampleImpactReport)
+
+    const loaded = await loadImpactAnalysisReport('impact-1')
+    expect(loaded).toEqual(sampleImpactReport)
+  })
+
+  it('snapshot 기준으로 리포트 목록을 조회할 수 있다', async () => {
+    await saveImpactAnalysisReport(sampleImpactReport)
+    await saveImpactAnalysisReport({
+      ...sampleImpactReport,
+      id: 'impact-2',
+      createdAt: '2024-01-01T00:01:00.000Z',
+    })
+
+    const reports = await loadImpactAnalysisReportsBySnapshot('snapshot-1')
+    expect(reports.map((report) => report.id)).toEqual(['impact-1', 'impact-2'])
   })
 })

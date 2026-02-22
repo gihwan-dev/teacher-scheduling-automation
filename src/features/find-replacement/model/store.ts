@@ -9,6 +9,7 @@ import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type {
   CellKey,
   TimetableCell,
@@ -24,11 +25,16 @@ import type {
 import { buildCellMap } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
 import {
+  analyzeMultiReplacementImpact,
+  analyzeReplacementImpact,
+} from '@/features/analyze-schedule-impact'
+import {
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadConstraintPolicy,
   loadLatestTimetableSnapshot,
   loadTeacherPolicies,
+  saveImpactAnalysisReport,
   updateTimetableSnapshot,
 } from '@/shared/persistence/indexeddb/repository'
 import { getWeekDateRange } from '@/shared/lib/week-tag'
@@ -53,12 +59,14 @@ interface ReplacementState {
   searchConfig: ReplacementSearchConfig
   searchResult: ReplacementSearchResult | null
   selectedCandidate: ReplacementCandidate | null
+  impactReport: ImpactAnalysisReport | null
 
   // 다중 교체 상태
   isMultiMode: boolean
   multiTargetCellKeys: Array<CellKey>
   multiSearchResult: MultiReplacementSearchResult | null
   selectedMultiCandidate: MultiReplacementCandidate | null
+  multiImpactReport: ImpactAnalysisReport | null
 
   // 뷰 컨텍스트
   viewGrade: number
@@ -67,6 +75,7 @@ interface ReplacementState {
   // 상태 플래그
   isLoading: boolean
   isSearching: boolean
+  impactReportLoading: boolean
 
   // 액션
   loadSnapshot: () => Promise<void>
@@ -105,14 +114,17 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   },
   searchResult: null,
   selectedCandidate: null,
+  impactReport: null,
   isMultiMode: false,
   multiTargetCellKeys: [],
   multiSearchResult: null,
   selectedMultiCandidate: null,
+  multiImpactReport: null,
   viewGrade: 1,
   viewClassNumber: 1,
   isLoading: false,
   isSearching: false,
+  impactReportLoading: false,
 
   loadSnapshot: async () => {
     set({ isLoading: true })
@@ -160,9 +172,12 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
+      impactReport: null,
       multiTargetCellKeys: [],
       multiSearchResult: null,
       selectedMultiCandidate: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -173,9 +188,12 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
+      impactReport: null,
       multiTargetCellKeys: [],
       multiSearchResult: null,
       selectedMultiCandidate: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -190,6 +208,8 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: key,
       searchResult: null,
       selectedCandidate: null,
+      impactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -235,17 +255,64 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
     set({
       searchResult: result,
       selectedCandidate: null,
+      impactReport: null,
+      impactReportLoading: false,
       isSearching: false,
     })
   },
 
   selectCandidate: (candidate) => {
-    set({ selectedCandidate: candidate })
+    set({
+      selectedCandidate: candidate,
+      impactReport: null,
+      impactReportLoading: candidate !== null,
+    })
+    if (!candidate) {
+      return
+    }
+
+    const { snapshot, cells, searchResult, teachers } = get()
+    if (!snapshot) {
+      set({ impactReportLoading: false })
+      return
+    }
+
+    const selectedCandidateId = candidate.id
+    const allCandidates = searchResult?.candidates ?? [candidate]
+
+    void (async () => {
+      try {
+        const report = analyzeReplacementImpact({
+          snapshot,
+          beforeCells: cells,
+          selectedCandidate: candidate,
+          allCandidates,
+          teachers,
+        })
+        await saveImpactAnalysisReport(report)
+
+        if (get().selectedCandidate?.id !== selectedCandidateId) {
+          return
+        }
+        set({
+          impactReport: report,
+          impactReportLoading: false,
+        })
+      } catch {
+        if (get().selectedCandidate?.id !== selectedCandidateId) {
+          return
+        }
+        set({
+          impactReport: null,
+          impactReportLoading: false,
+        })
+      }
+    })()
   },
 
   confirmReplacement: async () => {
-    const { selectedCandidate, cells, snapshot } = get()
-    if (!selectedCandidate || !snapshot) return
+    const { selectedCandidate, cells, snapshot, impactReport } = get()
+    if (!selectedCandidate || !snapshot || !impactReport) return
 
     let newCells: Array<TimetableCell>
 
@@ -302,6 +369,9 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
+      impactReport: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -321,9 +391,12 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
+      impactReport: null,
       multiTargetCellKeys: [],
       multiSearchResult: null,
       selectedMultiCandidate: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -338,6 +411,8 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       multiTargetCellKeys: [...multiTargetCellKeys, key],
       multiSearchResult: null,
       selectedMultiCandidate: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -347,6 +422,8 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       multiTargetCellKeys: multiTargetCellKeys.filter((k) => k !== key),
       multiSearchResult: null,
       selectedMultiCandidate: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 
@@ -389,17 +466,64 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
     set({
       multiSearchResult: result,
       selectedMultiCandidate: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
       isSearching: false,
     })
   },
 
   selectMultiCandidate: (candidate) => {
-    set({ selectedMultiCandidate: candidate })
+    set({
+      selectedMultiCandidate: candidate,
+      multiImpactReport: null,
+      impactReportLoading: candidate !== null,
+    })
+    if (!candidate) {
+      return
+    }
+
+    const { snapshot, cells, multiSearchResult, teachers } = get()
+    if (!snapshot) {
+      set({ impactReportLoading: false })
+      return
+    }
+
+    const selectedCandidateId = candidate.id
+    const allCandidates = multiSearchResult?.candidates ?? [candidate]
+
+    void (async () => {
+      try {
+        const report = analyzeMultiReplacementImpact({
+          snapshot,
+          beforeCells: cells,
+          selectedCandidate: candidate,
+          allCandidates,
+          teachers,
+        })
+        await saveImpactAnalysisReport(report)
+
+        if (get().selectedMultiCandidate?.id !== selectedCandidateId) {
+          return
+        }
+        set({
+          multiImpactReport: report,
+          impactReportLoading: false,
+        })
+      } catch {
+        if (get().selectedMultiCandidate?.id !== selectedCandidateId) {
+          return
+        }
+        set({
+          multiImpactReport: null,
+          impactReportLoading: false,
+        })
+      }
+    })()
   },
 
   confirmMultiReplacement: async () => {
-    const { selectedMultiCandidate, cells, snapshot } = get()
-    if (!selectedMultiCandidate || !snapshot) return
+    const { selectedMultiCandidate, cells, snapshot, multiImpactReport } = get()
+    if (!selectedMultiCandidate || !snapshot || !multiImpactReport) return
 
     let newCells = [...cells]
 
@@ -457,6 +581,9 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       multiTargetCellKeys: [],
       multiSearchResult: null,
       selectedMultiCandidate: null,
+      impactReport: null,
+      multiImpactReport: null,
+      impactReportLoading: false,
     })
   },
 }))

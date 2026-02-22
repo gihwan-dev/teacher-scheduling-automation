@@ -10,6 +10,7 @@ import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { ChangeEvent } from '@/entities/change-history'
 import type { WeekTag } from '@/shared/lib/week-tag'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { ScheduleTransaction } from '@/entities/schedule-transaction'
 
 // SchoolConfig
@@ -238,6 +239,18 @@ export async function loadAcademicCalendarEventsByRange(
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
 }
 
+export async function loadAcademicCalendarEvents(): Promise<
+  Array<AcademicCalendarEvent>
+> {
+  const events = await db.academicCalendarEvents.toArray()
+  return events.sort((a, b) => {
+    if (a.startDate === b.startDate) {
+      return a.endDate.localeCompare(b.endDate)
+    }
+    return a.startDate.localeCompare(b.startDate)
+  })
+}
+
 // ScheduleTransactions
 export async function saveScheduleTransaction(
   transaction: ScheduleTransaction,
@@ -249,4 +262,26 @@ export async function updateScheduleTransaction(
   transaction: ScheduleTransaction,
 ): Promise<void> {
   await db.scheduleTransactions.put(transaction)
+}
+
+// ImpactAnalysisReports
+export async function saveImpactAnalysisReport(
+  report: ImpactAnalysisReport,
+): Promise<void> {
+  await db.impactAnalysisReports.put(report)
+}
+
+export async function loadImpactAnalysisReport(
+  id: string,
+): Promise<ImpactAnalysisReport | undefined> {
+  return db.impactAnalysisReports.get(id)
+}
+
+export async function loadImpactAnalysisReportsBySnapshot(
+  snapshotId: string,
+): Promise<Array<ImpactAnalysisReport>> {
+  return db.impactAnalysisReports
+    .where('snapshotId')
+    .equals(snapshotId)
+    .sortBy('createdAt')
 }

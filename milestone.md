@@ -32,12 +32,12 @@
 
 ## Phase 3. [PARALLEL:PG-1] 영향 분석 및 시수 예측
 
-- [ ] **변경 전 영향 분석 리포트 구현**
+- [x] **변경 전 영향 분석 리포트 구현**
   - 목표: 승인 전에 교사/학급/연강/공강 변화 정보를 리포트로 제공한다.
   - 검증: 최소 한 개 이상의 교체 시나리오에서 영향 리포트가 사전 출력된다.
   - 검증: 리포트에 위험도(`LOW/MEDIUM/HIGH`)와 대안 목록이 포함된다.
 
-- [ ] **학사일정 변경 기반 시수 부족 예측 및 보강 추천 구현**
+- [x] **학사일정 변경 기반 시수 부족 예측 및 보강 추천 구현**
   - 목표: 행사/휴업/단축수업 변경 시 부족 시수를 자동 계산하고 보강 후보를 제시한다.
   - 검증: 학년/학급 단위 부족 시수가 자동 계산된다.
   - 검증: 보강 추천 결과가 리포트 형태로 제공된다.
@@ -151,3 +151,39 @@
     - `pnpm run lint src`: 통과
     - `pnpm run test:unit`: 31 files, 266 tests 통과 (종료 지연 경고는 기존과 동일)
   - 다음 미완료 Phase: **Phase 3 (영향 분석 및 시수 예측)**
+- [2026-02-22] Phase 3 세션 요약:
+  - 완료: 영향 분석 및 시수 예측(교체 사전 리포트 + 학사일정 기반 부족 시수/보강 추천)
+  - 구현 내용:
+    - `entities/impact-analysis` 신규 추가:
+      - `ImpactRiskLevel`, `ImpactAnalysisReport`, `HourShortagePredictionReport` 타입/스키마
+    - IndexedDB v7 확장:
+      - `impactAnalysisReports` 테이블 추가
+      - repository API 확장
+        - `saveImpactAnalysisReport`
+        - `loadImpactAnalysisReport`
+        - `loadImpactAnalysisReportsBySnapshot`
+        - `loadAcademicCalendarEvents`
+    - `features/analyze-schedule-impact` 신규 추가:
+      - `analyzeReplacementImpact` / `analyzeMultiReplacementImpact`
+      - `predictHourShortageFromCalendarChange`
+    - 교체 플로우 반영:
+      - 후보 선택 즉시 영향 분석 -> 리포트 저장 -> 상태 반영
+      - 리포트 없으면 단일/다중 교체 확정 차단
+      - `ImpactAnalysisPanel` 추가 및 확정 다이얼로그에 리스크 요약 노출
+    - 설정 플로우 반영:
+      - Setup에 `학사일정` 탭 추가(`AcademicCalendarTable`)
+      - `academicCalendarEvents`/`baselineAcademicCalendarEvents` 분리 상태 관리
+      - `HourShortageReport` 추가(현재 주 기준 부족 시수 증가 및 보강 추천 표시)
+  - 테스트:
+    - `entities/impact-analysis` 스키마 테스트 신규 추가
+    - 영향 분석/시수 예측 엔진 테스트 신규 추가
+    - 교체 스토어 영향 리포트 게이트 테스트 신규 추가
+    - 시수 예측 재계산(스토어 상태 변경) 테스트 신규 추가
+    - repository 영향 리포트/학사일정 전체 조회 테스트 확장
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit src/features/analyze-schedule-impact/lib/__tests__/analyze-replacement-impact.test.ts src/features/analyze-schedule-impact/lib/__tests__/predict-hour-shortage.test.ts`: 통과
+    - `pnpm run test:unit src/features/find-replacement/lib/__tests__/candidate-ranker.test.ts src/features/find-replacement/lib/__tests__/replacement-finder.test.ts src/features/find-replacement/lib/__tests__/multi-replacement-finder.test.ts`: 통과
+    - `pnpm run test:unit src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
+  - 다음 미완료 Phase: **Phase 4 (주차 버전 관리 체계 구현)**

@@ -34,6 +34,8 @@ export function CandidateListPanel({
   const {
     searchResult,
     selectedCandidate,
+    impactReport,
+    impactReportLoading,
     selectCandidate,
     confirmReplacement,
   } = useReplacementStore()
@@ -85,11 +87,22 @@ export function CandidateListPanel({
               ))}
             </div>
 
+            {selectedCandidate && impactReportLoading && (
+              <p className="text-xs text-muted-foreground mt-3">
+                영향 분석 리포트 생성 중...
+              </p>
+            )}
+
             {selectedCandidate && (
               <AlertDialog>
                 <AlertDialogTrigger
                   render={
-                    <Button className="w-full mt-3" disabled={isConfirming} />
+                    <Button
+                      className="w-full mt-3"
+                      disabled={
+                        isConfirming || impactReportLoading || impactReport === null
+                      }
+                    />
                   }
                 >
                   교체 확정
@@ -102,6 +115,11 @@ export function CandidateListPanel({
                     <AlertDialogDescription>
                       선택한 후보로 시간표를 교체합니다. 이 작업은 즉시
                       저장됩니다.
+                      {impactReport && (
+                        <span className="block mt-2">
+                          영향 리스크: <strong>{impactReport.riskLevel}</strong>
+                        </span>
+                      )}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

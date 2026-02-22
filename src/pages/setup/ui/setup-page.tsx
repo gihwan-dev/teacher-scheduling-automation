@@ -6,6 +6,8 @@ import { SchoolConfigForm } from './school-config-form'
 import { SubjectTable } from './subject-table'
 import { TeacherTable } from './teacher-table'
 import { FixedEventTable } from './fixed-event-table'
+import { AcademicCalendarTable } from './academic-calendar-table'
+import { HourShortageReport } from './hour-shortage-report'
 import { ValidationSummary } from './validation-summary'
 import type { SetupTab } from '@/features/manage-school-setup'
 import { useSetupStore } from '@/features/manage-school-setup'
@@ -92,6 +94,7 @@ export function SetupPage() {
           <TabsTrigger value="subjects">과목 관리</TabsTrigger>
           <TabsTrigger value="teachers">교사 관리</TabsTrigger>
           <TabsTrigger value="fixedEvents">고정 이벤트</TabsTrigger>
+          <TabsTrigger value="academicCalendar">학사일정</TabsTrigger>
         </TabsList>
 
         <TabsContent value="school">
@@ -108,6 +111,11 @@ export function SetupPage() {
 
         <TabsContent value="fixedEvents">
           <FixedEventTable />
+        </TabsContent>
+
+        <TabsContent value="academicCalendar" className="space-y-4">
+          <AcademicCalendarTable />
+          <HourShortageReport />
         </TabsContent>
       </Tabs>
 

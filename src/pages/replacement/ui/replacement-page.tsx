@@ -7,6 +7,7 @@ import { ReplacementPreview } from './replacement-preview'
 import { RelaxationPanel } from './relaxation-panel'
 import { MultiCandidateListPanel } from './multi-candidate-list-panel'
 import { MultiReplacementPreview } from './multi-replacement-preview'
+import { ImpactAnalysisPanel } from './impact-analysis-panel'
 import { useReplacementStore } from '@/features/find-replacement'
 import {
   Select,
@@ -186,6 +187,9 @@ export function ReplacementPage() {
       ) : (
         <ReplacementPreview teachers={teachers} subjects={subjects} />
       )}
+
+      {/* 영향 분석 */}
+      <ImpactAnalysisPanel />
 
       {/* 완화 제안 (단일 모드 전용) */}
       {!isMultiMode && <RelaxationPanel />}

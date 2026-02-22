@@ -30,6 +30,8 @@ export function MultiCandidateListPanel(_props: MultiCandidateListPanelProps) {
   const {
     multiSearchResult,
     selectedMultiCandidate,
+    multiImpactReport,
+    impactReportLoading,
     selectMultiCandidate,
     confirmMultiReplacement,
   } = useReplacementStore()
@@ -80,11 +82,24 @@ export function MultiCandidateListPanel(_props: MultiCandidateListPanelProps) {
               ))}
             </div>
 
+            {selectedMultiCandidate && impactReportLoading && (
+              <p className="text-xs text-muted-foreground mt-3">
+                영향 분석 리포트 생성 중...
+              </p>
+            )}
+
             {selectedMultiCandidate && (
               <AlertDialog>
                 <AlertDialogTrigger
                   render={
-                    <Button className="w-full mt-3" disabled={isConfirming} />
+                    <Button
+                      className="w-full mt-3"
+                      disabled={
+                        isConfirming ||
+                        impactReportLoading ||
+                        multiImpactReport === null
+                      }
+                    />
                   }
                 >
                   다중 교체 확정
@@ -97,6 +112,11 @@ export function MultiCandidateListPanel(_props: MultiCandidateListPanelProps) {
                     <AlertDialogDescription>
                       선택한 {selectedMultiCandidate.sources.length}개 셀의
                       교체를 동시에 적용합니다. 이 작업은 즉시 저장됩니다.
+                      {multiImpactReport && (
+                        <span className="block mt-2">
+                          영향 리스크: <strong>{multiImpactReport.riskLevel}</strong>
+                        </span>
+                      )}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
