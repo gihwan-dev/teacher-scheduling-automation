@@ -92,12 +92,12 @@
 
 ## Phase 8. [SEQUENTIAL] 2차 확장 (후속 릴리스)
 
-- [ ] **시험 모드 및 감독 배정 확장**
+- [x] **시험 모드 및 감독 배정 확장**
   - 목표: 시험 시간표 별도 관리, 감독 중복 방지, 감독 통계 기능을 추가한다.
   - 검증: 시험기간 일반 수업 차단과 시험 모드 전환이 일관되게 동작한다.
   - 검증: 감독 배정 중복이 차단된다.
 
-- [ ] **대강 자동 추천 고도화**
+- [x] **대강 자동 추천 고도화**
   - 목표: 결강 입력 시 공강/과목 적합/누적 공정성을 반영한 대강 추천을 제공한다.
   - 검증: 대강 추천 결과가 우선순위와 근거를 함께 제공한다.
   - 검증: 담임 제외 등 운영 옵션이 반영된다.
@@ -303,3 +303,19 @@
   - 잔여 리스크:
     - Vitest 종료 지연 경고(`Tests closed successfully but something prevents Vite server from exiting`)는 기존과 동일하게 지속됨
   - 다음 미완료 Phase: **Phase 8 (2차 확장: 시험 모드/대강 자동 추천 고도화)**
+- [2026-02-22] Phase 8 세션 요약:
+  - 완료: 시험 모드/감독 배정 + 대강 추천 고도화 전체 구현
+  - 구현 범위:
+    - `Teacher.homeroom` 계약/스키마/UI/URL 인코딩 동기화 및 v8 마이그레이션 기본값(`null`) 반영
+    - IndexedDB v8 저장소 확장(`examModeWeeks`, `examSlots`, `invigilationAssignments`, `substituteAssignments`) 및 repository API 추가
+    - `/exam` 전용 페이지/스토어/자동 감독 배정/충돌 검증/통계/수동 조정/저장 플로우 구현
+    - `/replacement`에 `교체/대강` 모드 분리, 담임 제외 옵션, 최근 4주 공정성 랭킹/근거 노출, 확정 시 대강 로그 + 이력(`SUBSTITUTE_ASSIGN`) 저장
+    - `/generate`, `/edit`, `/replacement` 시험주차 가이드 배너 및 `/exam` 이동 게이트 반영
+    - change-history 액션 확장(`EXAM_MODE_ENABLED`, `INVIGILATION_AUTO_ASSIGN`, `SUBSTITUTE_ASSIGN`) 및 이력 필터 연동
+  - 테스트/검증:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit`: 통과 (47 files, 346 tests)
+  - 잔여 리스크:
+    - Vitest 종료 지연 경고는 기존과 동일하게 지속되며 기능 검증 자체는 통과
+- 모든 마일스톤 완료: Phase 1~8 체크리스트가 모두 `[x]` 상태로 마감됨.

@@ -11,6 +11,10 @@ import {
 } from '../lib/apply-replacement-scope'
 import { findReplacementCandidates } from '../lib/replacement-finder'
 import { findMultiReplacementCandidates } from '../lib/multi-replacement-finder'
+import {
+  buildSubstituteLoadByTeacher,
+  findSubstituteCandidates,
+} from '../lib/substitute-finder'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
@@ -30,13 +34,14 @@ import type {
   ReplacementApplyScopeState,
   ReplacementCandidate,
   ReplacementSearchConfig,
+  ReplacementSearchMode,
   ReplacementSearchResult,
   ScopeValidationIssue,
   ScopeValidationSummary,
   ScopedAlternativeCandidate,
 } from './types'
 import type { WeekTag } from '@/shared/lib/week-tag'
-import { buildCellMap } from '@/features/edit-timetable-cell'
+import { buildCellMap, parseCellKey } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
 import { applyScheduleTransaction } from '@/features/apply-schedule-transaction'
 import {
@@ -51,10 +56,18 @@ import {
   loadSnapshotBySelection,
   loadSnapshotWeeks,
   loadSnapshotsByWeek,
+  loadSubstituteAssignmentsByRange,
   loadTeacherPolicies,
+  saveChangeEvents,
   saveImpactAnalysisReport,
+  saveSubstituteAssignments,
 } from '@/shared/persistence/indexeddb/repository'
-import { compareWeekTag, shiftWeekTag } from '@/shared/lib/week-tag'
+import {
+  compareWeekTag,
+  getIsoDateForWeekDay,
+  shiftWeekTag,
+} from '@/shared/lib/week-tag'
+import { generateId } from '@/shared/lib/id'
 
 interface PreparedScopeSave {
   weekTag: WeekTag
@@ -118,6 +131,8 @@ interface ReplacementState {
   selectCandidate: (candidate: ReplacementCandidate | null) => void
   confirmReplacement: () => Promise<boolean>
   updateSearchConfig: (config: Partial<ReplacementSearchConfig>) => void
+  setSearchMode: (mode: ReplacementSearchMode) => void
+  toggleExcludeHomeroomTeachers: () => void
 
   // 범위 적용 액션
   setApplyScopeType: (type: ReplacementApplyScopeState['type']) => void
@@ -414,6 +429,92 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
     return true
   }
 
+  const persistSubstituteAssignmentLogs = async (input: {
+    selectedCandidate: ReplacementCandidate
+    prepared: Array<PreparedScopeSave>
+    searchMode: ReplacementSearchMode
+  }): Promise<void> => {
+    if (input.searchMode !== 'SUBSTITUTE') {
+      return
+    }
+
+    const source = parseCellKey(input.selectedCandidate.sourceCellKey)
+    const timestamp = new Date().toISOString()
+
+    const records = input.prepared
+      .map((item) => {
+        const beforeCell = item.sourceSnapshot.cells.find(
+          (cell) =>
+            cell.grade === source.grade &&
+            cell.classNumber === source.classNumber &&
+            cell.day === source.day &&
+            cell.period === source.period,
+        )
+        const afterCell = item.nextCells.find(
+          (cell) =>
+            cell.grade === source.grade &&
+            cell.classNumber === source.classNumber &&
+            cell.day === source.day &&
+            cell.period === source.period,
+        )
+
+        if (!beforeCell || !afterCell) {
+          return null
+        }
+
+        if (beforeCell.teacherId === afterCell.teacherId) {
+          return null
+        }
+
+        return {
+          id: generateId(),
+          snapshotId: item.sourceSnapshot.id,
+          weekTag: item.weekTag,
+          date: getIsoDateForWeekDay(item.weekTag, source.day),
+          day: source.day,
+          period: source.period,
+          grade: source.grade,
+          classNumber: source.classNumber,
+          subjectId: beforeCell.subjectId,
+          absentTeacherId: beforeCell.teacherId,
+          substituteTeacherId: afterCell.teacherId,
+          source: 'REPLACEMENT' as const,
+          reason: '대강 모드 확정',
+          createdAt: timestamp,
+        }
+      })
+      .filter((record): record is NonNullable<typeof record> => record !== null)
+
+    if (records.length > 0) {
+      await saveSubstituteAssignments(records)
+      await saveChangeEvents(
+        records.map((record, index) => ({
+          id: generateId(),
+          snapshotId: record.snapshotId,
+          weekTag: record.weekTag,
+          actionType: 'SUBSTITUTE_ASSIGN',
+          actor: 'LOCAL_OPERATOR',
+          cellKey: input.selectedCandidate.sourceCellKey,
+          before: null,
+          after: null,
+          beforePayload: {
+            absentTeacherId: record.absentTeacherId,
+          },
+          afterPayload: {
+            substituteTeacherId: record.substituteTeacherId,
+            date: record.date,
+            period: record.period,
+          },
+          impactSummary: '대강 배정 확정',
+          conflictDetected: false,
+          rollbackRef: null,
+          timestamp: Date.now() + index,
+          isUndone: false,
+        })),
+      )
+    }
+  }
+
   return {
     snapshot: null,
     cells: [],
@@ -432,6 +533,9 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
       scope: 'SAME_CLASS',
       includeViolating: false,
       maxCandidates: 20,
+      searchMode: 'REPLACEMENT',
+      excludeHomeroomTeachers: false,
+      fairnessWindowWeeks: 4,
     },
     searchResult: null,
     selectedCandidate: null,
@@ -635,7 +739,7 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
         activeDays: schoolConfig.activeDays,
       })
 
-      const result = findReplacementCandidates(targetCellKey, sourceCell, cells, searchConfig, {
+      const finderContext = {
         schoolConfig,
         constraintPolicy,
         teacherPolicies,
@@ -644,16 +748,64 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
         subjects,
         weekTag: snapshot.weekTag,
         academicCalendarEvents: weekEvents,
-      })
+      }
 
-      set({
-        searchResult: result,
-        selectedCandidate: null,
-        impactReport: null,
-        impactReportLoading: false,
-        isSearching: false,
-        ...clearScopeSummaryState(),
-      })
+      void (async () => {
+        if (searchConfig.searchMode === 'SUBSTITUTE') {
+          const fromWeek = shiftWeekTag(
+            snapshot.weekTag,
+            -(searchConfig.fairnessWindowWeeks - 1),
+          )
+          const recentSubstituteAssignments = await loadSubstituteAssignmentsByRange({
+            fromWeekTag: fromWeek,
+            toWeekTag: snapshot.weekTag,
+          })
+          const substituteLoadByTeacher = buildSubstituteLoadByTeacher({
+            weekTag: snapshot.weekTag,
+            fairnessWindowWeeks: searchConfig.fairnessWindowWeeks,
+            rows: recentSubstituteAssignments.map((row) => ({
+              weekTag: row.weekTag,
+              substituteTeacherId: row.substituteTeacherId,
+            })),
+          })
+
+          const result = findSubstituteCandidates({
+            sourceCellKey: targetCellKey,
+            sourceCell,
+            allCells: cells,
+            config: searchConfig,
+            ctx: finderContext,
+            substituteLoadByTeacher,
+          })
+
+          set({
+            searchResult: result,
+            selectedCandidate: null,
+            impactReport: null,
+            impactReportLoading: false,
+            isSearching: false,
+            ...clearScopeSummaryState(),
+          })
+          return
+        }
+
+        const result = findReplacementCandidates(
+          targetCellKey,
+          sourceCell,
+          cells,
+          searchConfig,
+          finderContext,
+        )
+
+        set({
+          searchResult: result,
+          selectedCandidate: null,
+          impactReport: null,
+          impactReportLoading: false,
+          isSearching: false,
+          ...clearScopeSummaryState(),
+        })
+      })()
     },
 
     selectCandidate: (candidate) => {
@@ -776,12 +928,22 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
         return false
       }
 
-      return commitScopedChanges({
+      const success = await commitScopedChanges({
         targetWeeks,
         prepared: validated.prepared,
         appliedScope,
         impactAlternatives: impactReport.alternatives,
       })
+
+      if (success) {
+        await persistSubstituteAssignmentLogs({
+          selectedCandidate,
+          prepared: validated.prepared,
+          searchMode: searchConfig.searchMode,
+        })
+      }
+
+      return success
     },
 
     updateSearchConfig: (config) => {
@@ -791,8 +953,46 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
       }))
     },
 
+    setSearchMode: (mode) => {
+      set((state) => ({
+        searchConfig: {
+          ...state.searchConfig,
+          searchMode: mode,
+        },
+        isMultiMode: mode === 'SUBSTITUTE' ? false : state.isMultiMode,
+        multiTargetCellKeys: mode === 'SUBSTITUTE' ? [] : state.multiTargetCellKeys,
+        multiSearchResult: mode === 'SUBSTITUTE' ? null : state.multiSearchResult,
+        selectedMultiCandidate:
+          mode === 'SUBSTITUTE' ? null : state.selectedMultiCandidate,
+        multiImpactReport: mode === 'SUBSTITUTE' ? null : state.multiImpactReport,
+        targetCellKey: null,
+        searchResult: null,
+        selectedCandidate: null,
+        impactReport: null,
+        impactReportLoading: false,
+        ...clearScopeSummaryState(),
+      }))
+    },
+
+    toggleExcludeHomeroomTeachers: () => {
+      set((state) => ({
+        searchConfig: {
+          ...state.searchConfig,
+          excludeHomeroomTeachers: !state.searchConfig.excludeHomeroomTeachers,
+        },
+        searchResult: null,
+        selectedCandidate: null,
+        impactReport: null,
+        impactReportLoading: false,
+        ...clearScopeSummaryState(),
+      }))
+    },
+
     toggleMultiMode: () => {
-      const { isMultiMode } = get()
+      const { isMultiMode, searchConfig } = get()
+      if (searchConfig.searchMode === 'SUBSTITUTE') {
+        return
+      }
       set({
         isMultiMode: !isMultiMode,
         targetCellKey: null,

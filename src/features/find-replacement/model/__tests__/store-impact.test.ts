@@ -20,8 +20,11 @@ vi.mock('@/shared/persistence/indexeddb/repository', () => ({
   loadSnapshotBySelection: vi.fn(),
   loadSnapshotWeeks: vi.fn(),
   loadSnapshotsByWeek: vi.fn(),
+  loadSubstituteAssignmentsByRange: vi.fn(),
   loadTeacherPolicies: vi.fn(),
+  saveChangeEvents: vi.fn(),
   saveImpactAnalysisReport: vi.fn(),
+  saveSubstituteAssignments: vi.fn(),
 }))
 
 vi.mock('@/features/apply-schedule-transaction', () => ({
@@ -86,6 +89,8 @@ const candidate: ReplacementCandidate = {
     scoreDelta: 0.2,
     similarityScore: 99,
     idleMinimizationScore: 99,
+    fairnessScore: 100,
+    candidateReasons: [],
     totalRank: 10,
   },
 }
@@ -171,6 +176,7 @@ describe('replacement store impact integration', () => {
           name: '김교사',
           subjectIds: ['s-1'],
           baseHoursPerWeek: 10,
+          homeroom: null,
           classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 10 }],
           createdAt: '2026-02-22T00:00:00.000Z',
           updatedAt: '2026-02-22T00:00:00.000Z',
@@ -260,6 +266,7 @@ describe('replacement store impact integration', () => {
           name: '김교사',
           subjectIds: ['s-1'],
           baseHoursPerWeek: 10,
+          homeroom: null,
           classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 10 }],
           createdAt: '2026-02-22T00:00:00.000Z',
           updatedAt: '2026-02-22T00:00:00.000Z',

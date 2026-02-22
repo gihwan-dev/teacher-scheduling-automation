@@ -15,6 +15,7 @@ import { Route as ReplacementRouteImport } from './routes/replacement'
 import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as GenerateRouteImport } from './routes/generate'
+import { Route as ExamRouteImport } from './routes/exam'
 import { Route as EditRouteImport } from './routes/edit'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -48,6 +49,11 @@ const GenerateRoute = GenerateRouteImport.update({
   path: '/generate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExamRoute = ExamRouteImport.update({
+  id: '/exam',
+  path: '/exam',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EditRoute = EditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -62,6 +68,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/edit': typeof EditRoute
+  '/exam': typeof ExamRoute
   '/generate': typeof GenerateRoute
   '/history': typeof HistoryRoute
   '/policy': typeof PolicyRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/edit': typeof EditRoute
+  '/exam': typeof ExamRoute
   '/generate': typeof GenerateRoute
   '/history': typeof HistoryRoute
   '/policy': typeof PolicyRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/edit': typeof EditRoute
+  '/exam': typeof ExamRoute
   '/generate': typeof GenerateRoute
   '/history': typeof HistoryRoute
   '/policy': typeof PolicyRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/edit'
+    | '/exam'
     | '/generate'
     | '/history'
     | '/policy'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/edit'
+    | '/exam'
     | '/generate'
     | '/history'
     | '/policy'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/edit'
+    | '/exam'
     | '/generate'
     | '/history'
     | '/policy'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EditRoute: typeof EditRoute
+  ExamRoute: typeof ExamRoute
   GenerateRoute: typeof GenerateRoute
   HistoryRoute: typeof HistoryRoute
   PolicyRoute: typeof PolicyRoute
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GenerateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/exam': {
+      id: '/exam'
+      path: '/exam'
+      fullPath: '/exam'
+      preLoaderRoute: typeof ExamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/edit': {
       id: '/edit'
       path: '/edit'
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EditRoute: EditRoute,
+  ExamRoute: ExamRoute,
   GenerateRoute: GenerateRoute,
   HistoryRoute: HistoryRoute,
   PolicyRoute: PolicyRoute,

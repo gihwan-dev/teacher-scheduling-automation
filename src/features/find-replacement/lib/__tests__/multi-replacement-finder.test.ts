@@ -60,6 +60,9 @@ const defaultConfig: ReplacementSearchConfig = {
   scope: 'SAME_CLASS',
   includeViolating: false,
   maxCandidates: 20,
+  searchMode: 'REPLACEMENT',
+  excludeHomeroomTeachers: false,
+  fairnessWindowWeeks: 4,
 }
 
 const defaultTeachers: Array<Teacher> = [
@@ -68,6 +71,7 @@ const defaultTeachers: Array<Teacher> = [
     name: '교사1',
     subjectIds: ['S1'],
     baseHoursPerWeek: 2,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -77,6 +81,7 @@ const defaultTeachers: Array<Teacher> = [
     name: '교사2',
     subjectIds: ['S2'],
     baseHoursPerWeek: 2,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',

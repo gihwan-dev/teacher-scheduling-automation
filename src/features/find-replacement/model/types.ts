@@ -3,7 +3,8 @@ import type { CellKey, TimetableCell } from '@/entities/timetable'
 import type { ImpactRiskLevel } from '@/entities/impact-analysis'
 import type { WeekTag } from '@/shared/lib/week-tag'
 
-export type ReplacementType = 'SWAP' | 'MOVE'
+export type ReplacementType = 'SWAP' | 'MOVE' | 'SUBSTITUTE'
+export type ReplacementSearchMode = 'REPLACEMENT' | 'SUBSTITUTE'
 
 export interface ReplacementCandidate {
   id: string
@@ -14,6 +15,7 @@ export interface ReplacementCandidate {
   targetCell: TimetableCell | null // SWAP=셀, MOVE=null
   resultSourceCell: TimetableCell | null // SWAP=상대셀이 이동, MOVE=null(빈)
   resultTargetCell: TimetableCell // 소스셀이 이동한 결과
+  substituteTeacherId?: string
   ranking: CandidateRanking
 }
 
@@ -23,6 +25,8 @@ export interface CandidateRanking {
   scoreDelta: number
   similarityScore: number
   idleMinimizationScore: number
+  fairnessScore: number
+  candidateReasons: Array<string>
   totalRank: number
 }
 
@@ -30,6 +34,9 @@ export interface ReplacementSearchConfig {
   scope: 'SAME_CLASS'
   includeViolating: boolean
   maxCandidates: number
+  searchMode: ReplacementSearchMode
+  excludeHomeroomTeachers: boolean
+  fairnessWindowWeeks: number
 }
 
 export interface ReplacementSearchResult {

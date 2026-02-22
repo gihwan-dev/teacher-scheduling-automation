@@ -433,6 +433,9 @@ function simulateRelaxations(
     scope: 'SAME_CLASS',
     includeViolating: false,
     maxCandidates: 5,
+    searchMode: 'REPLACEMENT',
+    excludeHomeroomTeachers: false,
+    fairnessWindowWeeks: 4,
   }
 
   // 1. teacherMaxDailyHours + 1

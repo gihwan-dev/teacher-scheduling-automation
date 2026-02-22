@@ -100,6 +100,7 @@ export async function seedSampleData(): Promise<void> {
       name: td.name,
       subjectIds: [subjects[td.subjectIndex].id],
       baseHoursPerWeek: hours * classes.length,
+      homeroom: null,
       classAssignments: classes.map((c) => ({
         grade: c.grade,
         classNumber: c.classNumber,

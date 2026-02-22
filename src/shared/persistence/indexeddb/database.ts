@@ -11,6 +11,12 @@ import type { ChangeEvent } from '@/entities/change-history'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { ScheduleTransaction } from '@/entities/schedule-transaction'
+import type {
+  ExamModeWeekState,
+  ExamSlot,
+  InvigilationAssignment,
+} from '@/entities/exam-mode'
+import type { SubstituteAssignment } from '@/entities/substitute-assignment'
 import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
 
 export interface SetupSnapshot {
@@ -37,6 +43,10 @@ class SchedulingDatabase extends Dexie {
   academicCalendarEvents!: EntityTable<AcademicCalendarEvent, 'id'>
   impactAnalysisReports!: EntityTable<ImpactAnalysisReport, 'id'>
   scheduleTransactions!: EntityTable<ScheduleTransaction, 'draftId'>
+  examModeWeeks!: EntityTable<ExamModeWeekState, 'weekTag'>
+  examSlots!: EntityTable<ExamSlot, 'id'>
+  invigilationAssignments!: EntityTable<InvigilationAssignment, 'id'>
+  substituteAssignments!: EntityTable<SubstituteAssignment, 'id'>
 
   constructor() {
     super('SchedulingAutomation')
@@ -136,6 +146,36 @@ class SchedulingDatabase extends Dexie {
       scheduleTransactions: 'draftId, status, updatedAt, *targetWeeks',
       impactAnalysisReports: 'id, snapshotId, weekTag, riskLevel, createdAt',
     })
+    this.version(8)
+      .stores({
+        schoolConfigs: 'id, updatedAt',
+        subjects: 'id, name',
+        teachers: 'id, name',
+        fixedEvents: 'id, type, teacherId',
+        setupSnapshots: 'id, name, updatedAt',
+        timetableSnapshots:
+          'id, schoolConfigId, weekTag, versionNo, [weekTag+versionNo], createdAt',
+        constraintPolicies: 'id, updatedAt',
+        teacherPolicies: 'id, teacherId, updatedAt',
+        changeEvents: 'id, snapshotId, weekTag, actionType, timestamp',
+        academicCalendarEvents:
+          'id, eventType, startDate, endDate, scopeType, scopeValue',
+        scheduleTransactions: 'draftId, status, updatedAt, *targetWeeks',
+        impactAnalysisReports: 'id, snapshotId, weekTag, riskLevel, createdAt',
+        examModeWeeks: 'weekTag, isEnabled, updatedAt',
+        examSlots: 'id, weekTag, date, [weekTag+day+period]',
+        invigilationAssignments: 'id, weekTag, slotId, teacherId, status',
+        substituteAssignments:
+          'id, weekTag, date, absentTeacherId, substituteTeacherId',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('teachers')
+          .toCollection()
+          .modify((teacher: LegacyTeacher) => {
+            applyV8TeacherDefaults(teacher)
+          })
+      })
   }
 }
 
@@ -176,6 +216,11 @@ type LegacyChangeEvent = Omit<
 
 export type V6SnapshotMigrationRecord = LegacyTimetableSnapshot
 export type V6ChangeEventMigrationRecord = LegacyChangeEvent
+export type LegacyHomeroom = { grade: number; classNumber: number } | null
+type LegacyTeacher = Omit<Teacher, 'homeroom'> & {
+  homeroom?: LegacyHomeroom
+}
+export type V8TeacherMigrationRecord = LegacyTeacher
 
 export function applyV6SnapshotDefaults(snapshot: LegacyTimetableSnapshot): void {
   const weekTag = snapshot.weekTag ?? computeWeekTagFromIso(snapshot.createdAt)
@@ -207,4 +252,8 @@ export function applyV6ChangeEventDefaults(event: LegacyChangeEvent): void {
   event.impactSummary = event.impactSummary ?? null
   event.conflictDetected = event.conflictDetected ?? false
   event.rollbackRef = event.rollbackRef ?? null
+}
+
+export function applyV8TeacherDefaults(teacher: LegacyTeacher): void {
+  teacher.homeroom = teacher.homeroom ?? null
 }

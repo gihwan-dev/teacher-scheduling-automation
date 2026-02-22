@@ -26,6 +26,9 @@ const ACTION_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'RECOMPUTE', label: '재계산' },
   { value: 'VERSION_CLONE', label: '버전 복제' },
   { value: 'VERSION_RESTORE', label: '버전 복원' },
+  { value: 'EXAM_MODE_ENABLED', label: '시험 모드 시작' },
+  { value: 'INVIGILATION_AUTO_ASSIGN', label: '감독 자동 배정' },
+  { value: 'SUBSTITUTE_ASSIGN', label: '대강 확정' },
   { value: 'TRANSACTION_COMMIT', label: '트랜잭션 확정' },
   { value: 'TRANSACTION_ROLLBACK', label: '트랜잭션 롤백' },
 ]

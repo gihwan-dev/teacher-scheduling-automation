@@ -19,6 +19,12 @@ import type {
   ScheduleTransaction,
   ValidationViolation,
 } from '@/entities/schedule-transaction'
+import type {
+  ExamModeWeekState,
+  ExamSlot,
+  InvigilationAssignment,
+} from '@/entities/exam-mode'
+import type { SubstituteAssignment } from '@/entities/substitute-assignment'
 import { transitionScheduleTransactionStatus } from '@/entities/schedule-transaction'
 import { generateId } from '@/shared/lib/id'
 
@@ -397,6 +403,88 @@ export async function loadAcademicCalendarEvents(): Promise<
     }
     return a.startDate.localeCompare(b.startDate)
   })
+}
+
+// Exam mode
+export async function saveExamModeWeekState(
+  state: ExamModeWeekState,
+): Promise<void> {
+  await db.examModeWeeks.put(state)
+}
+
+export async function loadExamModeWeekState(
+  weekTag: WeekTag,
+): Promise<ExamModeWeekState | undefined> {
+  return db.examModeWeeks.get(weekTag)
+}
+
+export async function loadExamModeWeeks(): Promise<Array<ExamModeWeekState>> {
+  return db.examModeWeeks.orderBy('weekTag').toArray()
+}
+
+export async function saveExamSlots(
+  weekTag: WeekTag,
+  slots: Array<ExamSlot>,
+): Promise<void> {
+  await db.transaction('rw', db.examSlots, async () => {
+    await db.examSlots.where('weekTag').equals(weekTag).delete()
+    if (slots.length > 0) {
+      await db.examSlots.bulkPut(slots)
+    }
+  })
+}
+
+export async function loadExamSlotsByWeek(
+  weekTag: WeekTag,
+): Promise<Array<ExamSlot>> {
+  return db.examSlots
+    .where('weekTag')
+    .equals(weekTag)
+    .sortBy('[weekTag+day+period]')
+}
+
+export async function saveInvigilationAssignments(
+  weekTag: WeekTag,
+  assignments: Array<InvigilationAssignment>,
+): Promise<void> {
+  await db.transaction('rw', db.invigilationAssignments, async () => {
+    await db.invigilationAssignments.where('weekTag').equals(weekTag).delete()
+    if (assignments.length > 0) {
+      await db.invigilationAssignments.bulkPut(assignments)
+    }
+  })
+}
+
+export async function loadInvigilationAssignmentsByWeek(
+  weekTag: WeekTag,
+): Promise<Array<InvigilationAssignment>> {
+  return db.invigilationAssignments.where('weekTag').equals(weekTag).toArray()
+}
+
+// Substitute assignments
+export async function saveSubstituteAssignments(
+  assignments: Array<SubstituteAssignment>,
+): Promise<void> {
+  if (assignments.length === 0) {
+    return
+  }
+  await db.substituteAssignments.bulkPut(assignments)
+}
+
+export async function loadSubstituteAssignmentsByRange(input: {
+  fromWeekTag: WeekTag
+  toWeekTag: WeekTag
+}): Promise<Array<SubstituteAssignment>> {
+  return db.substituteAssignments
+    .where('weekTag')
+    .between(input.fromWeekTag, input.toWeekTag, true, true)
+    .toArray()
+}
+
+export async function loadSubstituteAssignmentsByWeek(
+  weekTag: WeekTag,
+): Promise<Array<SubstituteAssignment>> {
+  return db.substituteAssignments.where('weekTag').equals(weekTag).toArray()
 }
 
 // ScheduleTransactions

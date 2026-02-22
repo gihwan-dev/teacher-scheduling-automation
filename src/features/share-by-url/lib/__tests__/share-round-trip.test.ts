@@ -53,6 +53,7 @@ const teachers: Array<Teacher> = [
     name: '김교사',
     subjectIds: ['sub-1', 'sub-3'],
     baseHoursPerWeek: 20,
+    homeroom: null,
     classAssignments: [
       { grade: 1, classNumber: 1, hoursPerWeek: 5 },
       { grade: 1, classNumber: 2, hoursPerWeek: 3 },
@@ -65,6 +66,7 @@ const teachers: Array<Teacher> = [
     name: '이교사',
     subjectIds: ['sub-2'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [{ grade: 2, classNumber: 1, hoursPerWeek: 4 }],
     createdAt: '',
     updatedAt: '',

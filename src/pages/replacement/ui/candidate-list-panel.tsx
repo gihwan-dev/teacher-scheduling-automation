@@ -256,7 +256,11 @@ function CandidateRow({
         variant={candidate.type === 'SWAP' ? 'default' : 'secondary'}
         className="shrink-0 text-[10px]"
       >
-        {candidate.type === 'SWAP' ? '교환' : '이동'}
+        {candidate.type === 'SWAP'
+          ? '교환'
+          : candidate.type === 'SUBSTITUTE'
+            ? '대강'
+            : '이동'}
       </Badge>
       <span className="flex-1 truncate">
         {DAY_LABELS[target.day]} {target.period}교시
@@ -279,6 +283,11 @@ function CandidateRow({
         <Badge variant="destructive" className="text-[10px] shrink-0">
           {candidate.ranking.violationCount}
         </Badge>
+      )}
+      {candidate.ranking.candidateReasons.length > 0 && (
+        <span className="text-[10px] text-muted-foreground ml-1">
+          {candidate.ranking.candidateReasons.join(' · ')}
+        </span>
       )}
     </button>
   )

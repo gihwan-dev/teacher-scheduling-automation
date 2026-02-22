@@ -47,6 +47,7 @@ const teachers: Array<Teacher> = [
     name: '교사1',
     subjectIds: ['S1'],
     baseHoursPerWeek: 2,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -56,6 +57,7 @@ const teachers: Array<Teacher> = [
     name: '교사2',
     subjectIds: ['S2'],
     baseHoursPerWeek: 2,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -65,6 +67,7 @@ const teachers: Array<Teacher> = [
     name: '교사3',
     subjectIds: ['S3'],
     baseHoursPerWeek: 2,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -74,6 +77,7 @@ const teachers: Array<Teacher> = [
     name: '교사4',
     subjectIds: ['S4'],
     baseHoursPerWeek: 2,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -245,6 +249,9 @@ describe('rankCandidate', () => {
       scope: 'SAME_CLASS' as const,
       includeViolating: false,
       maxCandidates: 3,
+      searchMode: 'REPLACEMENT' as const,
+      excludeHomeroomTeachers: false,
+      fairnessWindowWeeks: 4,
     }
     const ctx = {
       schoolConfig: {

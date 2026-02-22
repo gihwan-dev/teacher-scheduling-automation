@@ -1,5 +1,6 @@
 import { findMultiReplacementCandidates } from './multi-replacement-finder'
 import { findReplacementCandidates } from './replacement-finder'
+import { findSubstituteCandidates } from './substitute-finder'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
@@ -189,6 +190,23 @@ export function applySingleCandidateToWeekCells(input: {
     }
   }
 
+  if (selectedCandidate.type === 'SUBSTITUTE') {
+    const sourcePos = parseCellKey(selectedCandidate.sourceCellKey)
+    return {
+      ok: true,
+      cells: cells.map((cell) => {
+        if (!isSameCellPosition(cell, sourcePos)) {
+          return cell
+        }
+        return {
+          ...cell,
+          teacherId: selectedCandidate.resultTargetCell.teacherId,
+          status: 'TEMP_MODIFIED',
+        }
+      }),
+    }
+  }
+
   if (selectedCandidate.type === 'SWAP') {
     const targetCell = getCellByKey(cells, selectedCandidate.targetCellKey)
     if (!targetCell) {
@@ -339,16 +357,29 @@ export function buildScopedSingleAlternatives(input: {
     context: input.context,
   })
 
-  const result = findReplacementCandidates(
-    input.selectedCandidate.sourceCellKey,
-    sourceCell,
-    input.cells,
-    {
-      ...input.context.searchConfig,
-      maxCandidates: 3,
-    },
-    finderContext,
-  )
+  const result =
+    input.context.searchConfig.searchMode === 'SUBSTITUTE'
+      ? findSubstituteCandidates({
+          sourceCellKey: input.selectedCandidate.sourceCellKey,
+          sourceCell,
+          allCells: input.cells,
+          config: {
+            ...input.context.searchConfig,
+            maxCandidates: 3,
+          },
+          ctx: finderContext,
+          substituteLoadByTeacher: new Map(),
+        })
+      : findReplacementCandidates(
+          input.selectedCandidate.sourceCellKey,
+          sourceCell,
+          input.cells,
+          {
+            ...input.context.searchConfig,
+            maxCandidates: 3,
+          },
+          finderContext,
+        )
 
   const alternatives = result.candidates.slice(0, 3)
 
@@ -482,7 +513,12 @@ function isSameCellPosition(
 
 function toSingleAlternativeLabel(candidate: ReplacementCandidate): string {
   const target = parseCellKey(candidate.targetCellKey)
-  const typeLabel = candidate.type === 'SWAP' ? '교환' : '이동'
+  const typeLabel =
+    candidate.type === 'SWAP'
+      ? '교환'
+      : candidate.type === 'SUBSTITUTE'
+        ? '대강'
+        : '이동'
   return `${DAY_LABELS[target.day]} ${target.period}교시 ${typeLabel}`
 }
 

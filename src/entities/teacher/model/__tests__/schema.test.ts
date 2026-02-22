@@ -7,6 +7,7 @@ describe('teacherSchema', () => {
     name: '김교사',
     subjectIds: ['sub-1'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [
       { grade: 1, classNumber: 1, hoursPerWeek: 3 },
       { grade: 1, classNumber: 2, hoursPerWeek: 3 },
@@ -35,6 +36,21 @@ describe('teacherSchema', () => {
     expect(
       teacherSchema.safeParse({ ...validTeacher, classAssignments: [] })
         .success,
+    ).toBe(true)
+  })
+
+  it('homeroom이 null이면 통과한다', () => {
+    expect(
+      teacherSchema.safeParse({ ...validTeacher, homeroom: null }).success,
+    ).toBe(true)
+  })
+
+  it('homeroom 형식이 올바르면 통과한다', () => {
+    expect(
+      teacherSchema.safeParse({
+        ...validTeacher,
+        homeroom: { grade: 1, classNumber: 1 },
+      }).success,
     ).toBe(true)
   })
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { EditableTimetableGrid } from './editable-timetable-grid'
 import { EditToolbar } from './edit-toolbar'
@@ -18,9 +18,12 @@ import {
 import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useUnsavedWarning } from '@/shared/lib/hooks/use-unsaved-warning'
+import { Button } from '@/components/ui/button'
+import { loadAcademicCalendarEventsByRange } from '@/shared/persistence/indexeddb/repository'
 import {
   buildForwardWeekWindow,
   computeWeekTagFromTimestamp,
+  getWeekDateRange,
 } from '@/shared/lib/week-tag'
 
 export function EditPage() {
@@ -41,6 +44,7 @@ export function EditPage() {
     loadSnapshot,
     setViewTarget,
   } = useEditStore()
+  const [isExamWeek, setIsExamWeek] = useState(false)
 
   const weekOptions = useMemo(() => {
     const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
@@ -100,6 +104,22 @@ export function EditPage() {
       })
     }
   }, [navigate, search.version, search.week, snapshot])
+
+  useEffect(() => {
+    if (!snapshot || !schoolConfig) {
+      setIsExamWeek(false)
+      return
+    }
+
+    void (async () => {
+      const { startDate, endDate } = getWeekDateRange(
+        snapshot.weekTag,
+        schoolConfig.activeDays,
+      )
+      const events = await loadAcademicCalendarEventsByRange(startDate, endDate)
+      setIsExamWeek(events.some((event) => event.eventType === 'EXAM_PERIOD'))
+    })()
+  }, [schoolConfig, snapshot])
 
   useUnsavedWarning(isDirty)
 
@@ -181,6 +201,30 @@ export function EditPage() {
           <EditToolbar />
         </div>
       </div>
+
+      {isExamWeek && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <p className="font-medium text-destructive">
+            시험주차 감지: 일반 수업 편집은 HC-04 규칙으로 차단됩니다.
+          </p>
+          <p className="text-muted-foreground mt-1">
+            시험 시간표/감독 배정은 `시험` 페이지에서 진행해 주세요.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2"
+            onClick={() =>
+              navigate({
+                to: '/exam',
+                search: () => ({ week: snapshot.weekTag }),
+              })
+            }
+          >
+            시험 페이지로 이동
+          </Button>
+        </div>
+      )}
 
       {/* 학년/반 선택 + 단축키 */}
       <div className="flex items-center justify-between flex-wrap gap-4">

@@ -16,8 +16,9 @@ const NAV_ITEMS: Array<NavItem> = [
   { to: '/generate', label: '생성', step: 3, isDone: (s) => s.generateDone },
   { to: '/edit', label: '편집', step: 4, isDone: (s) => s.generateDone },
   { to: '/replacement', label: '교체', step: 5, isDone: (s) => s.generateDone },
-  { to: '/history', label: '이력', step: 6, isDone: (s) => s.generateDone },
-  { to: '/share', label: '공유', step: 7, isDone: () => true },
+  { to: '/exam', label: '시험', step: 6, isDone: (s) => s.generateDone },
+  { to: '/history', label: '이력', step: 7, isDone: (s) => s.generateDone },
+  { to: '/share', label: '공유', step: 8, isDone: () => true },
 ]
 
 export function NavProgress() {

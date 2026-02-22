@@ -32,6 +32,9 @@ describe('changeActionTypeSchema', () => {
       'RECOMPUTE',
       'VERSION_CLONE',
       'VERSION_RESTORE',
+      'EXAM_MODE_ENABLED',
+      'INVIGILATION_AUTO_ASSIGN',
+      'SUBSTITUTE_ASSIGN',
       'TRANSACTION_COMMIT',
       'TRANSACTION_ROLLBACK',
     ]) {

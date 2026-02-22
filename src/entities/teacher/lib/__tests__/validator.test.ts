@@ -16,6 +16,7 @@ function makeTeacher(overrides: Partial<Teacher> = {}): Teacher {
     name: '김교사',
     subjectIds: ['sub-1'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [],
     createdAt: ts,
     updatedAt: ts,
@@ -40,6 +41,7 @@ describe('validateHoursConsistency', () => {
   it('배정 합계와 기준 시수가 같으면 valid', () => {
     const teacher = makeTeacher({
       baseHoursPerWeek: 6,
+      homeroom: null,
       classAssignments: [
         { grade: 1, classNumber: 1, hoursPerWeek: 3 },
         { grade: 1, classNumber: 2, hoursPerWeek: 3 },
@@ -54,6 +56,7 @@ describe('validateHoursConsistency', () => {
   it('배정 합계와 기준 시수가 다르면 invalid', () => {
     const teacher = makeTeacher({
       baseHoursPerWeek: 18,
+      homeroom: null,
       classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
     })
     const result = validateHoursConsistency(teacher)

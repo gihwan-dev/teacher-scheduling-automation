@@ -7,9 +7,12 @@ import {
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadChangeEventsByWeek,
+  loadExamModeWeekState,
+  loadExamSlotsByWeek,
   loadFixedEvents,
   loadImpactAnalysisReport,
   loadImpactAnalysisReportsBySnapshot,
+  loadInvigilationAssignmentsByWeek,
   loadLatestSnapshotByWeek,
   loadScheduleTransaction,
   loadSchoolConfig,
@@ -18,17 +21,23 @@ import {
   loadSnapshotWeeks,
   loadSnapshotsByWeek,
   loadSubjects,
+  loadSubstituteAssignmentsByRange,
+  loadSubstituteAssignmentsByWeek,
   loadTeachers,
   rollbackScheduleTransaction,
   saveAcademicCalendarEvents,
   saveAllSetupData,
   saveChangeEvent,
+  saveExamModeWeekState,
+  saveExamSlots,
   saveFixedEvents,
   saveImpactAnalysisReport,
+  saveInvigilationAssignments,
   saveNextSnapshotVersion,
   saveScheduleTransaction,
   saveSchoolConfig,
   saveSubjects,
+  saveSubstituteAssignments,
   saveTeachers,
   saveTimetableSnapshot,
   updateScheduleTransaction,
@@ -40,6 +49,12 @@ import type { ScheduleTransaction } from '@/entities/schedule-transaction'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
+import type {
+  ExamModeWeekState,
+  ExamSlot,
+  InvigilationAssignment,
+} from '@/entities/exam-mode'
+import type { SubstituteAssignment } from '@/entities/substitute-assignment'
 import type { TimetableSnapshot } from '@/entities/timetable'
 
 const ts = '2024-01-01T00:00:00.000Z'
@@ -79,6 +94,7 @@ const sampleTeachers: Array<Teacher> = [
     name: '김교사',
     subjectIds: ['sub-1'],
     baseHoursPerWeek: 18,
+    homeroom: null,
     classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
     createdAt: ts,
     updatedAt: ts,
@@ -187,6 +203,79 @@ const sampleImpactReport: ImpactAnalysisReport = {
   createdAt: ts,
 }
 
+const sampleExamModeState: ExamModeWeekState = {
+  weekTag: '2026-W08',
+  isEnabled: true,
+  enabledAt: ts,
+  enabledBy: 'LOCAL_OPERATOR',
+  createdAt: ts,
+  updatedAt: ts,
+}
+
+const sampleExamSlots: Array<ExamSlot> = [
+  {
+    id: 'exam-slot-1',
+    weekTag: '2026-W08',
+    date: '2026-02-23',
+    day: 'MON',
+    period: 1,
+    grade: 1,
+    classNumber: 1,
+    subjectId: 'sub-1',
+    subjectName: '수학',
+    durationMinutes: 50,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+]
+
+const sampleInvigilationAssignments: Array<InvigilationAssignment> = [
+  {
+    id: 'invigilation-1',
+    weekTag: '2026-W08',
+    slotId: 'exam-slot-1',
+    teacherId: 'teacher-1',
+    status: 'ASSIGNED',
+    isManual: false,
+    reason: null,
+    createdAt: ts,
+    updatedAt: ts,
+  },
+]
+
+const sampleSubstituteAssignments: Array<SubstituteAssignment> = [
+  {
+    id: 'substitute-1',
+    weekTag: '2026-W07',
+    date: '2026-02-16',
+    day: 'MON',
+    period: 2,
+    grade: 1,
+    classNumber: 1,
+    subjectId: 'sub-1',
+    absentTeacherId: 'teacher-1',
+    substituteTeacherId: 'teacher-2',
+    source: 'REPLACEMENT',
+    reason: '대강 테스트',
+    createdAt: ts,
+  },
+  {
+    id: 'substitute-2',
+    weekTag: '2026-W08',
+    date: '2026-02-23',
+    day: 'MON',
+    period: 3,
+    grade: 1,
+    classNumber: 1,
+    subjectId: 'sub-1',
+    absentTeacherId: 'teacher-1',
+    substituteTeacherId: 'teacher-3',
+    source: 'REPLACEMENT',
+    reason: '대강 테스트',
+    createdAt: ts,
+  },
+]
+
 const sampleChangedCells = [
   {
     teacherId: 'teacher-1',
@@ -211,6 +300,10 @@ beforeEach(async () => {
   await db.academicCalendarEvents.clear()
   await db.scheduleTransactions.clear()
   await db.impactAnalysisReports.clear()
+  await db.examModeWeeks.clear()
+  await db.examSlots.clear()
+  await db.invigilationAssignments.clear()
+  await db.substituteAssignments.clear()
 })
 
 describe('SchoolConfig persistence', () => {
@@ -421,6 +514,48 @@ describe('AcademicCalendarEvents persistence', () => {
 
     const events = await loadAcademicCalendarEvents()
     expect(events.map((event) => event.id)).toEqual(['ac-1', 'ac-2'])
+  })
+})
+
+describe('Exam mode persistence', () => {
+  it('시험 모드 주차 상태를 저장/조회한다', async () => {
+    await saveExamModeWeekState(sampleExamModeState)
+
+    const loaded = await loadExamModeWeekState('2026-W08')
+    expect(loaded).toEqual(sampleExamModeState)
+  })
+
+  it('시험 슬롯과 감독 배정을 주차별로 저장/조회한다', async () => {
+    await saveExamSlots('2026-W08', sampleExamSlots)
+    await saveInvigilationAssignments('2026-W08', sampleInvigilationAssignments)
+
+    const loadedSlots = await loadExamSlotsByWeek('2026-W08')
+    const loadedAssignments = await loadInvigilationAssignmentsByWeek('2026-W08')
+
+    expect(loadedSlots).toEqual(sampleExamSlots)
+    expect(loadedAssignments).toEqual(sampleInvigilationAssignments)
+  })
+})
+
+describe('Substitute assignment persistence', () => {
+  it('대강 배정을 주차 범위로 조회한다', async () => {
+    await saveSubstituteAssignments(sampleSubstituteAssignments)
+
+    const rows = await loadSubstituteAssignmentsByRange({
+      fromWeekTag: '2026-W08',
+      toWeekTag: '2026-W08',
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('substitute-2')
+  })
+
+  it('주차별 대강 배정 조회를 지원한다', async () => {
+    await saveSubstituteAssignments(sampleSubstituteAssignments)
+
+    const rows = await loadSubstituteAssignmentsByWeek('2026-W07')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('substitute-1')
   })
 })
 

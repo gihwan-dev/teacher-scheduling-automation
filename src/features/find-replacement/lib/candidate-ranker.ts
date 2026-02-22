@@ -65,7 +65,10 @@ export function rankCandidate(
 
   // 3. 유사도: MOVE(1셀 변경) > SWAP(2셀 변경)
   const totalCells = ctx.allCells.length || 1
-  const changedCells = candidate.type === 'MOVE' ? 1 : 2
+  const changedCells =
+    candidate.type === 'SWAP'
+      ? 2
+      : 1
   const similarityScore = Math.round((1 - changedCells / totalCells) * 100)
 
   // 4. 공강 최소화 점수
@@ -74,6 +77,15 @@ export function rankCandidate(
     ctx.schoolConfig.activeDays,
     ctx.schoolConfig.periodsPerDay,
   )
+
+  const fairnessScore = 100
+  const candidateReasons: Array<string> = []
+  if (violationCount === 0) {
+    candidateReasons.push('필수 제약 위반 0건')
+  }
+  if (scoreDelta >= 0) {
+    candidateReasons.push(`점수 변화 ${scoreDelta > 0 ? '+' : ''}${scoreDelta.toFixed(1)}`)
+  }
 
   // 5. 종합 점수
   const totalRank =
@@ -88,6 +100,8 @@ export function rankCandidate(
     scoreDelta,
     similarityScore,
     idleMinimizationScore,
+    fairnessScore,
+    candidateReasons,
     totalRank: Math.round(totalRank * 100) / 100,
   }
 }

@@ -14,7 +14,7 @@ import { generateId } from '@/shared/lib/id'
 
 export interface ReplacementCandidateImpactInput {
   id: string
-  type: 'SWAP' | 'MOVE'
+  type: 'SWAP' | 'MOVE' | 'SUBSTITUTE'
   sourceCell: TimetableCell
   sourceCellKey: string
   targetCellKey: string
@@ -122,6 +122,15 @@ function applySingleCandidate(
   beforeCells: Array<TimetableCell>,
   candidate: ReplacementCandidateImpactInput,
 ): Array<TimetableCell> {
+  if (candidate.type === 'SUBSTITUTE') {
+    return beforeCells.map((cell) => {
+      if (!isSameCell(cell, candidate.sourceCell)) {
+        return cell
+      }
+      return candidate.resultTargetCell
+    })
+  }
+
   if (candidate.type === 'SWAP' && candidate.targetCell) {
     return beforeCells.map((cell) => {
       if (isSameCell(cell, candidate.sourceCell)) {
@@ -306,10 +315,14 @@ function buildSingleAlternatives(
       const scoreDelta = candidate.ranking.scoreDelta
       const scoreLabel =
         scoreDelta > 0 ? `+${scoreDelta.toFixed(1)}` : scoreDelta.toFixed(1)
+      const typeLabel =
+        candidate.type === 'SWAP'
+          ? '교환'
+          : candidate.type === 'SUBSTITUTE'
+            ? '대강'
+            : '이동'
 
-      return `${DAY_LABELS[target.day]} ${target.period}교시 ${
-        candidate.type === 'SWAP' ? '교환' : '이동'
-      } ${scoreLabel}점 / 위반 ${candidate.ranking.violationCount}건`
+      return `${DAY_LABELS[target.day]} ${target.period}교시 ${typeLabel} ${scoreLabel}점 / 위반 ${candidate.ranking.violationCount}건`
     })
 }
 

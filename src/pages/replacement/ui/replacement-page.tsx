@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Search01Icon } from '@hugeicons/core-free-icons'
@@ -25,9 +25,11 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
 import { WeekVersionSelector } from '@/components/ui/week-version-selector'
+import { loadAcademicCalendarEventsByRange } from '@/shared/persistence/indexeddb/repository'
 import {
   buildForwardWeekWindow,
   computeWeekTagFromTimestamp,
+  getWeekDateRange,
 } from '@/shared/lib/week-tag'
 
 export function ReplacementPage() {
@@ -43,6 +45,7 @@ export function ReplacementPage() {
     targetCellKey,
     viewGrade,
     viewClassNumber,
+    searchConfig,
     isLoading,
     isSearching,
     isApplyingScope,
@@ -52,8 +55,11 @@ export function ReplacementPage() {
     setViewTarget,
     search: searchCandidates,
     searchMulti,
+    setSearchMode,
+    toggleExcludeHomeroomTeachers,
     toggleMultiMode,
   } = useReplacementStore()
+  const [isExamWeek, setIsExamWeek] = useState(false)
 
   const weekOptions = useMemo(() => {
     const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
@@ -111,6 +117,23 @@ export function ReplacementPage() {
       })
     }
   }, [navigate, search.version, search.week, snapshot])
+
+  useEffect(() => {
+    if (!snapshot || !schoolConfig) {
+      setIsExamWeek(false)
+      return
+    }
+
+    void (async () => {
+      const { startDate, endDate } = getWeekDateRange(
+        snapshot.weekTag,
+        schoolConfig.activeDays,
+      )
+      const events = await loadAcademicCalendarEventsByRange(startDate, endDate)
+      const hasExamPeriod = events.some((event) => event.eventType === 'EXAM_PERIOD')
+      setIsExamWeek(hasExamPeriod)
+    })()
+  }, [schoolConfig, snapshot])
 
   const handleWeekChange = (week: WeekTag) => {
     navigate({
@@ -172,9 +195,9 @@ export function ReplacementPage() {
     return { value: String(classNumber), label: `${classNumber}반` }
   })
 
-  const canSearch = isMultiMode
-    ? multiTargetCellKeys.length >= 2
-    : !!targetCellKey
+  const isSubstituteMode = searchConfig.searchMode === 'SUBSTITUTE'
+  const canSearch =
+    isSubstituteMode || !isMultiMode ? !!targetCellKey : multiTargetCellKeys.length >= 2
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -182,11 +205,37 @@ export function ReplacementPage() {
       <div>
         <h1 className="text-2xl font-bold">교체 후보 탐색</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {isMultiMode
+          {isSubstituteMode
+            ? '결강 시간에 대한 대강 후보를 탐색하고 근거를 확인한 뒤 확정하세요.'
+            : isMultiMode
             ? '교체할 셀을 2~3개 선택한 후 탐색 버튼을 눌러 호환되는 교체 조합을 확인하세요.'
             : '교체할 셀을 선택한 후 탐색 버튼을 눌러 안전한 교체 후보를 확인하세요.'}
         </p>
       </div>
+
+      {isExamWeek && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <p className="font-medium text-destructive">
+            시험주차 감지: 일반 수업 변경은 HC-04로 차단됩니다.
+          </p>
+          <p className="text-muted-foreground mt-1">
+            이 주차({snapshot.weekTag}) 작업은 `시험` 페이지에서 진행해 주세요.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2"
+            onClick={() =>
+              navigate({
+                to: '/exam',
+                search: () => ({ week: snapshot.weekTag }),
+              })
+            }
+          >
+            시험 페이지로 이동
+          </Button>
+        </div>
+      )}
 
       {/* 컨트롤바 */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -199,6 +248,35 @@ export function ReplacementPage() {
           onVersionChange={handleVersionChange}
           disabled={isSearching || isApplyingScope}
         />
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={!isSubstituteMode ? 'default' : 'outline'}
+            onClick={() => setSearchMode('REPLACEMENT')}
+            disabled={isSearching || isApplyingScope}
+          >
+            교체 모드
+          </Button>
+          <Button
+            size="sm"
+            variant={isSubstituteMode ? 'default' : 'outline'}
+            onClick={() => setSearchMode('SUBSTITUTE')}
+            disabled={isSearching || isApplyingScope}
+          >
+            대강 모드
+          </Button>
+          {isSubstituteMode && (
+            <Button
+              size="sm"
+              variant={searchConfig.excludeHomeroomTeachers ? 'default' : 'outline'}
+              onClick={toggleExcludeHomeroomTeachers}
+              disabled={isSearching || isApplyingScope}
+            >
+              담임 제외
+            </Button>
+          )}
+        </div>
 
         <Select
           items={gradeOptions}
@@ -237,6 +315,7 @@ export function ReplacementPage() {
           variant={isMultiMode ? 'default' : 'outline'}
           size="sm"
           onClick={toggleMultiMode}
+          disabled={isSubstituteMode}
         >
           {isMultiMode ? '다중 모드' : '단일 모드'}
           {isMultiMode && multiTargetCellKeys.length > 0 && (
@@ -247,7 +326,7 @@ export function ReplacementPage() {
         </Button>
 
         <Button
-          onClick={isMultiMode ? searchMulti : searchCandidates}
+          onClick={isSubstituteMode || !isMultiMode ? searchCandidates : searchMulti}
           disabled={!canSearch || isSearching || isApplyingScope}
         >
           {isSearching ? (
@@ -273,7 +352,7 @@ export function ReplacementPage() {
           teachers={teachers}
           subjects={subjects}
         />
-        {isMultiMode ? (
+        {isMultiMode && !isSubstituteMode ? (
           <MultiCandidateListPanel teachers={teachers} subjects={subjects} />
         ) : (
           <CandidateListPanel teachers={teachers} subjects={subjects} />
@@ -281,7 +360,7 @@ export function ReplacementPage() {
       </div>
 
       {/* 미리보기 */}
-      {isMultiMode ? (
+      {isMultiMode && !isSubstituteMode ? (
         <MultiReplacementPreview teachers={teachers} subjects={subjects} />
       ) : (
         <ReplacementPreview teachers={teachers} subjects={subjects} />
@@ -291,7 +370,7 @@ export function ReplacementPage() {
       <ImpactAnalysisPanel />
 
       {/* 완화 제안 (단일 모드 전용) */}
-      {!isMultiMode && <RelaxationPanel />}
+      {!isMultiMode && !isSubstituteMode && <RelaxationPanel />}
     </div>
   )
 }

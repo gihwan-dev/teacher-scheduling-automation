@@ -1,5 +1,13 @@
-export type { Teacher, ClassHoursAssignment } from './model/types'
-export { teacherSchema, classHoursAssignmentSchema } from './model/schema'
+export type {
+  Teacher,
+  ClassHoursAssignment,
+  HomeroomAssignment,
+} from './model/types'
+export {
+  teacherSchema,
+  classHoursAssignmentSchema,
+  homeroomAssignmentSchema,
+} from './model/schema'
 export {
   validateHoursConsistency,
   validateClassCapacity,

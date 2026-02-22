@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -15,9 +15,11 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
 import { WeekVersionSelector } from '@/components/ui/week-version-selector'
 import { useGenerateStore } from '@/features/generate-timetable/model/store'
+import { loadAcademicCalendarEventsByRange } from '@/shared/persistence/indexeddb/repository'
 import {
   buildForwardWeekWindow,
   computeWeekTagFromTimestamp,
+  getWeekDateRange,
 } from '@/shared/lib/week-tag'
 
 export function GeneratePage() {
@@ -38,6 +40,7 @@ export function GeneratePage() {
     setTargetWeekTag,
     generate,
   } = useGenerateStore()
+  const [isExamWeek, setIsExamWeek] = useState(false)
 
   const weekOptions = useMemo(() => {
     const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
@@ -72,6 +75,22 @@ export function GeneratePage() {
       replace: true,
     })
   }, [navigate, search.week, targetWeekTag])
+
+  useEffect(() => {
+    if (!schoolConfig) {
+      setIsExamWeek(false)
+      return
+    }
+
+    void (async () => {
+      const { startDate, endDate } = getWeekDateRange(
+        targetWeekTag,
+        schoolConfig.activeDays,
+      )
+      const events = await loadAcademicCalendarEventsByRange(startDate, endDate)
+      setIsExamWeek(events.some((event) => event.eventType === 'EXAM_PERIOD'))
+    })()
+  }, [schoolConfig, targetWeekTag])
 
   const handleGenerate = async () => {
     await generate()
@@ -143,6 +162,30 @@ export function GeneratePage() {
           </Button>
         </div>
       </div>
+
+      {isExamWeek && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <p className="font-medium text-destructive">
+            시험주차 감지: 일반 수업 생성 결과는 HC-04로 제한될 수 있습니다.
+          </p>
+          <p className="text-muted-foreground mt-1">
+            시험 시간표/감독 배정은 `시험` 페이지에서 진행해 주세요.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2"
+            onClick={() =>
+              navigate({
+                to: '/exam',
+                search: () => ({ week: targetWeekTag }),
+              })
+            }
+          >
+            시험 페이지로 이동
+          </Button>
+        </div>
+      )}
 
       {/* 설정 요약 */}
       <Card>

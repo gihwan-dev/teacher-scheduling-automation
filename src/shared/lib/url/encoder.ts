@@ -48,6 +48,11 @@ export function buildSharePayload(
       n: t.name,
       s: t.subjectIds.map((id) => subjectIdToIndex.get(id) ?? -1),
       h: t.baseHoursPerWeek,
+      ...(t.homeroom
+        ? {
+            hr: [t.homeroom.grade, t.homeroom.classNumber] as [number, number],
+          }
+        : {}),
       ca: t.classAssignments.map(
         (ca) =>
           [ca.grade, ca.classNumber, ca.hoursPerWeek] as [

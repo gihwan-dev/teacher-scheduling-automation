@@ -13,6 +13,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useSetupStore } from '@/features/manage-school-setup'
 import { validateHoursConsistency } from '@/entities/teacher'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export function TeacherTable() {
   const {
@@ -33,6 +40,7 @@ export function TeacherTable() {
       name: newName.trim(),
       subjectIds: [],
       baseHoursPerWeek: newBaseHours,
+      homeroom: null,
       classAssignments: [],
     })
     setNewName('')
@@ -101,6 +109,7 @@ export function TeacherTable() {
             <TableHead className="w-[40px]" />
             <TableHead className="w-[140px]">이름</TableHead>
             <TableHead>담당 과목</TableHead>
+            <TableHead className="w-[170px]">담임</TableHead>
             <TableHead className="w-[100px]">기준 시수</TableHead>
             <TableHead className="w-[100px]">배정 합계</TableHead>
             <TableHead className="w-[80px]">상태</TableHead>
@@ -153,6 +162,115 @@ export function TeacherTable() {
                     </div>
                   </TableCell>
                   <TableCell>
+                    {!schoolConfig ? (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Select
+                          items={Array.from(
+                            { length: schoolConfig.gradeCount },
+                            (_, index) => ({
+                              value: String(index + 1),
+                              label: `${index + 1}학년`,
+                            }),
+                          )}
+                          value={teacher.homeroom ? String(teacher.homeroom.grade) : ''}
+                          onValueChange={(val) => {
+                            if (!val) {
+                              return
+                            }
+                            const grade = Number(val)
+                            updateTeacher(teacher.id, {
+                              homeroom: { grade, classNumber: 1 },
+                            })
+                          }}
+                        >
+                          <SelectTrigger size="sm" className="w-20">
+                            <SelectValue placeholder="학년" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from(
+                              { length: schoolConfig.gradeCount },
+                              (_, index) => index + 1,
+                            ).map((grade) => (
+                              <SelectItem key={grade} value={String(grade)}>
+                                {grade}학년
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          items={
+                            teacher.homeroom
+                              ? Array.from(
+                                  {
+                                    length:
+                                      schoolConfig.classCountByGrade[
+                                        teacher.homeroom.grade
+                                      ] ?? 0,
+                                  },
+                                  (_, index) => ({
+                                    value: String(index + 1),
+                                    label: `${index + 1}반`,
+                                  }),
+                                )
+                              : []
+                          }
+                          value={
+                            teacher.homeroom
+                              ? String(teacher.homeroom.classNumber)
+                              : ''
+                          }
+                          onValueChange={(val) => {
+                            if (!teacher.homeroom || !val) {
+                              return
+                            }
+                            updateTeacher(teacher.id, {
+                              homeroom: {
+                                ...teacher.homeroom,
+                                classNumber: Number(val),
+                              },
+                            })
+                          }}
+                          disabled={!teacher.homeroom}
+                        >
+                          <SelectTrigger size="sm" className="w-16">
+                            <SelectValue placeholder="반" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teacher.homeroom &&
+                              Array.from(
+                                {
+                                  length:
+                                    schoolConfig.classCountByGrade[
+                                      teacher.homeroom.grade
+                                    ] ?? 0,
+                                },
+                                (_, index) => index + 1,
+                              ).map((classNumber) => (
+                                <SelectItem
+                                  key={classNumber}
+                                  value={String(classNumber)}
+                                >
+                                  {classNumber}반
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() =>
+                            updateTeacher(teacher.id, { homeroom: null })
+                          }
+                          title="담임 해제"
+                        >
+                          x
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Input
                       type="number"
                       min={0}
@@ -188,7 +306,7 @@ export function TeacherTable() {
                 {/* 확장 행: 학년/반별 배정 시수 그리드 */}
                 {isExpanded && schoolConfig && (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <div className="bg-muted/30 rounded-lg p-4 space-y-3">
                         <p className="text-sm font-medium">
                           학년/반별 배정 시수
@@ -258,6 +376,7 @@ export function TeacherTable() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               />
             </TableCell>
+            <TableCell />
             <TableCell />
             <TableCell>
               <Input

@@ -47,6 +47,13 @@ export function restoreFromPayload(payload: SharePayload): RestoredState {
     name: t.n,
     subjectIds: t.s.map((idx) => subjectIds[idx]),
     baseHoursPerWeek: t.h,
+    homeroom:
+      t.hr === undefined || t.hr === null
+        ? null
+        : {
+            grade: t.hr[0],
+            classNumber: t.hr[1],
+          },
     classAssignments: t.ca.map(([grade, classNumber, hoursPerWeek]) => ({
       grade,
       classNumber,

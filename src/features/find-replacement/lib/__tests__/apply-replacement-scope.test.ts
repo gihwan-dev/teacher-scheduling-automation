@@ -39,6 +39,8 @@ function makeMoveCandidate(overrides: Partial<ReplacementCandidate> = {}): Repla
       scoreDelta: 0.1,
       similarityScore: 100,
       idleMinimizationScore: 100,
+      fairnessScore: 100,
+      candidateReasons: [],
       totalRank: 10,
     },
     ...overrides,

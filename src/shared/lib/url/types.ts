@@ -15,6 +15,7 @@ export interface CompactTeacher {
   n: string // name
   s: Array<number> // subject indices
   h: number // baseHoursPerWeek
+  hr?: [number, number] | null // homeroom: [grade, classNumber]
   ca: Array<[number, number, number]> // classAssignments: [grade, classNumber, hoursPerWeek]
 }
 
