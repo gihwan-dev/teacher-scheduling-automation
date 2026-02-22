@@ -11,12 +11,35 @@ import type {
 } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
-import type { ChangeEvent } from '@/entities/change-history'
+import type { ChangeActionType, ChangeEvent } from '@/entities/change-history'
 import type { WeekTag } from '@/shared/lib/week-tag'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
-import type { ScheduleTransaction } from '@/entities/schedule-transaction'
+import type {
+  ScheduleTransaction,
+  ValidationViolation,
+} from '@/entities/schedule-transaction'
+import { transitionScheduleTransactionStatus } from '@/entities/schedule-transaction'
 import { generateId } from '@/shared/lib/id'
+
+type CommitTransactionActionType = Extract<
+  ChangeActionType,
+  'TRANSACTION_COMMIT' | 'VERSION_RESTORE'
+>
+
+export interface CommitTransactionWeekPlan {
+  weekTag: WeekTag
+  sourceSnapshot: TimetableSnapshot
+  nextCells: Array<TimetableCell>
+  appliedScope: AppliedScope
+}
+
+interface SnapshotSummary {
+  snapshotId: string
+  versionNo: number
+  cellCount: number
+  baseVersionId: string | null
+}
 
 // SchoolConfig
 export async function saveSchoolConfig(config: SchoolConfig): Promise<void> {
@@ -183,6 +206,62 @@ export async function loadSnapshotBySelection(selection: {
   return loadLatestSnapshotByWeek(weekTag)
 }
 
+function normalizeAppliedScope(
+  sourceSnapshot: TimetableSnapshot,
+  weekTag: WeekTag,
+  appliedScopeOverride?: AppliedScope,
+): AppliedScope {
+  if (appliedScopeOverride) {
+    return appliedScopeOverride
+  }
+  if (sourceSnapshot.appliedScope.type === 'RANGE') {
+    return {
+      ...sourceSnapshot.appliedScope,
+      fromWeek: weekTag,
+      toWeek: sourceSnapshot.appliedScope.toWeek ?? weekTag,
+    }
+  }
+  return {
+    ...sourceSnapshot.appliedScope,
+    fromWeek: weekTag,
+    toWeek: null,
+  }
+}
+
+function createSnapshotSummary(snapshot: TimetableSnapshot): SnapshotSummary {
+  return {
+    snapshotId: snapshot.id,
+    versionNo: snapshot.versionNo,
+    cellCount: snapshot.cells.length,
+    baseVersionId: snapshot.baseVersionId,
+  }
+}
+
+function countChangedSlots(
+  beforeCells: Array<TimetableCell>,
+  afterCells: Array<TimetableCell>,
+): number {
+  const beforeMap = new Map(beforeCells.map((cell) => [slotKey(cell), slotValue(cell)]))
+  const afterMap = new Map(afterCells.map((cell) => [slotKey(cell), slotValue(cell)]))
+  const allKeys = new Set([...beforeMap.keys(), ...afterMap.keys()])
+
+  let changed = 0
+  for (const key of allKeys) {
+    if (beforeMap.get(key) !== afterMap.get(key)) {
+      changed += 1
+    }
+  }
+  return changed
+}
+
+function slotKey(cell: TimetableCell): string {
+  return `${cell.grade}-${cell.classNumber}-${cell.day}-${cell.period}`
+}
+
+function slotValue(cell: TimetableCell): string {
+  return `${cell.teacherId}-${cell.subjectId}-${cell.status}-${cell.isFixed ? '1' : '0'}`
+}
+
 export async function saveNextSnapshotVersion(params: {
   sourceSnapshot: TimetableSnapshot
   cells: Array<TimetableCell>
@@ -194,23 +273,11 @@ export async function saveNextSnapshotVersion(params: {
   const latest = await loadLatestSnapshotByWeek(weekTag)
   const nextVersionNo = (latest?.versionNo ?? 0) + 1
 
-  const appliedScope = (() => {
-    if (appliedScopeOverride) {
-      return appliedScopeOverride
-    }
-    if (sourceSnapshot.appliedScope.type === 'RANGE') {
-      return {
-        ...sourceSnapshot.appliedScope,
-        fromWeek: weekTag,
-        toWeek: sourceSnapshot.appliedScope.toWeek ?? weekTag,
-      }
-    }
-    return {
-      ...sourceSnapshot.appliedScope,
-      fromWeek: weekTag,
-      toWeek: null,
-    }
-  })()
+  const appliedScope = normalizeAppliedScope(
+    sourceSnapshot,
+    weekTag,
+    appliedScopeOverride,
+  )
 
   const nextSnapshot: TimetableSnapshot = {
     ...sourceSnapshot,
@@ -343,6 +410,197 @@ export async function updateScheduleTransaction(
   transaction: ScheduleTransaction,
 ): Promise<void> {
   await db.scheduleTransactions.put(transaction)
+}
+
+export async function createScheduleTransactionDraft(input: {
+  targetWeeks: Array<WeekTag>
+  validationResult: {
+    passed: boolean
+    violations: Array<ValidationViolation>
+  }
+  impactReportId: string
+}): Promise<ScheduleTransaction> {
+  const timestamp = new Date().toISOString()
+  const transaction: ScheduleTransaction = {
+    draftId: generateId(),
+    targetWeeks: [...new Set(input.targetWeeks)].sort((a, b) =>
+      a.localeCompare(b),
+    ),
+    validationResult: input.validationResult,
+    impactReportId: input.impactReportId,
+    status: 'DRAFT',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  await saveScheduleTransaction(transaction)
+  return transaction
+}
+
+export async function loadScheduleTransaction(
+  draftId: string,
+): Promise<ScheduleTransaction | undefined> {
+  return db.scheduleTransactions.get(draftId)
+}
+
+export async function commitScheduleTransactionAtomically(input: {
+  transaction: ScheduleTransaction
+  plans: Array<CommitTransactionWeekPlan>
+  impactReports: Array<ImpactAnalysisReport>
+  actor: string
+  actionType: CommitTransactionActionType
+  impactSummary: string | null
+}): Promise<{
+  transaction: ScheduleTransaction
+  savedSnapshots: Array<TimetableSnapshot>
+}> {
+  const nextStatus = transitionScheduleTransactionStatus(
+    input.transaction.status,
+    'COMMITTED',
+  )
+  const eventTimestamp = Date.now()
+  const committedAt = new Date().toISOString()
+  const orderedPlans = [...input.plans].sort((a, b) =>
+    a.weekTag.localeCompare(b.weekTag),
+  )
+
+  return db.transaction(
+    'rw',
+    [
+      db.timetableSnapshots,
+      db.scheduleTransactions,
+      db.impactAnalysisReports,
+      db.changeEvents,
+    ],
+    async () => {
+      const savedSnapshots: Array<TimetableSnapshot> = []
+      const commitEvents: Array<ChangeEvent> = []
+
+      for (let index = 0; index < orderedPlans.length; index += 1) {
+        const plan = orderedPlans[index]
+        const weekSnapshots = await db.timetableSnapshots
+          .where('weekTag')
+          .equals(plan.weekTag)
+          .sortBy('versionNo')
+        const latest = weekSnapshots.at(-1)
+        const nextVersionNo = (latest?.versionNo ?? 0) + 1
+
+        const nextSnapshot: TimetableSnapshot = {
+          ...plan.sourceSnapshot,
+          id: generateId(),
+          weekTag: plan.weekTag,
+          versionNo: nextVersionNo,
+          baseVersionId: latest ? plan.sourceSnapshot.id : null,
+          appliedScope: normalizeAppliedScope(
+            plan.sourceSnapshot,
+            plan.weekTag,
+            plan.appliedScope,
+          ),
+          cells: plan.nextCells,
+          createdAt: committedAt,
+        }
+        savedSnapshots.push(nextSnapshot)
+
+        const changedSlots = countChangedSlots(plan.sourceSnapshot.cells, plan.nextCells)
+        const versionImpactSummary =
+          input.actionType === 'VERSION_RESTORE'
+            ? `restore v${plan.sourceSnapshot.versionNo} -> v${nextSnapshot.versionNo} (changed ${changedSlots} slots)`
+            : `${input.impactSummary ?? '트랜잭션 확정'} (${plan.weekTag}, changed ${changedSlots} slots)`
+
+        commitEvents.push({
+          id: generateId(),
+          snapshotId: nextSnapshot.id,
+          weekTag: plan.weekTag,
+          actionType: input.actionType,
+          actor: input.actor,
+          cellKey: 'VERSION' as ChangeEvent['cellKey'],
+          before: null,
+          after: null,
+          beforePayload: createSnapshotSummary(plan.sourceSnapshot),
+          afterPayload: createSnapshotSummary(nextSnapshot),
+          impactSummary: versionImpactSummary,
+          conflictDetected: false,
+          rollbackRef: null,
+          timestamp: eventTimestamp + index,
+          isUndone: false,
+        })
+      }
+
+      await db.timetableSnapshots.bulkPut(savedSnapshots)
+      if (input.impactReports.length > 0) {
+        await db.impactAnalysisReports.bulkPut(input.impactReports)
+      }
+
+      const committedTransaction: ScheduleTransaction = {
+        ...input.transaction,
+        status: nextStatus,
+        updatedAt: committedAt,
+      }
+      await db.scheduleTransactions.put(committedTransaction)
+      await db.changeEvents.bulkPut(commitEvents)
+
+      return {
+        transaction: committedTransaction,
+        savedSnapshots,
+      }
+    },
+  )
+}
+
+export async function rollbackScheduleTransaction(input: {
+  transaction: ScheduleTransaction
+  actor: string
+  reason: string
+  weekTag: WeekTag
+  snapshotId: string
+  violations?: Array<ValidationViolation>
+  conflictDetected?: boolean
+}): Promise<ScheduleTransaction> {
+  const rollbackAt = new Date().toISOString()
+  const rollbackStatus =
+    input.transaction.status === 'ROLLED_BACK'
+      ? 'ROLLED_BACK'
+      : transitionScheduleTransactionStatus(input.transaction.status, 'ROLLED_BACK')
+
+  return db.transaction(
+    'rw',
+    [db.scheduleTransactions, db.changeEvents],
+    async () => {
+      const rolledBackTransaction: ScheduleTransaction = {
+        ...input.transaction,
+        status: rollbackStatus,
+        updatedAt: rollbackAt,
+      }
+
+      await db.scheduleTransactions.put(rolledBackTransaction)
+      await db.changeEvents.put({
+        id: generateId(),
+        snapshotId: input.snapshotId,
+        weekTag: input.weekTag,
+        actionType: 'TRANSACTION_ROLLBACK',
+        actor: input.actor,
+        cellKey: 'VERSION' as ChangeEvent['cellKey'],
+        before: null,
+        after: null,
+        beforePayload: {
+          draftId: input.transaction.draftId,
+          statusBefore: input.transaction.status,
+          violationCount:
+            input.violations?.length ??
+            input.transaction.validationResult.violations.length,
+        },
+        afterPayload: {
+          statusAfter: rollbackStatus,
+        },
+        impactSummary: input.reason,
+        conflictDetected: input.conflictDetected ?? true,
+        rollbackRef: input.transaction.draftId,
+        timestamp: Date.now(),
+        isUndone: false,
+      })
+
+      return rolledBackTransaction
+    },
+  )
 }
 
 // ImpactAnalysisReports

@@ -26,6 +26,7 @@ import {
 } from '@/features/generate-timetable'
 import { recomputeUnlocked } from '@/features/recompute-timetable'
 import { useChangeHistoryStore } from '@/features/track-change-history'
+import { applyScheduleTransaction } from '@/features/apply-schedule-transaction'
 import {
   buildAcademicCalendarBlockedSlots,
   validateScheduleChange,
@@ -38,7 +39,6 @@ import {
   loadSnapshotWeeks,
   loadSnapshotsByWeek,
   loadTeacherPolicies,
-  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { getWeekDateRange } from '@/shared/lib/week-tag'
 
@@ -106,7 +106,7 @@ interface EditState {
   undo: () => void
   redo: () => void
   recompute: () => Promise<void>
-  saveSnapshot: () => Promise<void>
+  saveSnapshot: () => Promise<boolean>
   confirmChanges: () => void
 }
 
@@ -947,13 +947,37 @@ export const useEditStore = create<EditState>((set, get) => ({
   },
 
   saveSnapshot: async () => {
-    const { snapshot, cells } = get()
-    if (!snapshot) return
-
-    const nextSnapshot = await saveNextSnapshotVersion({
-      sourceSnapshot: snapshot,
+    const {
+      snapshot,
       cells,
+      violations,
+      teachers,
+    } = get()
+    if (!snapshot) return false
+
+    const result = await applyScheduleTransaction({
+      kind: 'EDIT_SAVE',
+      plans: [
+        {
+          weekTag: snapshot.weekTag,
+          sourceSnapshot: snapshot,
+          nextCells: cells,
+          appliedScope: {
+            type: 'THIS_WEEK',
+            fromWeek: snapshot.weekTag,
+            toWeek: null,
+          },
+        },
+      ],
+      prevalidatedViolations: violations,
+      teachers,
+      impactSummary: '편집 저장 트랜잭션 확정',
     })
+    if (!result.ok) {
+      return false
+    }
+
+    const nextSnapshot = result.savedSnapshots[0]
     const versions = await loadSnapshotsByWeek(nextSnapshot.weekTag)
 
     set({
@@ -967,6 +991,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     })
 
     await useChangeHistoryStore.getState().loadEvents(nextSnapshot.id)
+    return true
   },
 
   confirmChanges: () => {

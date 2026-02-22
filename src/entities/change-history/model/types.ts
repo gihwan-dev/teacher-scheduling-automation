@@ -11,6 +11,8 @@ export type ChangeActionType =
   | 'RECOMPUTE'
   | 'VERSION_CLONE'
   | 'VERSION_RESTORE'
+  | 'TRANSACTION_COMMIT'
+  | 'TRANSACTION_ROLLBACK'
 
 export interface ChangeEvent {
   id: string

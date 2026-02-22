@@ -38,6 +38,7 @@ import type {
 import type { WeekTag } from '@/shared/lib/week-tag'
 import { buildCellMap } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
+import { applyScheduleTransaction } from '@/features/apply-schedule-transaction'
 import {
   analyzeMultiReplacementImpact,
   analyzeReplacementImpact,
@@ -52,7 +53,6 @@ import {
   loadSnapshotsByWeek,
   loadTeacherPolicies,
   saveImpactAnalysisReport,
-  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { compareWeekTag, shiftWeekTag } from '@/shared/lib/week-tag'
 
@@ -341,8 +341,9 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
     appliedScope: NonNullable<
       ReturnType<typeof resolveReplacementScopeTargetWeeks>['appliedScope']
     >
+    impactAlternatives?: Array<string>
   }): Promise<boolean> => {
-    const { snapshot, cells } = get()
+    const { snapshot, cells, teachers } = get()
     if (!snapshot) {
       return false
     }
@@ -350,17 +351,36 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
     const sortedPrepared = [...input.prepared].sort((a, b) =>
       compareWeekTag(a.weekTag, b.weekTag),
     )
-
-    const savedSnapshots: Array<TimetableSnapshot> = []
-    for (const item of sortedPrepared) {
-      const saved = await saveNextSnapshotVersion({
+    const result = await applyScheduleTransaction({
+      kind: 'REPLACEMENT_SCOPE',
+      plans: sortedPrepared.map((item) => ({
+        weekTag: item.weekTag,
         sourceSnapshot: item.sourceSnapshot,
-        cells: item.nextCells,
-        overrideWeekTag: item.weekTag,
-        appliedScopeOverride: input.appliedScope,
+        nextCells: item.nextCells,
+        appliedScope: input.appliedScope,
+      })),
+      preferredCommitActionType: 'TRANSACTION_COMMIT',
+      impactAlternatives: input.impactAlternatives,
+      prevalidatedViolations: [],
+      teachers,
+      impactSummary: '교체 범위 트랜잭션 확정',
+    })
+    if (!result.ok) {
+      const failureIssues = input.targetWeeks.map((weekTag) => ({
+        weekTag,
+        reason: 'VALIDATION_FAILED' as const,
+        message: result.rollbackReason ?? '트랜잭션 적용 중 오류가 발생했습니다.',
+        violations: result.violations,
+        alternatives: [] as Array<ScopedAlternativeCandidate>,
+      }))
+      set({
+        scopeValidationSummary: buildBlockedSummary(input.targetWeeks, failureIssues),
+        isApplyingScope: false,
       })
-      savedSnapshots.push(saved)
+      return false
     }
+
+    const savedSnapshots = result.savedSnapshots
 
     const [weekTags, selectedWeekSnapshots] = await Promise.all([
       loadSnapshotWeeks(),
@@ -760,6 +780,7 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
         targetWeeks,
         prepared: validated.prepared,
         appliedScope,
+        impactAlternatives: impactReport.alternatives,
       })
     },
 
@@ -989,6 +1010,7 @@ export const useReplacementStore = create<ReplacementState>((set, get) => {
         targetWeeks,
         prepared: validated.prepared,
         appliedScope,
+        impactAlternatives: multiImpactReport.alternatives,
       })
     },
   }

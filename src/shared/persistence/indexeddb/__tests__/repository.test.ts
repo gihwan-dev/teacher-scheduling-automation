@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../database'
 import {
+  commitScheduleTransactionAtomically,
+  createScheduleTransactionDraft,
   loadAcademicCalendarEvents,
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
@@ -9,6 +11,7 @@ import {
   loadImpactAnalysisReport,
   loadImpactAnalysisReportsBySnapshot,
   loadLatestSnapshotByWeek,
+  loadScheduleTransaction,
   loadSchoolConfig,
   loadSnapshotBySelection,
   loadSnapshotVersion,
@@ -16,6 +19,7 @@ import {
   loadSnapshotsByWeek,
   loadSubjects,
   loadTeachers,
+  rollbackScheduleTransaction,
   saveAcademicCalendarEvents,
   saveAllSetupData,
   saveChangeEvent,
@@ -182,6 +186,19 @@ const sampleImpactReport: ImpactAnalysisReport = {
   alternatives: ['화 3교시 이동 +0.1점 / 위반 0건'],
   createdAt: ts,
 }
+
+const sampleChangedCells = [
+  {
+    teacherId: 'teacher-1',
+    subjectId: 'sub-1',
+    grade: 1,
+    classNumber: 1,
+    day: 'MON' as const,
+    period: 1,
+    isFixed: false,
+    status: 'CONFIRMED_MODIFIED' as const,
+  },
+]
 
 beforeEach(async () => {
   await db.schoolConfigs.clear()
@@ -419,6 +436,128 @@ describe('ScheduleTransaction persistence', () => {
 
     const stored = await db.scheduleTransactions.get('draft-1')
     expect(stored?.status).toBe('COMMITTED')
+  })
+
+  it('draft 생성 후 조회할 수 있다', async () => {
+    const created = await createScheduleTransactionDraft({
+      targetWeeks: ['2026-W08', '2026-W08'],
+      validationResult: {
+        passed: true,
+        violations: [],
+      },
+      impactReportId: 'impact-1',
+    })
+
+    const loaded = await loadScheduleTransaction(created.draftId)
+    expect(loaded?.status).toBe('DRAFT')
+    expect(loaded?.targetWeeks).toEqual(['2026-W08'])
+  })
+
+  it('commitScheduleTransactionAtomically는 스냅샷/리포트/이력을 원자적으로 저장한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    const draft = await createScheduleTransactionDraft({
+      targetWeeks: ['2026-W08'],
+      validationResult: {
+        passed: true,
+        violations: [],
+      },
+      impactReportId: sampleImpactReport.id,
+    })
+
+    const committed = await commitScheduleTransactionAtomically({
+      transaction: draft,
+      plans: [
+        {
+          weekTag: '2026-W08',
+          sourceSnapshot: sampleSnapshotV1,
+          nextCells: sampleChangedCells,
+          appliedScope: sampleSnapshotV1.appliedScope,
+        },
+      ],
+      impactReports: [sampleImpactReport],
+      actor: 'LOCAL_OPERATOR',
+      actionType: 'TRANSACTION_COMMIT',
+      impactSummary: '편집 저장 트랜잭션 확정',
+    })
+
+    expect(committed.transaction.status).toBe('COMMITTED')
+    expect(committed.savedSnapshots).toHaveLength(1)
+    expect(committed.savedSnapshots[0].versionNo).toBe(2)
+
+    const storedTx = await loadScheduleTransaction(draft.draftId)
+    expect(storedTx?.status).toBe('COMMITTED')
+
+    const storedReport = await loadImpactAnalysisReport(sampleImpactReport.id)
+    expect(storedReport?.id).toBe(sampleImpactReport.id)
+
+    const weekEvents = await loadChangeEventsByWeek('2026-W08')
+    expect(
+      weekEvents.some((event) => event.actionType === 'TRANSACTION_COMMIT'),
+    ).toBe(true)
+  })
+
+  it('rollbackScheduleTransaction은 rollbackRef를 포함한 이력을 남긴다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    const draft = await createScheduleTransactionDraft({
+      targetWeeks: ['2026-W08'],
+      validationResult: {
+        passed: false,
+        violations: [],
+      },
+      impactReportId: 'impact-1',
+    })
+
+    const rolledBack = await rollbackScheduleTransaction({
+      transaction: draft,
+      actor: 'LOCAL_OPERATOR',
+      reason: '검증 오류',
+      weekTag: '2026-W08',
+      snapshotId: sampleSnapshotV1.id,
+      conflictDetected: true,
+    })
+
+    expect(rolledBack.status).toBe('ROLLED_BACK')
+    const events = await loadChangeEventsByWeek('2026-W08')
+    const rollbackEvent = events.find(
+      (event) => event.actionType === 'TRANSACTION_ROLLBACK',
+    )
+    expect(rollbackEvent?.rollbackRef).toBe(draft.draftId)
+    expect(rollbackEvent?.conflictDetected).toBe(true)
+  })
+
+  it('커밋 실패 시 부분 저장이 발생하지 않는다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    const committedTx = {
+      ...sampleTransaction,
+      status: 'COMMITTED' as const,
+    }
+    await saveScheduleTransaction(committedTx)
+
+    const beforeSnapshotCount = (await loadSnapshotsByWeek('2026-W08')).length
+    const beforeEvents = (await loadChangeEventsByWeek('2026-W08')).length
+
+    await expect(
+      commitScheduleTransactionAtomically({
+        transaction: committedTx,
+        plans: [
+          {
+            weekTag: '2026-W08',
+            sourceSnapshot: sampleSnapshotV1,
+            nextCells: sampleChangedCells,
+            appliedScope: sampleSnapshotV1.appliedScope,
+          },
+        ],
+        impactReports: [sampleImpactReport],
+        actor: 'LOCAL_OPERATOR',
+        actionType: 'TRANSACTION_COMMIT',
+        impactSummary: 'invalid',
+      }),
+    ).rejects.toThrow()
+
+    const afterSnapshotCount = (await loadSnapshotsByWeek('2026-W08')).length
+    const afterEvents = (await loadChangeEventsByWeek('2026-W08')).length
+    expect(afterSnapshotCount).toBe(beforeSnapshotCount)
+    expect(afterEvents).toBe(beforeEvents)
   })
 })
 

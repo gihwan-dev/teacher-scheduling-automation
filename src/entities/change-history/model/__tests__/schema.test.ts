@@ -32,6 +32,8 @@ describe('changeActionTypeSchema', () => {
       'RECOMPUTE',
       'VERSION_CLONE',
       'VERSION_RESTORE',
+      'TRANSACTION_COMMIT',
+      'TRANSACTION_ROLLBACK',
     ]) {
       expect(changeActionTypeSchema.safeParse(type).success).toBe(true)
     }

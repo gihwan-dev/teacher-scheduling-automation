@@ -5,6 +5,7 @@ import { HistoryFilterBar } from './history-filter-bar'
 import { HistoryTimeline } from './history-timeline'
 import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
 import type { WeekTag } from '@/shared/lib/week-tag'
+import { applyScheduleTransaction } from '@/features/apply-schedule-transaction'
 import { useChangeHistoryStore } from '@/features/track-change-history'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,6 +13,7 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { WeekVersionSelector } from '@/components/ui/week-version-selector'
 import {
+  loadAllSetupData,
   loadSnapshotWeeks,
   loadSnapshotsByWeek,
   saveNextSnapshotVersion,
@@ -169,21 +171,35 @@ export function HistoryPage() {
     if (!selectedSnapshot || !latestSnapshot) return
     setIsApplying(true)
     try {
-      const restored = await saveNextSnapshotVersion({
-        sourceSnapshot: selectedSnapshot,
-        cells: selectedSnapshot.cells,
+      const setupData = await loadAllSetupData()
+      const restoredResult = await applyScheduleTransaction({
+        kind: 'VERSION_RESTORE',
+        preferredCommitActionType: 'VERSION_RESTORE',
+        plans: [
+          {
+            weekTag: selectedWeek,
+            sourceSnapshot: selectedSnapshot,
+            nextCells: selectedSnapshot.cells,
+            appliedScope: selectedSnapshot.appliedScope,
+          },
+        ],
+        teachers: setupData.teachers,
       })
+
+      if (!restoredResult.ok) {
+        toast.error(
+          restoredResult.rollbackReason ?? '복원 트랜잭션이 롤백되었습니다.',
+        )
+        return
+      }
+      const restored = restoredResult.savedSnapshots[0]
+
       const changedSlots = countChangedSlots(latestSnapshot.cells, selectedSnapshot.cells)
-      await appendVersionEvent({
-        snapshotId: restored.id,
-        weekTag: selectedWeek,
-        actionType: 'VERSION_RESTORE',
-        beforePayload: createSnapshotSummary(latestSnapshot),
-        afterPayload: createSnapshotSummary(restored),
-        impactSummary: `restore v${selectedSnapshot.versionNo} -> v${restored.versionNo} (changed ${changedSlots} slots)`,
-      })
+      toast.success(
+        `버전 v${restored.versionNo}으로 복원했습니다. (${changedSlots}개 슬롯 변경)`,
+      )
+
       await refreshWeekData(selectedWeek)
-      toast.success(`버전 v${restored.versionNo}으로 복원했습니다.`)
       navigate({
         search: () => ({
           week: selectedWeek,

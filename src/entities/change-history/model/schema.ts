@@ -14,6 +14,8 @@ export const changeActionTypeSchema = z.enum([
   'RECOMPUTE',
   'VERSION_CLONE',
   'VERSION_RESTORE',
+  'TRANSACTION_COMMIT',
+  'TRANSACTION_ROLLBACK',
 ])
 
 export const changeEventSchema = z.object({

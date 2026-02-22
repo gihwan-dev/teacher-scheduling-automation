@@ -68,12 +68,12 @@
 
 ## Phase 6. [SEQUENTIAL] 트랜잭션 커밋/롤백 및 감사 로그 완성
 
-- [ ] **수정 트랜잭션 파이프라인 구현**
+- [x] **수정 트랜잭션 파이프라인 구현**
   - 목표: 임시 상태 생성 -> 전체 검증 -> 영향 분석 -> 승인 Commit / 실패 Rollback 흐름을 완성한다.
   - 검증: 실패 시 데이터가 원자적으로 롤백된다.
   - 검증: 승인 전에는 본 스냅샷이 변하지 않는다.
 
-- [ ] **감사 로그 기반 복원 흐름 구현**
+- [x] **감사 로그 기반 복원 흐름 구현**
   - 목표: 수정자/시각/전후 내용/적용 주차/충돌 여부를 기록하고 복원에 사용한다.
   - 검증: 특정 버전 복원 시 감사 로그로 추적 가능한 이력이 유지된다.
   - 검증: 롤백 참조(`rollback_ref`)가 이력에서 확인된다.
@@ -245,3 +245,38 @@
     - `pnpm run test:unit src/features/find-replacement/lib/__tests__/apply-replacement-scope.test.ts src/features/find-replacement/model/__tests__/store-impact.test.ts src/shared/lib/__tests__/week-tag.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
     - `pnpm run test:unit`: 37 files, 306 tests 통과 (Vitest 종료 지연 경고는 기존과 동일)
   - 다음 미완료 Phase: **Phase 6 (트랜잭션 커밋/롤백 및 감사 로그 완성)**
+- [2026-02-22] Phase 6 세션 요약:
+  - 완료: 트랜잭션 커밋/롤백 및 감사 로그 완성(편집 저장/교체 확정/버전 복원 경로 통합)
+  - 구현 내용:
+    - `features/apply-schedule-transaction` 신규 추가:
+      - `applyScheduleTransaction(input)` 오케스트레이션 API
+      - `DRAFT -> COMMITTED/ROLLED_BACK` 전이 기반 자동 커밋/롤백 처리
+    - `shared/persistence/indexeddb/repository` 확장:
+      - `createScheduleTransactionDraft`
+      - `loadScheduleTransaction`
+      - `commitScheduleTransactionAtomically`
+      - `rollbackScheduleTransaction`
+      - 원자 커밋 대상 테이블 통합(`timetableSnapshots`, `scheduleTransactions`, `impactAnalysisReports`, `changeEvents`)
+    - `entities/change-history` 액션 확장:
+      - `TRANSACTION_COMMIT`, `TRANSACTION_ROLLBACK` 타입/스키마 반영
+    - 복원/저장 경로 연동:
+      - `features/edit-timetable-cell` 저장 경로를 트랜잭션 API로 전환
+      - `features/find-replacement` 범위 확정 경로를 트랜잭션 API로 전환
+      - `pages/history` 복원 버튼은 유지하고 내부 저장만 트랜잭션 API로 전환
+    - 감사 로그 가시성 확장:
+      - `pages/history` 필터에 트랜잭션 액션 추가
+      - 카드에 `impactSummary`, `conflictDetected`, `rollbackRef` 노출
+    - 공통 영향 분석 유틸 추가:
+      - `analyzeSnapshotDiffImpact` (before/after diff 기반 요약)
+  - 테스트:
+    - `features/apply-schedule-transaction` 테스트 신규 추가
+    - `features/analyze-schedule-impact` diff 분석 테스트 신규 추가
+    - `shared/persistence/indexeddb` 트랜잭션 원자성/롤백 테스트 확장
+    - `features/find-replacement` 저장 경로 테스트를 트랜잭션 API 기준으로 갱신
+    - `entities/change-history` 스키마 테스트 액션 목록 확장
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src/features/apply-schedule-transaction src/features/edit-timetable-cell src/features/find-replacement src/pages/history src/entities/change-history src/shared/persistence/indexeddb`: 통과
+    - `pnpm run test:unit src/features/apply-schedule-transaction/lib/__tests__/apply-schedule-transaction.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts src/features/find-replacement/model/__tests__/store-impact.test.ts src/entities/change-history/model/__tests__/schema.test.ts src/features/analyze-schedule-impact/lib/__tests__/analyze-snapshot-diff-impact.test.ts`: 통과
+    - `pnpm run test:unit`: 39 files, 315 tests 통과 (Vitest 종료 지연 경고는 기존과 동일)
+  - 다음 미완료 Phase: **Phase 7 (1차 릴리스 품질 게이트)**

@@ -4,11 +4,11 @@ import { useReplacementStore } from '../store'
 import type { ReplacementCandidate } from '../types'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
+import { applyScheduleTransaction } from '@/features/apply-schedule-transaction'
 import {
   loadSnapshotWeeks,
   loadSnapshotsByWeek,
   saveImpactAnalysisReport,
-  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { analyzeReplacementImpact } from '@/features/analyze-schedule-impact'
 
@@ -21,8 +21,11 @@ vi.mock('@/shared/persistence/indexeddb/repository', () => ({
   loadSnapshotWeeks: vi.fn(),
   loadSnapshotsByWeek: vi.fn(),
   loadTeacherPolicies: vi.fn(),
-  saveNextSnapshotVersion: vi.fn(),
   saveImpactAnalysisReport: vi.fn(),
+}))
+
+vi.mock('@/features/apply-schedule-transaction', () => ({
+  applyScheduleTransaction: vi.fn(),
 }))
 
 vi.mock('@/features/analyze-schedule-impact', () => ({
@@ -32,9 +35,9 @@ vi.mock('@/features/analyze-schedule-impact', () => ({
 
 const mockedLoadSnapshotsByWeek = vi.mocked(loadSnapshotsByWeek)
 const mockedLoadSnapshotWeeks = vi.mocked(loadSnapshotWeeks)
-const mockedSaveNextSnapshotVersion = vi.mocked(saveNextSnapshotVersion)
 const mockedSaveImpactAnalysisReport = vi.mocked(saveImpactAnalysisReport)
 const mockedAnalyzeReplacementImpact = vi.mocked(analyzeReplacementImpact)
+const mockedApplyScheduleTransaction = vi.mocked(applyScheduleTransaction)
 
 const sourceCell: TimetableCell = {
   teacherId: 't-1',
@@ -102,11 +105,26 @@ const impactReport: ImpactAnalysisReport = {
 beforeEach(() => {
   mockedLoadSnapshotsByWeek.mockReset()
   mockedLoadSnapshotWeeks.mockReset()
-  mockedSaveNextSnapshotVersion.mockReset()
   mockedSaveImpactAnalysisReport.mockReset()
   mockedAnalyzeReplacementImpact.mockReset()
+  mockedApplyScheduleTransaction.mockReset()
   mockedLoadSnapshotsByWeek.mockResolvedValue([snapshot])
   mockedLoadSnapshotWeeks.mockResolvedValue(['2026-W08'])
+  mockedApplyScheduleTransaction.mockResolvedValue({
+    ok: true,
+    draftId: 'draft-1',
+    status: 'COMMITTED',
+    savedSnapshots: [
+      {
+        ...snapshot,
+        id: 'snapshot-2',
+        versionNo: 2,
+        baseVersionId: 'snapshot-1',
+      },
+    ],
+    violations: [],
+    rollbackReason: null,
+  })
   useReplacementStore.setState(useReplacementStore.getInitialState(), true)
 })
 
@@ -210,16 +228,10 @@ describe('replacement store impact integration', () => {
 
     const result = await useReplacementStore.getState().confirmReplacement()
     expect(result).toBe(false)
-    expect(mockedSaveNextSnapshotVersion).not.toHaveBeenCalled()
+    expect(mockedApplyScheduleTransaction).not.toHaveBeenCalled()
   })
 
   it('리포트가 있으면 교체를 저장한다', async () => {
-    mockedSaveNextSnapshotVersion.mockResolvedValue({
-      ...snapshot,
-      id: 'snapshot-2',
-      versionNo: 2,
-      baseVersionId: 'snapshot-1',
-    })
     useReplacementStore.setState({
       snapshot,
       cells: [sourceCell],
@@ -270,14 +282,10 @@ describe('replacement store impact integration', () => {
     const result = await useReplacementStore.getState().confirmReplacement()
 
     expect(result).toBe(true)
-    expect(mockedSaveNextSnapshotVersion).toHaveBeenCalledTimes(1)
-    expect(mockedSaveNextSnapshotVersion).toHaveBeenCalledWith(
+    expect(mockedApplyScheduleTransaction).toHaveBeenCalledTimes(1)
+    expect(mockedApplyScheduleTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
-        appliedScopeOverride: {
-          type: 'THIS_WEEK',
-          fromWeek: '2026-W08',
-          toWeek: null,
-        },
+        kind: 'REPLACEMENT_SCOPE',
       }),
     )
     expect(useReplacementStore.getState().selectedCandidate).toBeNull()
