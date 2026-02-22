@@ -1,4 +1,4 @@
-import type { ConstraintViolation } from '@/entities/constraint-policy'
+import type { ValidationViolation } from '@/entities/schedule-transaction'
 import type { CellKey, TimetableCell } from '@/entities/timetable'
 
 export type ReplacementType = 'SWAP' | 'MOVE'
@@ -17,7 +17,7 @@ export interface ReplacementCandidate {
 
 export interface CandidateRanking {
   violationCount: number
-  violations: Array<ConstraintViolation>
+  violations: Array<ValidationViolation>
   scoreDelta: number
   similarityScore: number
   idleMinimizationScore: number

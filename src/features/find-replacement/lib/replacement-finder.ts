@@ -1,9 +1,13 @@
 import { rankCandidate } from './candidate-ranker'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
+import type { Subject } from '@/entities/subject'
+import type { Teacher } from '@/entities/teacher'
 import type { CellKey, TimetableCell } from '@/entities/timetable'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import type { DayOfWeek } from '@/shared/lib/types'
 import type {
   RelaxationSuggestion,
@@ -19,6 +23,7 @@ import {
   expandGradeBlockedSlots,
   isPlacementValid,
 } from '@/features/generate-timetable'
+import { buildAcademicCalendarBlockedSlots } from '@/features/validate-schedule-change'
 import { generateId } from '@/shared/lib/id'
 
 export interface ReplacementFinderContext {
@@ -26,6 +31,10 @@ export interface ReplacementFinderContext {
   constraintPolicy: ConstraintPolicy
   teacherPolicies: Array<TeacherPolicy>
   fixedEvents: Array<FixedEvent>
+  teachers: Array<Teacher>
+  subjects: Array<Subject>
+  weekTag: WeekTag
+  academicCalendarEvents: Array<AcademicCalendarEvent>
 }
 
 /**
@@ -47,7 +56,13 @@ export function findReplacementCandidates(
     return emptyResult(startTime)
   }
 
-  const { schoolConfig, constraintPolicy, teacherPolicies, fixedEvents } = ctx
+  const {
+    schoolConfig,
+    constraintPolicy,
+    teacherPolicies,
+    fixedEvents,
+    academicCalendarEvents,
+  } = ctx
   const { activeDays, periodsPerDay } = schoolConfig
 
   // blocked slots
@@ -56,6 +71,14 @@ export function findReplacementCandidates(
     blockedSlots,
     schoolConfig.classCountByGrade,
   )
+  const calendarBlockedSlots = buildAcademicCalendarBlockedSlots({
+    schoolConfig,
+    weekTag: ctx.weekTag,
+    academicCalendarEvents,
+  })
+  for (const slotKey of calendarBlockedSlots) {
+    blockedSlots.add(slotKey)
+  }
 
   const candidates: Array<ReplacementCandidate> = []
 
@@ -89,8 +112,7 @@ export function findReplacementCandidates(
       constraintPolicy,
       teacherPolicies,
       blockedSlots,
-      activeDays,
-      periodsPerDay,
+      ctx,
       config.includeViolating,
     )
     if (swapCandidate) candidates.push(swapCandidate)
@@ -124,8 +146,7 @@ export function findReplacementCandidates(
         constraintPolicy,
         teacherPolicies,
         blockedSlots,
-        activeDays,
-        periodsPerDay,
+        ctx,
         config.includeViolating,
       )
       if (moveCandidate) candidates.push(moveCandidate)
@@ -163,8 +184,7 @@ function trySwap(
   constraintPolicy: ConstraintPolicy,
   teacherPolicies: Array<TeacherPolicy>,
   blockedSlots: Set<string>,
-  activeDays: Array<DayOfWeek>,
-  periodsPerDay: number,
+  ctx: ReplacementFinderContext,
   includeViolating: boolean,
 ): ReplacementCandidate | null {
   // 그리드: source와 target 모두 제거
@@ -282,8 +302,11 @@ function trySwap(
       allCells,
       constraintPolicy,
       teacherPolicies,
-      activeDays,
-      periodsPerDay,
+      schoolConfig: ctx.schoolConfig,
+      teachers: ctx.teachers,
+      subjects: ctx.subjects,
+      weekTag: ctx.weekTag,
+      academicCalendarEvents: ctx.academicCalendarEvents,
     },
   )
 
@@ -312,8 +335,7 @@ function tryMove(
   constraintPolicy: ConstraintPolicy,
   teacherPolicies: Array<TeacherPolicy>,
   blockedSlots: Set<string>,
-  activeDays: Array<DayOfWeek>,
-  periodsPerDay: number,
+  ctx: ReplacementFinderContext,
   includeViolating: boolean,
 ): ReplacementCandidate | null {
   const grid = new TimetableGrid()
@@ -377,8 +399,11 @@ function tryMove(
       allCells,
       constraintPolicy,
       teacherPolicies,
-      activeDays,
-      periodsPerDay,
+      schoolConfig: ctx.schoolConfig,
+      teachers: ctx.teachers,
+      subjects: ctx.subjects,
+      weekTag: ctx.weekTag,
+      academicCalendarEvents: ctx.academicCalendarEvents,
     },
   )
 

@@ -4,10 +4,12 @@ import type { Subject } from '@/entities/subject'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type {
   ConstraintPolicy,
-  ConstraintViolation,
 } from '@/entities/constraint-policy'
+import type { ValidationViolation } from '@/entities/schedule-transaction'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableSnapshot } from '@/entities/timetable'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { WeekTag } from '@/shared/lib/week-tag'
 
 export interface GenerationInput {
   schoolConfig: SchoolConfig
@@ -16,13 +18,15 @@ export interface GenerationInput {
   fixedEvents: Array<FixedEvent>
   constraintPolicy: ConstraintPolicy
   teacherPolicies?: Array<TeacherPolicy>
+  targetWeekTag?: WeekTag
+  academicCalendarEvents?: Array<AcademicCalendarEvent>
   options?: { maxRetries?: number; seed?: number }
 }
 
 export interface GenerationResult {
   success: boolean
   snapshot: TimetableSnapshot | null
-  violations: Array<ConstraintViolation>
+  violations: Array<ValidationViolation>
   unplacedAssignments: Array<UnplacedAssignment>
   suggestions: Array<RelaxationSuggestion>
   stats: {

@@ -164,6 +164,8 @@ function makeBasicInput(
     fixedEvents: [],
     constraintPolicy: makePolicy(),
     teacherPolicies: [],
+    weekTag: '2026-W09',
+    academicCalendarEvents: [],
   }
 }
 
@@ -206,7 +208,7 @@ describe('recomputeUnlocked', () => {
 
     expect(result.success).toBe(true)
     const teacherConflicts = result.violations.filter(
-      (v) => v.type === 'TEACHER_CONFLICT',
+      (v) => v.ruleId === 'HC-07',
     )
     expect(teacherConflicts).toHaveLength(0)
   })
@@ -265,6 +267,8 @@ describe('recomputeUnlocked', () => {
       fixedEvents: [],
       constraintPolicy: makePolicy({ teacherMaxDailyHours: 1 }),
       teacherPolicies: [],
+      weekTag: '2026-W09',
+      academicCalendarEvents: [],
     })
 
     // 일일 1시수만 가능인데 5시수(잠긴2 + 미잠금3) 배치 → 미배치 발생 가능

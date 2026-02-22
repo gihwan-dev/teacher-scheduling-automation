@@ -4,6 +4,9 @@ import type { TimetableCell } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { ReplacementCandidate } from '../../model/types'
 import type { DayOfWeek } from '@/shared/lib/types'
+import type { SchoolConfig } from '@/entities/school'
+import type { Teacher } from '@/entities/teacher'
+import type { Subject } from '@/entities/subject'
 
 function makeCell(
   overrides: Partial<TimetableCell> &
@@ -28,6 +31,89 @@ const defaultPolicy: ConstraintPolicy = {
 }
 
 const activeDays: Array<DayOfWeek> = ['MON', 'TUE', 'WED', 'THU', 'FRI']
+const schoolConfig: SchoolConfig = {
+  id: 'school-1',
+  gradeCount: 1,
+  classCountByGrade: { 1: 1 },
+  activeDays,
+  periodsPerDay: 6,
+  createdAt: '2024-01-01',
+  updatedAt: '2024-01-01',
+}
+
+const teachers: Array<Teacher> = [
+  {
+    id: 'T1',
+    name: '교사1',
+    subjectIds: ['S1'],
+    baseHoursPerWeek: 2,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'T2',
+    name: '교사2',
+    subjectIds: ['S2'],
+    baseHoursPerWeek: 2,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'T3',
+    name: '교사3',
+    subjectIds: ['S3'],
+    baseHoursPerWeek: 2,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'T4',
+    name: '교사4',
+    subjectIds: ['S4'],
+    baseHoursPerWeek: 2,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 2 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+]
+
+const subjects: Array<Subject> = [
+  {
+    id: 'S1',
+    name: '과목1',
+    abbreviation: '과1',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'S2',
+    name: '과목2',
+    abbreviation: '과2',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'S3',
+    name: '과목3',
+    abbreviation: '과3',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'S4',
+    name: '과목4',
+    abbreviation: '과4',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+]
 
 const baseCells: Array<TimetableCell> = [
   makeCell({ teacherId: 'T1', subjectId: 'S1', day: 'MON', period: 1 }),
@@ -58,8 +144,11 @@ describe('rankCandidate', () => {
       allCells: baseCells,
       constraintPolicy: defaultPolicy,
       teacherPolicies: [],
-      activeDays,
-      periodsPerDay: 6,
+      schoolConfig,
+      teachers,
+      subjects,
+      weekTag: '2026-W09' as const,
+      academicCalendarEvents: [],
     }
 
     const rankClean = rankCandidate(
@@ -81,8 +170,11 @@ describe('rankCandidate', () => {
       allCells: baseCells,
       constraintPolicy: defaultPolicy,
       teacherPolicies: [],
-      activeDays,
-      periodsPerDay: 6,
+      schoolConfig,
+      teachers,
+      subjects,
+      weekTag: '2026-W09' as const,
+      academicCalendarEvents: [],
     }
 
     const rankMove = rankCandidate(
@@ -104,8 +196,11 @@ describe('rankCandidate', () => {
       allCells: baseCells,
       constraintPolicy: defaultPolicy,
       teacherPolicies: [],
-      activeDays,
-      periodsPerDay: 6,
+      schoolConfig,
+      teachers,
+      subjects,
+      weekTag: '2026-W09' as const,
+      academicCalendarEvents: [],
     }
 
     // 같은 type으로 비교하되 afterCells가 달라서 scoreDelta가 다름
@@ -164,6 +259,10 @@ describe('rankCandidate', () => {
       constraintPolicy: defaultPolicy,
       teacherPolicies: [],
       fixedEvents: [],
+      teachers,
+      subjects,
+      weekTag: '2026-W09' as const,
+      academicCalendarEvents: [],
     }
 
     const result = findReplacementCandidates(

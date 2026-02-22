@@ -106,4 +106,40 @@ describe('academicCalendarEventSchema', () => {
       }).success,
     ).toBe(false)
   })
+
+  it('GRADE 범위는 숫자 scopeValue를 요구한다', () => {
+    expect(
+      academicCalendarEventSchema.safeParse({
+        ...validEvent,
+        scopeType: 'GRADE',
+        scopeValue: '2',
+      }).success,
+    ).toBe(true)
+
+    expect(
+      academicCalendarEventSchema.safeParse({
+        ...validEvent,
+        scopeType: 'GRADE',
+        scopeValue: '2학년',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('CLASS 범위는 "{grade}-{classNumber}" 형식을 요구한다', () => {
+    expect(
+      academicCalendarEventSchema.safeParse({
+        ...validEvent,
+        scopeType: 'CLASS',
+        scopeValue: '2-3',
+      }).success,
+    ).toBe(true)
+
+    expect(
+      academicCalendarEventSchema.safeParse({
+        ...validEvent,
+        scopeType: 'CLASS',
+        scopeValue: '2_3',
+      }).success,
+    ).toBe(false)
+  })
 })

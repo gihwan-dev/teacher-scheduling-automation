@@ -11,6 +11,7 @@ import type { Teacher } from '@/entities/teacher'
 
 import type { GenerationResult } from './types'
 import {
+  loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadConstraintPolicy,
   loadTeacherPolicies,
@@ -18,6 +19,7 @@ import {
   saveTimetableSnapshot,
 } from '@/shared/persistence/indexeddb/repository'
 import { generateId } from '@/shared/lib/id'
+import { computeWeekTagFromTimestamp, getWeekDateRange } from '@/shared/lib/week-tag'
 
 function now(): string {
   return new Date().toISOString()
@@ -109,6 +111,16 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     // 비동기적으로 실행하여 UI 블로킹 방지
     await new Promise((resolve) => setTimeout(resolve, 0))
 
+    const targetWeekTag = computeWeekTagFromTimestamp(Date.now())
+    const { startDate, endDate } = getWeekDateRange(
+      targetWeekTag,
+      schoolConfig.activeDays,
+    )
+    const academicCalendarEvents = await loadAcademicCalendarEventsByRange(
+      startDate,
+      endDate,
+    )
+
     const result = generateTimetable({
       schoolConfig,
       teachers,
@@ -116,6 +128,8 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       fixedEvents,
       constraintPolicy,
       teacherPolicies,
+      targetWeekTag,
+      academicCalendarEvents,
     })
 
     set({ result, isGenerating: false })

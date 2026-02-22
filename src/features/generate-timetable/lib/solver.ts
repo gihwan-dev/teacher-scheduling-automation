@@ -19,9 +19,11 @@ import type {
   UnplacedAssignment,
 } from '../model/types'
 import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
-
 import { generateId } from '@/shared/lib/id'
-import { validateTimetable } from '@/entities/constraint-policy'
+import {
+  buildAcademicCalendarBlockedSlots,
+  validateScheduleChange,
+} from '@/features/validate-schedule-change'
 
 const MAX_HILL_CLIMBING_ITERATIONS = 1000
 const BACKTRACK_DEPTH_LIMIT = 3
@@ -175,7 +177,11 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
     fixedEvents,
     constraintPolicy,
     teacherPolicies,
+    targetWeekTag,
+    academicCalendarEvents = [],
   } = input
+  const createdAt = new Date().toISOString()
+  const weekTag = targetWeekTag ?? computeWeekTagFromIso(createdAt)
 
   // === 전처리 ===
   const grid = new TimetableGrid()
@@ -187,6 +193,14 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
     blockedSlots,
     schoolConfig.classCountByGrade,
   )
+  const calendarBlockedSlots = buildAcademicCalendarBlockedSlots({
+    schoolConfig,
+    weekTag,
+    academicCalendarEvents,
+  })
+  for (const slotKey of calendarBlockedSlots) {
+    blockedSlots.add(slotKey)
+  }
 
   // 고정 이벤트 배치
   const fixedCells = placeFixedEvents(fixedEvents, subjects, grid)
@@ -224,7 +238,15 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
     periodsPerDay,
     teacherPolicies,
   )
-  const violations = validateTimetable(cells, constraintPolicy)
+  const violations = validateScheduleChange({
+    cells,
+    constraintPolicy,
+    schoolConfig,
+    teachers,
+    subjects,
+    weekTag,
+    academicCalendarEvents,
+  })
   const suggestions = suggestRelaxations(unplaced, constraintPolicy)
 
   const hardViolations = violations.filter((v) => v.severity === 'error')
@@ -232,9 +254,6 @@ export function generateTimetable(input: GenerationInput): GenerationResult {
 
   const snapshot = success
     ? (() => {
-        const createdAt = new Date().toISOString()
-        const weekTag = computeWeekTagFromIso(createdAt)
-
         return {
           id: generateId(),
           schoolConfigId: schoolConfig.id,

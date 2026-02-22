@@ -6,6 +6,8 @@ import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { SchoolConfig } from '@/entities/school'
 import type { ReplacementSearchConfig } from '../../model/types'
 import type { DayOfWeek } from '@/shared/lib/types'
+import type { Teacher } from '@/entities/teacher'
+import type { Subject } from '@/entities/subject'
 
 function makeCell(
   overrides: Partial<TimetableCell> &
@@ -54,6 +56,63 @@ const defaultConfig: ReplacementSearchConfig = {
   maxCandidates: 20,
 }
 
+const defaultTeachers: Array<Teacher> = [
+  {
+    id: 'T1',
+    name: '교사1',
+    subjectIds: ['S1'],
+    baseHoursPerWeek: 3,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'T2',
+    name: '교사2',
+    subjectIds: ['S2'],
+    baseHoursPerWeek: 3,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'T3',
+    name: '교사3',
+    subjectIds: ['S3'],
+    baseHoursPerWeek: 3,
+    classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 3 }],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+]
+
+const defaultSubjects: Array<Subject> = [
+  {
+    id: 'S1',
+    name: '과목1',
+    abbreviation: '과1',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'S2',
+    name: '과목2',
+    abbreviation: '과2',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'S3',
+    name: '과목3',
+    abbreviation: '과3',
+    track: 'COMMON',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+]
+
 function makeContext(
   overrides?: Partial<ReplacementFinderContext>,
 ): ReplacementFinderContext {
@@ -62,6 +121,10 @@ function makeContext(
     constraintPolicy: defaultPolicy,
     teacherPolicies: [],
     fixedEvents: [],
+    teachers: defaultTeachers,
+    subjects: defaultSubjects,
+    weekTag: '2026-W09',
+    academicCalendarEvents: [],
     ...overrides,
   }
 }

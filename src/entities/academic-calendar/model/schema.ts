@@ -72,4 +72,39 @@ export const academicCalendarEventSchema = z
         message: 'SHORTENED_DAY에는 periodOverride가 필요합니다.',
       })
     }
+
+    if (event.scopeType === 'GRADE' && event.scopeValue !== null) {
+      const gradeValue = Number(event.scopeValue)
+      if (!/^\d+$/.test(event.scopeValue) || !Number.isInteger(gradeValue) || gradeValue < 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['scopeValue'],
+          message: 'GRADE 범위의 scopeValue는 1 이상의 숫자 문자열이어야 합니다.',
+        })
+      }
+    }
+
+    if (event.scopeType === 'CLASS' && event.scopeValue !== null) {
+      const classScopeRegex = /^\d+-\d+$/
+      if (!classScopeRegex.test(event.scopeValue)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['scopeValue'],
+          message:
+            'CLASS 범위의 scopeValue는 "{grade}-{classNumber}" 형식이어야 합니다.',
+        })
+      } else {
+        const [gradeStr, classNumberStr] = event.scopeValue.split('-')
+        const grade = Number(gradeStr)
+        const classNumber = Number(classNumberStr)
+        if (grade < 1 || classNumber < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['scopeValue'],
+            message:
+              'CLASS 범위의 scopeValue는 grade/classNumber가 1 이상이어야 합니다.',
+          })
+        }
+      }
+    }
   })

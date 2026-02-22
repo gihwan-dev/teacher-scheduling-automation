@@ -1,18 +1,19 @@
 import type {
   ConstraintPolicy,
-  ConstraintViolation,
 } from '@/entities/constraint-policy'
+import type { ValidationViolation } from '@/entities/schedule-transaction'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableCell } from '@/entities/timetable'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import type {
   RelaxationSuggestion,
   UnplacedAssignment,
 } from '@/features/generate-timetable'
-import { validateTimetable } from '@/entities/constraint-policy'
 import {
   TimetableGrid,
   buildAssignmentUnitsFromCells,
@@ -22,6 +23,10 @@ import {
 } from '@/features/generate-timetable'
 import { suggestRelaxations } from '@/features/generate-timetable/lib/failure-analyzer'
 import { computeTotalScore } from '@/features/generate-timetable/lib/scorer'
+import {
+  buildAcademicCalendarBlockedSlots,
+  validateScheduleChange,
+} from '@/features/validate-schedule-change'
 
 export interface RecomputeInput {
   cells: Array<TimetableCell>
@@ -31,13 +36,15 @@ export interface RecomputeInput {
   fixedEvents: Array<FixedEvent>
   constraintPolicy: ConstraintPolicy
   teacherPolicies: Array<TeacherPolicy>
+  weekTag: WeekTag
+  academicCalendarEvents: Array<AcademicCalendarEvent>
 }
 
 export interface RecomputeResult {
   success: boolean
   cells: Array<TimetableCell>
   score: number
-  violations: Array<ConstraintViolation>
+  violations: Array<ValidationViolation>
   unplacedAssignments: Array<UnplacedAssignment>
   suggestions: Array<RelaxationSuggestion>
   recomputeTimeMs: number
@@ -56,6 +63,8 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     fixedEvents,
     constraintPolicy,
     teacherPolicies,
+    weekTag,
+    academicCalendarEvents,
   } = input
   const { activeDays, periodsPerDay } = schoolConfig
 
@@ -83,6 +92,14 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     blockedSlots,
     schoolConfig.classCountByGrade,
   )
+  const calendarBlockedSlots = buildAcademicCalendarBlockedSlots({
+    schoolConfig,
+    weekTag,
+    academicCalendarEvents,
+  })
+  for (const slotKey of calendarBlockedSlots) {
+    blockedSlots.add(slotKey)
+  }
 
   // 4. 잠긴 시수 차감된 배정 단위 생성
   const subjectMap = new Map(subjects.map((s) => [s.id, s]))
@@ -126,7 +143,15 @@ export function recomputeUnlocked(input: RecomputeInput): RecomputeResult {
     periodsPerDay,
     teacherPolicies,
   )
-  const violations = validateTimetable(mergedCells, constraintPolicy)
+  const violations = validateScheduleChange({
+    cells: mergedCells,
+    constraintPolicy,
+    schoolConfig,
+    teachers,
+    subjects,
+    weekTag,
+    academicCalendarEvents,
+  })
   const suggestions =
     unplaced.length > 0 ? suggestRelaxations(unplaced, constraintPolicy) : []
 

@@ -8,6 +8,7 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type {
   CellKey,
   TimetableCell,
@@ -23,12 +24,14 @@ import type {
 import { buildCellMap } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
 import {
+  loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadConstraintPolicy,
   loadLatestTimetableSnapshot,
   loadTeacherPolicies,
   updateTimetableSnapshot,
 } from '@/shared/persistence/indexeddb/repository'
+import { getWeekDateRange } from '@/shared/lib/week-tag'
 
 interface ReplacementState {
   // 데이터
@@ -43,6 +46,7 @@ interface ReplacementState {
   fixedEvents: Array<FixedEvent>
   constraintPolicy: ConstraintPolicy | null
   teacherPolicies: Array<TeacherPolicy>
+  academicCalendarEvents: Array<AcademicCalendarEvent>
 
   // 단일 교체 탐색 상태
   targetCellKey: CellKey | null
@@ -92,6 +96,7 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   fixedEvents: [],
   constraintPolicy: null,
   teacherPolicies: [],
+  academicCalendarEvents: [],
   targetCellKey: null,
   searchConfig: {
     scope: 'SAME_CLASS',
@@ -128,17 +133,29 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
     }
 
     const cells = snapshot.cells
+    const loadedSchoolConfig = setupData.schoolConfig ?? null
+    const academicCalendarEvents =
+      loadedSchoolConfig !== null
+        ? await (async () => {
+            const { startDate, endDate } = getWeekDateRange(
+              snapshot.weekTag,
+              loadedSchoolConfig.activeDays,
+            )
+            return loadAcademicCalendarEventsByRange(startDate, endDate)
+          })()
+        : []
 
     set({
       snapshot,
       cells,
       cellMap: buildCellMap(cells),
-      schoolConfig: setupData.schoolConfig ?? null,
+      schoolConfig: loadedSchoolConfig,
       teachers: setupData.teachers,
       subjects: setupData.subjects,
       fixedEvents: setupData.fixedEvents,
       constraintPolicy: savedPolicy ?? null,
       teacherPolicies,
+      academicCalendarEvents,
       isLoading: false,
       targetCellKey: null,
       searchResult: null,
@@ -186,11 +203,15 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       constraintPolicy,
       teacherPolicies,
       fixedEvents,
+      teachers,
+      subjects,
+      snapshot,
+      academicCalendarEvents,
     } = get()
     if (!targetCellKey || !schoolConfig || !constraintPolicy) return
 
     const sourceCell = cellMap.get(targetCellKey)
-    if (!sourceCell) return
+    if (!sourceCell || !snapshot) return
 
     set({ isSearching: true })
 
@@ -204,6 +225,10 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
         constraintPolicy,
         teacherPolicies,
         fixedEvents,
+        teachers,
+        subjects,
+        weekTag: snapshot.weekTag,
+        academicCalendarEvents,
       },
     )
 
@@ -334,9 +359,14 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       constraintPolicy,
       teacherPolicies,
       fixedEvents,
+      teachers,
+      subjects,
+      snapshot,
+      academicCalendarEvents,
     } = get()
     if (multiTargetCellKeys.length < 2 || !schoolConfig || !constraintPolicy)
       return
+    if (!snapshot) return
 
     set({ isSearching: true })
 
@@ -349,6 +379,10 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
         constraintPolicy,
         teacherPolicies,
         fixedEvents,
+        teachers,
+        subjects,
+        weekTag: snapshot.weekTag,
+        academicCalendarEvents,
       },
     )
 
