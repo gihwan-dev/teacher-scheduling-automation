@@ -58,11 +58,10 @@ export function isPlacementValid(
   blockedSlots: Set<string>,
   teacherPolicies?: Array<TeacherPolicy>,
 ): boolean {
+  const subjectType = unit.subjectType ?? 'CLASS'
+
   // 1. 교사 충돌 금지: 동일 시간 2개 반 불가
-  if (
-    unit.subjectType === 'CLASS' &&
-    grid.isTeacherBusy(unit.teacherId, day, period)
-  ) {
+  if (subjectType === 'CLASS' && grid.isTeacherBusy(unit.teacherId, day, period)) {
     return false
   }
 
@@ -82,7 +81,7 @@ export function isPlacementValid(
   const tp = teacherPolicies?.find((p) => p.teacherId === unit.teacherId)
   const maxDaily = tp?.maxDailyHoursOverride ?? policy.teacherMaxDailyHours
   const teacherDayHours =
-    unit.subjectType === 'CLASS'
+    subjectType === 'CLASS'
       ? grid.getTeacherDayHours(unit.teacherId, day)
       : grid.getTeacherDayUniqueHours(unit.teacherId, day)
   if (teacherDayHours >= maxDaily) {

@@ -60,7 +60,7 @@ export const legacyClassHoursAssignmentSchema = classHoursAssignmentSchema
 export const teacherSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  subjectIds: z.array(z.string().min(1)).optional(),
+  subjectIds: z.array(z.string().min(1)).min(1),
   baseHoursPerWeek: z.number().int().min(0),
   assignments: z.array(teachingAssignmentSchema).optional(),
   homeroom: homeroomAssignmentSchema.nullable().optional(),

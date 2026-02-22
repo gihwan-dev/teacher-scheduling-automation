@@ -364,6 +364,7 @@ function buildAssignmentUnits(
         units.push({
           teacherId: teacher.id,
           subjectId,
+          subjectType: 'CLASS',
           grade: assignment.grade,
           classNumber: assignment.classNumber,
           totalHours: assignment.hoursPerWeek,
