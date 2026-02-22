@@ -1,15 +1,19 @@
 import { defineConfig } from 'vitest/config'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const rootDir = dirname(fileURLToPath(import.meta.url))
 
 const config = defineConfig({
   resolve: {
     alias: {
-      '@': '/Users/choegihwan/Documents/Projects/scheduling-automation/src',
+      '@': resolve(rootDir, 'src'),
     },
   },
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['/Users/choegihwan/Documents/Projects/scheduling-automation/src/test-setup.ts'],
+    setupFiles: [resolve(rootDir, 'src/test-setup.ts')],
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
   },
 })
