@@ -22,6 +22,7 @@ import type {
   ReplacementSearchConfig,
   ReplacementSearchResult,
 } from './types'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import { buildCellMap } from '@/features/edit-timetable-cell'
 import { isCellEditable } from '@/features/edit-timetable-cell/lib/edit-validator'
 import {
@@ -32,10 +33,12 @@ import {
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadConstraintPolicy,
-  loadLatestTimetableSnapshot,
+  loadSnapshotBySelection,
+  loadSnapshotWeeks,
+  loadSnapshotsByWeek,
   loadTeacherPolicies,
   saveImpactAnalysisReport,
-  updateTimetableSnapshot,
+  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { getWeekDateRange } from '@/shared/lib/week-tag'
 
@@ -44,6 +47,8 @@ interface ReplacementState {
   snapshot: TimetableSnapshot | null
   cells: Array<TimetableCell>
   cellMap: Map<CellKey, TimetableCell>
+  availableWeekTags: Array<WeekTag>
+  availableVersionNos: Array<number>
 
   // 참조 데이터
   schoolConfig: SchoolConfig | null
@@ -78,7 +83,10 @@ interface ReplacementState {
   impactReportLoading: boolean
 
   // 액션
-  loadSnapshot: () => Promise<void>
+  loadSnapshot: (selection?: {
+    weekTag?: WeekTag
+    versionNo?: number
+  }) => Promise<void>
   setViewTarget: (grade: number, classNumber: number) => void
   selectTargetCell: (key: CellKey) => void
   search: () => void
@@ -99,6 +107,8 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   snapshot: null,
   cells: [],
   cellMap: new Map(),
+  availableWeekTags: [],
+  availableVersionNos: [],
   schoolConfig: null,
   teachers: [],
   subjects: [],
@@ -126,25 +136,30 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   isSearching: false,
   impactReportLoading: false,
 
-  loadSnapshot: async () => {
+  loadSnapshot: async (selection = {}) => {
     set({ isLoading: true })
-    const [setupData, snapshot, savedPolicy, teacherPolicies] =
+    const [setupData, snapshot, savedPolicy, teacherPolicies, weekTags] =
       await Promise.all([
         loadAllSetupData(),
-        loadLatestTimetableSnapshot(),
+        loadSnapshotBySelection(selection),
         loadConstraintPolicy(),
         loadTeacherPolicies(),
+        loadSnapshotWeeks(),
       ])
 
     if (!snapshot) {
       set({
         isLoading: false,
         schoolConfig: setupData.schoolConfig ?? null,
+        availableWeekTags: weekTags,
+        availableVersionNos: [],
       })
       return
     }
 
     const cells = snapshot.cells
+    const versionSnapshots = await loadSnapshotsByWeek(snapshot.weekTag)
+    const availableVersionNos = versionSnapshots.map((item) => item.versionNo)
     const loadedSchoolConfig = setupData.schoolConfig ?? null
     const academicCalendarEvents =
       loadedSchoolConfig !== null
@@ -161,6 +176,8 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       snapshot,
       cells,
       cellMap: buildCellMap(cells),
+      availableWeekTags: weekTags,
+      availableVersionNos,
       schoolConfig: loadedSchoolConfig,
       teachers: setupData.teachers,
       subjects: setupData.subjects,
@@ -355,17 +372,17 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
         .concat(resultTargetCell)
     }
 
-    const updated: TimetableSnapshot = {
-      ...snapshot,
+    const nextSnapshot = await saveNextSnapshotVersion({
+      sourceSnapshot: snapshot,
       cells: newCells,
-    }
-
-    await updateTimetableSnapshot(updated)
+    })
+    const versions = await loadSnapshotsByWeek(nextSnapshot.weekTag)
 
     set({
-      snapshot: updated,
+      snapshot: nextSnapshot,
       cells: newCells,
       cellMap: buildCellMap(newCells),
+      availableVersionNos: versions.map((item) => item.versionNo),
       targetCellKey: null,
       searchResult: null,
       selectedCandidate: null,
@@ -567,17 +584,17 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
       }
     }
 
-    const updated: TimetableSnapshot = {
-      ...snapshot,
+    const nextSnapshot = await saveNextSnapshotVersion({
+      sourceSnapshot: snapshot,
       cells: newCells,
-    }
-
-    await updateTimetableSnapshot(updated)
+    })
+    const versions = await loadSnapshotsByWeek(nextSnapshot.weekTag)
 
     set({
-      snapshot: updated,
+      snapshot: nextSnapshot,
       cells: newCells,
       cellMap: buildCellMap(newCells),
+      availableVersionNos: versions.map((item) => item.versionNo),
       multiTargetCellKeys: [],
       multiSearchResult: null,
       selectedMultiCandidate: null,

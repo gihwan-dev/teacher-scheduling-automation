@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildForwardWeekWindow,
   computeWeekTagFromTimestamp,
   getIsoDateForWeekDay,
   getWeekDateRange,
   getWeekStartDate,
+  shiftWeekTag,
 } from '../week-tag'
 
 describe('week-tag utilities', () => {
@@ -34,5 +36,19 @@ describe('week-tag utilities', () => {
         startDate: '2026-02-23',
         endDate: '2026-02-27',
       })
+  })
+
+  it('주차를 N주 이동한다', () => {
+    expect(shiftWeekTag('2026-W09', 1)).toBe('2026-W10')
+    expect(shiftWeekTag('2026-W09', -1)).toBe('2026-W08')
+  })
+
+  it('현재+미래 주차 윈도우를 생성한다', () => {
+    expect(buildForwardWeekWindow('2026-W09', 3)).toEqual([
+      '2026-W09',
+      '2026-W10',
+      '2026-W11',
+      '2026-W12',
+    ])
   })
 })

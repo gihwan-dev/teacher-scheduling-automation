@@ -4,19 +4,24 @@ import {
   loadAcademicCalendarEvents,
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
+  loadChangeEventsByWeek,
   loadFixedEvents,
   loadImpactAnalysisReport,
   loadImpactAnalysisReportsBySnapshot,
   loadLatestSnapshotByWeek,
   loadSchoolConfig,
+  loadSnapshotBySelection,
   loadSnapshotVersion,
+  loadSnapshotWeeks,
   loadSnapshotsByWeek,
   loadSubjects,
   loadTeachers,
   saveAcademicCalendarEvents,
   saveAllSetupData,
+  saveChangeEvent,
   saveFixedEvents,
   saveImpactAnalysisReport,
+  saveNextSnapshotVersion,
   saveScheduleTransaction,
   saveSchoolConfig,
   saveSubjects,
@@ -114,6 +119,18 @@ const sampleSnapshotV2: TimetableSnapshot = {
   id: 'snapshot-2',
   versionNo: 2,
   baseVersionId: 'snapshot-1',
+}
+
+const sampleSnapshotOtherWeek: TimetableSnapshot = {
+  ...sampleSnapshotV1,
+  id: 'snapshot-3',
+  weekTag: '2026-W10',
+  versionNo: 1,
+  appliedScope: {
+    type: 'THIS_WEEK',
+    fromWeek: '2026-W10',
+    toWeek: null,
+  },
 }
 
 const sampleCalendarEvents: Array<AcademicCalendarEvent> = [
@@ -280,6 +297,75 @@ describe('TimetableSnapshot persistence', () => {
     const version = await loadSnapshotVersion('2026-W08', 1)
     expect(version?.id).toBe('snapshot-1')
   })
+
+  it('주차 목록을 역순으로 조회할 수 있다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotOtherWeek)
+
+    const weeks = await loadSnapshotWeeks()
+    expect(weeks).toEqual(['2026-W10', '2026-W08'])
+  })
+
+  it('주차/버전 선택으로 스냅샷을 조회한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotV2)
+
+    const latestByWeek = await loadSnapshotBySelection({
+      weekTag: '2026-W08',
+    })
+    expect(latestByWeek?.id).toBe('snapshot-2')
+
+    const exact = await loadSnapshotBySelection({
+      weekTag: '2026-W08',
+      versionNo: 1,
+    })
+    expect(exact?.id).toBe('snapshot-1')
+
+    const fallback = await loadSnapshotBySelection({
+      weekTag: '2026-W08',
+      versionNo: 999,
+    })
+    expect(fallback?.id).toBe('snapshot-2')
+  })
+
+  it('다음 버전을 append-only로 저장한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+    await saveTimetableSnapshot(sampleSnapshotV2)
+
+    const next = await saveNextSnapshotVersion({
+      sourceSnapshot: sampleSnapshotV1,
+      cells: [
+        {
+          teacherId: 'teacher-1',
+          subjectId: 'sub-1',
+          grade: 1,
+          classNumber: 1,
+          day: 'MON',
+          period: 1,
+          isFixed: false,
+          status: 'CONFIRMED_MODIFIED',
+        },
+      ],
+    })
+
+    expect(next.id).not.toBe(sampleSnapshotV1.id)
+    expect(next.weekTag).toBe('2026-W08')
+    expect(next.versionNo).toBe(3)
+    expect(next.baseVersionId).toBe(sampleSnapshotV1.id)
+    expect(next.cells).toHaveLength(1)
+  })
+
+  it('주차 첫 버전은 versionNo=1로 시작한다', async () => {
+    const next = await saveNextSnapshotVersion({
+      sourceSnapshot: sampleSnapshotV1,
+      cells: [],
+      overrideWeekTag: '2026-W11',
+    })
+
+    expect(next.weekTag).toBe('2026-W11')
+    expect(next.versionNo).toBe(1)
+    expect(next.baseVersionId).toBeNull()
+  })
 })
 
 describe('AcademicCalendarEvents persistence', () => {
@@ -334,5 +420,64 @@ describe('ImpactAnalysisReport persistence', () => {
 
     const reports = await loadImpactAnalysisReportsBySnapshot('snapshot-1')
     expect(reports.map((report) => report.id)).toEqual(['impact-1', 'impact-2'])
+  })
+})
+
+describe('ChangeEvents persistence', () => {
+  it('주차 기준으로 이력을 조회할 수 있다', async () => {
+    await saveChangeEvent({
+      id: 'event-1',
+      snapshotId: 'snapshot-1',
+      weekTag: '2026-W08',
+      actionType: 'EDIT',
+      actor: 'LOCAL_OPERATOR',
+      cellKey: '1-1-MON-1',
+      before: null,
+      after: null,
+      beforePayload: null,
+      afterPayload: null,
+      impactSummary: null,
+      conflictDetected: false,
+      rollbackRef: null,
+      timestamp: 10,
+      isUndone: false,
+    })
+    await saveChangeEvent({
+      id: 'event-2',
+      snapshotId: 'snapshot-2',
+      weekTag: '2026-W08',
+      actionType: 'RECOMPUTE',
+      actor: 'LOCAL_OPERATOR',
+      cellKey: '1-1-MON-1',
+      before: null,
+      after: null,
+      beforePayload: null,
+      afterPayload: null,
+      impactSummary: null,
+      conflictDetected: false,
+      rollbackRef: null,
+      timestamp: 20,
+      isUndone: false,
+    })
+    await saveChangeEvent({
+      id: 'event-3',
+      snapshotId: 'snapshot-3',
+      weekTag: '2026-W10',
+      actionType: 'LOCK',
+      actor: 'LOCAL_OPERATOR',
+      cellKey: '1-1-MON-1',
+      before: null,
+      after: null,
+      beforePayload: null,
+      afterPayload: null,
+      impactSummary: null,
+      conflictDetected: false,
+      rollbackRef: null,
+      timestamp: 30,
+      isUndone: false,
+    })
+
+    const weekEvents = await loadChangeEventsByWeek('2026-W08')
+    expect(weekEvents.map((event) => event.id)).toEqual(['event-1', 'event-2'])
   })
 })

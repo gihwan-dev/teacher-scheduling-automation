@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { ReplacementGrid } from './replacement-grid'
@@ -8,6 +9,7 @@ import { RelaxationPanel } from './relaxation-panel'
 import { MultiCandidateListPanel } from './multi-candidate-list-panel'
 import { MultiReplacementPreview } from './multi-replacement-preview'
 import { ImpactAnalysisPanel } from './impact-analysis-panel'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import { useReplacementStore } from '@/features/find-replacement'
 import {
   Select,
@@ -21,10 +23,19 @@ import { Badge } from '@/components/ui/badge'
 import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
+import { WeekVersionSelector } from '@/components/ui/week-version-selector'
+import {
+  buildForwardWeekWindow,
+  computeWeekTagFromTimestamp,
+} from '@/shared/lib/week-tag'
 
 export function ReplacementPage() {
+  const search = useSearch({ from: '/replacement' })
+  const navigate = useNavigate({ from: '/replacement' })
   const {
     snapshot,
+    availableWeekTags,
+    availableVersionNos,
     schoolConfig,
     teachers,
     subjects,
@@ -37,14 +48,88 @@ export function ReplacementPage() {
     multiTargetCellKeys,
     loadSnapshot,
     setViewTarget,
-    search,
+    search: searchCandidates,
     searchMulti,
     toggleMultiMode,
   } = useReplacementStore()
 
+  const weekOptions = useMemo(() => {
+    const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
+    const weeks = new Set(buildForwardWeekWindow(currentWeekTag, 3))
+    for (const week of availableWeekTags) {
+      weeks.add(week)
+    }
+    if (search.week) {
+      weeks.add(search.week)
+    }
+    return [...weeks]
+      .sort((a, b) => a.localeCompare(b))
+      .map((week) => ({ value: week, label: week }))
+  }, [availableWeekTags, search.week])
+
+  const versionOptions = useMemo(
+    () =>
+      [...availableVersionNos]
+        .sort((a, b) => b - a)
+        .map((versionNo) => ({
+          value: versionNo,
+          label: `v${versionNo}`,
+        })),
+    [availableVersionNos],
+  )
+
+  const selectedWeek = search.week ?? snapshot?.weekTag ?? null
+  const selectedVersion = search.version ?? null
+
   useEffect(() => {
-    loadSnapshot()
-  }, [loadSnapshot])
+    loadSnapshot({
+      weekTag: search.week,
+      versionNo: search.version,
+    })
+  }, [loadSnapshot, search.version, search.week])
+
+  useEffect(() => {
+    if (!snapshot) return
+    if (!search.week) {
+      navigate({
+        search: () => ({
+          week: snapshot.weekTag,
+        }),
+        replace: true,
+      })
+      return
+    }
+    if (search.version && search.version !== snapshot.versionNo) {
+      navigate({
+        search: () => ({
+          week: snapshot.weekTag,
+          version: snapshot.versionNo,
+        }),
+        replace: true,
+      })
+    }
+  }, [navigate, search.version, search.week, snapshot])
+
+  const handleWeekChange = (week: WeekTag) => {
+    navigate({
+      search: () => ({
+        week,
+      }),
+      replace: true,
+    })
+  }
+
+  const handleVersionChange = (version: number | null) => {
+    const week = selectedWeek ?? search.week
+    if (!week) return
+    navigate({
+      search: () => ({
+        week,
+        ...(version ? { version } : {}),
+      }),
+      replace: true,
+    })
+  }
 
   if (isLoading) {
     return <LoadingState />
@@ -103,6 +188,16 @@ export function ReplacementPage() {
 
       {/* 컨트롤바 */}
       <div className="flex items-center gap-3 flex-wrap">
+        <WeekVersionSelector
+          weekOptions={weekOptions}
+          selectedWeek={selectedWeek}
+          onWeekChange={handleWeekChange}
+          versionOptions={versionOptions}
+          selectedVersion={selectedVersion}
+          onVersionChange={handleVersionChange}
+          disabled={isSearching}
+        />
+
         <Select
           items={gradeOptions}
           value={String(viewGrade)}
@@ -150,7 +245,7 @@ export function ReplacementPage() {
         </Button>
 
         <Button
-          onClick={isMultiMode ? searchMulti : search}
+          onClick={isMultiMode ? searchMulti : searchCandidates}
           disabled={!canSearch || isSearching}
         >
           {isSearching ? (

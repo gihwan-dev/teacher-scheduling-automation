@@ -44,12 +44,12 @@
 
 ## Phase 4. [PARALLEL:PG-2] 주차 버전 관리 체계 구현
 
-- [ ] **주차 조회와 독립 버전 생성 기능 구현**
+- [x] **주차 조회와 독립 버전 생성 기능 구현**
   - 목표: 현재 주 + 다음 2~3주 동시 조회, 과거 주 조회, 특정 주차 수정이 가능하도록 한다.
   - 검증: 특정 주차를 수정해도 비대상 주차는 변경되지 않는다.
   - 검증: 주차별 버전 번호가 독립적으로 증가한다.
 
-- [ ] **주차 복제/복원 및 버전 로그 연결 구현**
+- [x] **주차 복제/복원 및 버전 로그 연결 구현**
   - 목표: 기존 주차를 복제해 새 버전을 만들고, 특정 버전으로 복원 가능하게 한다.
   - 검증: 복제 후 버전 간 추적 링크(`base_version_id`)가 유지된다.
   - 검증: 복원 시 변경 전후 비교 정보가 감사 로그와 연결된다.
@@ -187,3 +187,33 @@
     - `pnpm run test:unit src/features/find-replacement/lib/__tests__/candidate-ranker.test.ts src/features/find-replacement/lib/__tests__/replacement-finder.test.ts src/features/find-replacement/lib/__tests__/multi-replacement-finder.test.ts`: 통과
     - `pnpm run test:unit src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
   - 다음 미완료 Phase: **Phase 4 (주차 버전 관리 체계 구현)**
+- [2026-02-22] Phase 4 세션 요약:
+  - 완료: 주차 버전 관리 체계 구현(조회/독립 버전/복제/복원/버전 로그 연결)
+  - 구현 내용:
+    - 주차 유틸 확장:
+      - `shiftWeekTag`, `buildForwardWeekWindow` 추가
+    - repository API 확장:
+      - `loadSnapshotWeeks`, `loadSnapshotBySelection`, `saveNextSnapshotVersion`, `loadChangeEventsByWeek`
+    - 라우트 search 계약 추가:
+      - `/generate`: `week`
+      - `/edit`, `/replacement`, `/history`: `week`, `version`
+    - 공통 UI 추가:
+      - `components/ui/week-version-selector` (주차/버전 선택 공통 컴포넌트)
+    - 생성/편집/교체 플로우를 append-only 버전 저장으로 전환:
+      - 저장/확정 시 항상 새 버전 생성(`versionNo` 독립 증가, `baseVersionId` 연결)
+      - 선택 주차/버전 로드 지원 및 URL 컨텍스트 동기화
+    - 이력 페이지 확장:
+      - 주차/버전 선택 기반 타임라인 조회
+      - 동일 주차 내 `복제`/`복원` 액션 추가
+      - `VERSION_CLONE`, `VERSION_RESTORE` 감사 이벤트 및 요약 payload 기록
+  - 테스트:
+    - `shared/lib/week-tag` 테스트 확장
+    - repository 테스트 확장(주차 목록/선택 조회/다음 버전 저장/주차별 이력 조회)
+    - replacement store 영향 테스트 갱신
+    - change-history schema 테스트 확장
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src`: 통과
+    - `pnpm run test:unit src/shared/lib/__tests__/week-tag.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
+    - `pnpm run test:unit src/features/find-replacement/model/__tests__/store-impact.test.ts src/entities/change-history/model/__tests__/schema.test.ts`: 통과
+  - 다음 미완료 Phase: **Phase 5 (적용 범위 교체 플로우 구현)**

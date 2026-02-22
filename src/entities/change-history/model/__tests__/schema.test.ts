@@ -30,6 +30,8 @@ describe('changeActionTypeSchema', () => {
       'MOVE',
       'CONFIRM',
       'RECOMPUTE',
+      'VERSION_CLONE',
+      'VERSION_RESTORE',
     ]) {
       expect(changeActionTypeSchema.safeParse(type).success).toBe(true)
     }

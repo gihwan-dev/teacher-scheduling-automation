@@ -4,7 +4,7 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
-import type { TimetableSnapshot } from '@/entities/timetable'
+import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { ChangeEvent } from '@/entities/change-history'
@@ -12,6 +12,7 @@ import type { WeekTag } from '@/shared/lib/week-tag'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { ScheduleTransaction } from '@/entities/schedule-transaction'
+import { generateId } from '@/shared/lib/id'
 
 // SchoolConfig
 export async function saveSchoolConfig(config: SchoolConfig): Promise<void> {
@@ -152,6 +153,70 @@ export async function loadSnapshotVersion(
     .first()
 }
 
+export async function loadSnapshotWeeks(): Promise<Array<WeekTag>> {
+  const snapshots = await db.timetableSnapshots.toArray()
+  const weekTags = new Set<WeekTag>()
+  for (const snapshot of snapshots) {
+    weekTags.add(snapshot.weekTag)
+  }
+  return [...weekTags].sort((a, b) => b.localeCompare(a))
+}
+
+export async function loadSnapshotBySelection(selection: {
+  weekTag?: WeekTag
+  versionNo?: number
+}): Promise<TimetableSnapshot | undefined> {
+  const { weekTag, versionNo } = selection
+  if (!weekTag) {
+    return loadLatestTimetableSnapshot()
+  }
+  if (versionNo && versionNo > 0) {
+    const exact = await loadSnapshotVersion(weekTag, versionNo)
+    if (exact) {
+      return exact
+    }
+  }
+  return loadLatestSnapshotByWeek(weekTag)
+}
+
+export async function saveNextSnapshotVersion(params: {
+  sourceSnapshot: TimetableSnapshot
+  cells: Array<TimetableCell>
+  overrideWeekTag?: WeekTag
+}): Promise<TimetableSnapshot> {
+  const { sourceSnapshot, cells, overrideWeekTag } = params
+  const weekTag = overrideWeekTag ?? sourceSnapshot.weekTag
+  const latest = await loadLatestSnapshotByWeek(weekTag)
+  const nextVersionNo = (latest?.versionNo ?? 0) + 1
+
+  const appliedScope =
+    sourceSnapshot.appliedScope.type === 'RANGE'
+      ? {
+          ...sourceSnapshot.appliedScope,
+          fromWeek: weekTag,
+          toWeek: sourceSnapshot.appliedScope.toWeek ?? weekTag,
+        }
+      : {
+          ...sourceSnapshot.appliedScope,
+          fromWeek: weekTag,
+          toWeek: null,
+        }
+
+  const nextSnapshot: TimetableSnapshot = {
+    ...sourceSnapshot,
+    id: generateId(),
+    weekTag,
+    versionNo: nextVersionNo,
+    baseVersionId: latest ? sourceSnapshot.id : null,
+    appliedScope,
+    cells,
+    createdAt: new Date().toISOString(),
+  }
+
+  await saveTimetableSnapshot(nextSnapshot)
+  return nextSnapshot
+}
+
 export async function updateTimetableSnapshot(
   snapshot: TimetableSnapshot,
 ): Promise<void> {
@@ -203,6 +268,12 @@ export async function loadChangeEvents(
     .where('snapshotId')
     .equals(snapshotId)
     .sortBy('timestamp')
+}
+
+export async function loadChangeEventsByWeek(
+  weekTag: WeekTag,
+): Promise<Array<ChangeEvent>> {
+  return db.changeEvents.where('weekTag').equals(weekTag).sortBy('timestamp')
 }
 
 export async function updateChangeEvent(event: ChangeEvent): Promise<void> {

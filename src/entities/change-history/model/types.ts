@@ -9,6 +9,8 @@ export type ChangeActionType =
   | 'MOVE'
   | 'CONFIRM'
   | 'RECOMPUTE'
+  | 'VERSION_CLONE'
+  | 'VERSION_RESTORE'
 
 export interface ChangeEvent {
   id: string

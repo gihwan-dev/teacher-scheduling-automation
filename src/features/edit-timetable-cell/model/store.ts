@@ -19,6 +19,7 @@ import type {
   TimetableCell,
   TimetableSnapshot,
 } from '@/entities/timetable'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import {
   buildBlockedSlots,
   expandGradeBlockedSlots,
@@ -33,9 +34,11 @@ import {
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadConstraintPolicy,
-  loadLatestTimetableSnapshot,
+  loadSnapshotBySelection,
+  loadSnapshotWeeks,
+  loadSnapshotsByWeek,
   loadTeacherPolicies,
-  updateTimetableSnapshot,
+  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { getWeekDateRange } from '@/shared/lib/week-tag'
 
@@ -46,6 +49,8 @@ interface EditState {
   snapshot: TimetableSnapshot | null
   cells: Array<TimetableCell>
   cellMap: Map<CellKey, TimetableCell>
+  availableWeekTags: Array<WeekTag>
+  availableVersionNos: Array<number>
 
   // 내비게이션/선택
   focusedCell: CellKey | null
@@ -82,7 +87,10 @@ interface EditState {
   isRecomputing: boolean
 
   // 액션
-  loadSnapshot: () => Promise<void>
+  loadSnapshot: (selection?: {
+    weekTag?: WeekTag
+    versionNo?: number
+  }) => Promise<void>
   setViewTarget: (grade: number, classNumber: number) => void
   setFocusedCell: (key: CellKey | null) => void
   moveFocus: (direction: Direction) => void
@@ -106,6 +114,8 @@ export const useEditStore = create<EditState>((set, get) => ({
   snapshot: null,
   cells: [],
   cellMap: new Map(),
+  availableWeekTags: [],
+  availableVersionNos: [],
   focusedCell: null,
   selectedCells: new Set(),
   isEditing: false,
@@ -127,23 +137,29 @@ export const useEditStore = create<EditState>((set, get) => ({
   isLoading: false,
   isRecomputing: false,
 
-  loadSnapshot: async () => {
+  loadSnapshot: async (selection = {}) => {
     set({ isLoading: true })
-    const [setupData, snapshot, savedPolicy, teacherPolicies] =
+    const [setupData, snapshot, savedPolicy, teacherPolicies, weekTags] =
       await Promise.all([
         loadAllSetupData(),
-        loadLatestTimetableSnapshot(),
+        loadSnapshotBySelection(selection),
         loadConstraintPolicy(),
         loadTeacherPolicies(),
+        loadSnapshotWeeks(),
       ])
 
     if (!snapshot) {
       set({
         isLoading: false,
         schoolConfig: setupData.schoolConfig ?? null,
+        availableWeekTags: weekTags,
+        availableVersionNos: [],
       })
       return
     }
+
+    const versionSnapshots = await loadSnapshotsByWeek(snapshot.weekTag)
+    const availableVersionNos = versionSnapshots.map((item) => item.versionNo)
 
     const cells = snapshot.cells.map((c) => ({
       ...c,
@@ -178,6 +194,8 @@ export const useEditStore = create<EditState>((set, get) => ({
       snapshot,
       cells,
       cellMap: buildCellMap(cells),
+      availableWeekTags: weekTags,
+      availableVersionNos,
       schoolConfig: loadedSchoolConfig,
       teachers: setupData.teachers,
       subjects: setupData.subjects,
@@ -399,6 +417,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (snapshot) {
       useChangeHistoryStore.getState().appendEvent({
         snapshotId: snapshot.id,
+        weekTag: snapshot.weekTag,
         actionType: action.type,
         cellKey: action.cellKey,
         before: action.before,
@@ -471,6 +490,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (snapshot) {
       useChangeHistoryStore.getState().appendEvent({
         snapshotId: snapshot.id,
+        weekTag: snapshot.weekTag,
         actionType: action.type,
         cellKey: action.cellKey,
         before: action.before,
@@ -546,6 +566,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (snapshot) {
       useChangeHistoryStore.getState().appendEvent({
         snapshotId: snapshot.id,
+        weekTag: snapshot.weekTag,
         actionType: action.type,
         cellKey: action.cellKey,
         before: action.before,
@@ -626,6 +647,7 @@ export const useEditStore = create<EditState>((set, get) => ({
       for (const action of actions) {
         historyStore.appendEvent({
           snapshotId: snapshot.id,
+          weekTag: snapshot.weekTag,
           actionType: action.type,
           cellKey: action.cellKey,
           before: action.before,
@@ -707,6 +729,7 @@ export const useEditStore = create<EditState>((set, get) => ({
       for (const action of actions) {
         historyStore.appendEvent({
           snapshotId: snapshot.id,
+          weekTag: snapshot.weekTag,
           actionType: action.type,
           cellKey: action.cellKey,
           before: action.before,
@@ -918,20 +941,32 @@ export const useEditStore = create<EditState>((set, get) => ({
     })
 
     // 이력 기록
-    useChangeHistoryStore.getState().appendRecomputeEvent(snapshot.id)
+    useChangeHistoryStore
+      .getState()
+      .appendRecomputeEvent(snapshot.id, snapshot.weekTag)
   },
 
   saveSnapshot: async () => {
     const { snapshot, cells } = get()
     if (!snapshot) return
 
-    const updated: TimetableSnapshot = {
-      ...snapshot,
+    const nextSnapshot = await saveNextSnapshotVersion({
+      sourceSnapshot: snapshot,
       cells,
-    }
+    })
+    const versions = await loadSnapshotsByWeek(nextSnapshot.weekTag)
 
-    await updateTimetableSnapshot(updated)
-    set({ snapshot: updated, isDirty: false })
+    set({
+      snapshot: nextSnapshot,
+      cells: nextSnapshot.cells,
+      cellMap: buildCellMap(nextSnapshot.cells),
+      availableVersionNos: versions.map((item) => item.versionNo),
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+    })
+
+    await useChangeHistoryStore.getState().loadEvents(nextSnapshot.id)
   },
 
   confirmChanges: () => {
@@ -1005,7 +1040,7 @@ export const useEditStore = create<EditState>((set, get) => ({
     if (snapshot) {
       useChangeHistoryStore
         .getState()
-        .confirmTempModified(snapshot.id, tempModifiedKeys)
+        .confirmTempModified(snapshot.id, snapshot.weekTag, tempModifiedKeys)
     }
   },
 }))

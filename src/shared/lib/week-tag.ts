@@ -103,3 +103,30 @@ export function getWeekDateRange(
     endDate: formatIsoDate(end),
   }
 }
+
+export function shiftWeekTag(weekTag: WeekTag, offsetWeeks: number): WeekTag {
+  if (!Number.isInteger(offsetWeeks)) {
+    throw new Error(`offsetWeeks must be an integer: ${offsetWeeks}`)
+  }
+
+  const start = getWeekStartDate(weekTag)
+  const shifted = new Date(start)
+  shifted.setUTCDate(start.getUTCDate() + offsetWeeks * 7)
+
+  return computeWeekTagFromTimestamp(shifted.getTime())
+}
+
+export function buildForwardWeekWindow(
+  baseWeekTag: WeekTag,
+  futureCount: number,
+): Array<WeekTag> {
+  if (!Number.isInteger(futureCount) || futureCount < 0) {
+    throw new Error(`futureCount must be a non-negative integer: ${futureCount}`)
+  }
+
+  const weeks: Array<WeekTag> = []
+  for (let offset = 0; offset <= futureCount; offset += 1) {
+    weeks.push(shiftWeekTag(baseWeekTag, offset))
+  }
+  return weeks
+}

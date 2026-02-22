@@ -8,10 +8,10 @@ import {
 } from '@/components/ui/select'
 
 interface HistoryFilterBarProps {
-  weekTags: Array<WeekTag>
-  selectedWeekTag: string
+  weekTags?: Array<WeekTag>
+  selectedWeekTag?: string
   selectedActionType: string
-  onWeekTagChange: (value: string) => void
+  onWeekTagChange?: (value: string) => void
   onActionTypeChange: (value: string) => void
 }
 
@@ -24,11 +24,13 @@ const ACTION_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'MOVE', label: '이동' },
   { value: 'CONFIRM', label: '확정' },
   { value: 'RECOMPUTE', label: '재계산' },
+  { value: 'VERSION_CLONE', label: '버전 복제' },
+  { value: 'VERSION_RESTORE', label: '버전 복원' },
 ]
 
 export function HistoryFilterBar({
-  weekTags,
-  selectedWeekTag,
+  weekTags = [],
+  selectedWeekTag = 'ALL',
   selectedActionType,
   onWeekTagChange,
   onActionTypeChange,
@@ -40,22 +42,24 @@ export function HistoryFilterBar({
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <Select
-        items={weekTagOptions}
-        value={selectedWeekTag}
-        onValueChange={(val) => onWeekTagChange(val ?? 'ALL')}
-      >
-        <SelectTrigger className="w-36">
-          <SelectValue placeholder="주차 선택" />
-        </SelectTrigger>
-        <SelectContent>
-          {weekTagOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {onWeekTagChange && weekTagOptions.length > 1 && (
+        <Select
+          items={weekTagOptions}
+          value={selectedWeekTag}
+          onValueChange={(val) => onWeekTagChange(val ?? 'ALL')}
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="주차 선택" />
+          </SelectTrigger>
+          <SelectContent>
+            {weekTagOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <Select
         items={ACTION_TYPE_OPTIONS}

@@ -8,15 +8,18 @@ import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
+import type { WeekTag } from '@/shared/lib/week-tag'
 
 import type { GenerationResult } from './types'
 import {
   loadAcademicCalendarEventsByRange,
   loadAllSetupData,
   loadConstraintPolicy,
+  loadLatestSnapshotByWeek,
+  loadSnapshotWeeks,
   loadTeacherPolicies,
   saveConstraintPolicy,
-  saveTimetableSnapshot,
+  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { generateId } from '@/shared/lib/id'
 import { computeWeekTagFromTimestamp, getWeekDateRange } from '@/shared/lib/week-tag'
@@ -45,6 +48,8 @@ interface GenerateState {
   fixedEvents: Array<FixedEvent>
 
   // Generate state
+  targetWeekTag: WeekTag
+  availableWeekTags: Array<WeekTag>
   constraintPolicy: ConstraintPolicy
   teacherPolicies: Array<TeacherPolicy>
   result: GenerationResult | null
@@ -53,6 +58,7 @@ interface GenerateState {
   setupLoaded: boolean
 
   // Actions
+  setTargetWeekTag: (weekTag: WeekTag) => void
   setConstraintPolicy: (policy: Partial<ConstraintPolicy>) => void
   generate: () => Promise<void>
   saveResult: () => Promise<void>
@@ -64,12 +70,16 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   teachers: [],
   subjects: [],
   fixedEvents: [],
+  targetWeekTag: computeWeekTagFromTimestamp(Date.now()),
+  availableWeekTags: [],
   constraintPolicy: createDefaultPolicy(),
   teacherPolicies: [],
   result: null,
   isGenerating: false,
   isLoading: false,
   setupLoaded: false,
+
+  setTargetWeekTag: (targetWeekTag) => set({ targetWeekTag }),
 
   setConstraintPolicy: (updates) =>
     set((s) => ({
@@ -78,16 +88,19 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
   loadSetupData: async () => {
     set({ isLoading: true })
-    const [setupData, savedPolicy, teacherPolicies] = await Promise.all([
-      loadAllSetupData(),
-      loadConstraintPolicy(),
-      loadTeacherPolicies(),
-    ])
+    const [setupData, savedPolicy, teacherPolicies, availableWeekTags] =
+      await Promise.all([
+        loadAllSetupData(),
+        loadConstraintPolicy(),
+        loadTeacherPolicies(),
+        loadSnapshotWeeks(),
+      ])
     set({
       schoolConfig: setupData.schoolConfig ?? null,
       teachers: setupData.teachers,
       subjects: setupData.subjects,
       fixedEvents: setupData.fixedEvents,
+      availableWeekTags,
       constraintPolicy: savedPolicy ?? createDefaultPolicy(),
       teacherPolicies,
       isLoading: false,
@@ -101,6 +114,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       teachers,
       subjects,
       fixedEvents,
+      targetWeekTag,
       constraintPolicy,
       teacherPolicies,
     } = get()
@@ -111,7 +125,6 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     // 비동기적으로 실행하여 UI 블로킹 방지
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    const targetWeekTag = computeWeekTagFromTimestamp(Date.now())
     const { startDate, endDate } = getWeekDateRange(
       targetWeekTag,
       schoolConfig.activeDays,
@@ -139,9 +152,26 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     const { result, constraintPolicy } = get()
     if (!result?.snapshot) return
 
-    await Promise.all([
-      saveTimetableSnapshot(result.snapshot),
-      saveConstraintPolicy(constraintPolicy),
-    ])
+    const latest = await loadLatestSnapshotByWeek(result.snapshot.weekTag)
+    const sourceSnapshot =
+      latest === undefined
+        ? result.snapshot
+        : { ...result.snapshot, id: latest.id }
+    const savedSnapshot = await saveNextSnapshotVersion({
+      sourceSnapshot,
+      cells: result.snapshot.cells,
+      overrideWeekTag: result.snapshot.weekTag,
+    })
+
+    await saveConstraintPolicy(constraintPolicy)
+    set((state) => ({
+      availableWeekTags: Array.from(
+        new Set([...state.availableWeekTags, savedSnapshot.weekTag]),
+      ).sort((a, b) => b.localeCompare(a)),
+      result:
+        state.result === null
+          ? state.result
+          : { ...state.result, snapshot: savedSnapshot },
+    }))
   },
 }))

@@ -17,6 +17,8 @@ const ACTION_CONFIG: Record<
   MOVE: { label: '이동', icon: '↔️', variant: 'outline' },
   CONFIRM: { label: '확정', icon: '✓', variant: 'default' },
   RECOMPUTE: { label: '재계산', icon: '🔄', variant: 'outline' },
+  VERSION_CLONE: { label: '버전 복제', icon: '🧾', variant: 'secondary' },
+  VERSION_RESTORE: { label: '버전 복원', icon: '⟲', variant: 'default' },
 }
 
 interface HistoryEventCardProps {

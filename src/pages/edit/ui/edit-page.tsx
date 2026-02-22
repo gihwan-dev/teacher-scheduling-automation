@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { EditableTimetableGrid } from './editable-timetable-grid'
 import { EditToolbar } from './edit-toolbar'
 import { EditValidationPanel } from './edit-validation-panel'
 import { KeyboardShortcutsPanel } from './keyboard-shortcuts-panel'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import { StatusLegend } from '@/entities/timetable'
 import { useEditStore } from '@/features/edit-timetable-cell'
+import { WeekVersionSelector } from '@/components/ui/week-version-selector'
 import {
   Select,
   SelectContent,
@@ -15,10 +18,18 @@ import {
 import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useUnsavedWarning } from '@/shared/lib/hooks/use-unsaved-warning'
+import {
+  buildForwardWeekWindow,
+  computeWeekTagFromTimestamp,
+} from '@/shared/lib/week-tag'
 
 export function EditPage() {
+  const search = useSearch({ from: '/edit' })
+  const navigate = useNavigate({ from: '/edit' })
   const {
     snapshot,
+    availableWeekTags,
+    availableVersionNos,
     schoolConfig,
     teachers,
     subjects,
@@ -31,11 +42,87 @@ export function EditPage() {
     setViewTarget,
   } = useEditStore()
 
+  const weekOptions = useMemo(() => {
+    const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
+    const weeks = new Set(buildForwardWeekWindow(currentWeekTag, 3))
+    for (const week of availableWeekTags) {
+      weeks.add(week)
+    }
+    if (search.week) {
+      weeks.add(search.week)
+    }
+    return [...weeks]
+      .sort((a, b) => a.localeCompare(b))
+      .map((week) => ({ value: week, label: week }))
+  }, [availableWeekTags, search.week])
+
+  const versionOptions = useMemo(
+    () =>
+      [...availableVersionNos]
+        .sort((a, b) => b - a)
+        .map((versionNo) => ({
+          value: versionNo,
+          label: `v${versionNo}`,
+        })),
+    [availableVersionNos],
+  )
+
+  const selectedWeek = search.week ?? snapshot?.weekTag ?? null
+  const selectedVersion = search.version ?? null
+
   useEffect(() => {
-    loadSnapshot()
-  }, [loadSnapshot])
+    loadSnapshot({
+      weekTag: search.week,
+      versionNo: search.version,
+    })
+  }, [loadSnapshot, search.version, search.week])
+
+  useEffect(() => {
+    if (!snapshot) return
+    if (!search.week) {
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          week: snapshot.weekTag,
+        }),
+        replace: true,
+      })
+      return
+    }
+    if (search.version && search.version !== snapshot.versionNo) {
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          week: snapshot.weekTag,
+          version: snapshot.versionNo,
+        }),
+        replace: true,
+      })
+    }
+  }, [navigate, search.version, search.week, snapshot])
 
   useUnsavedWarning(isDirty)
+
+  const handleWeekChange = (week: WeekTag) => {
+    navigate({
+      search: () => ({
+        week,
+      }),
+      replace: true,
+    })
+  }
+
+  const handleVersionChange = (version: number | null) => {
+    const week = selectedWeek ?? search.week
+    if (!week) return
+    navigate({
+      search: () => ({
+        week,
+        ...(version ? { version } : {}),
+      }),
+      replace: true,
+    })
+  }
 
   if (isLoading) {
     return <LoadingState />
@@ -81,7 +168,18 @@ export function EditPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-2xl font-bold">시간표 편집</h1>
-        <EditToolbar />
+        <div className="flex items-center gap-2 flex-wrap">
+          <WeekVersionSelector
+            weekOptions={weekOptions}
+            selectedWeek={selectedWeek}
+            onWeekChange={handleWeekChange}
+            versionOptions={versionOptions}
+            selectedVersion={selectedVersion}
+            onVersionChange={handleVersionChange}
+            disabled={isLoading}
+          />
+          <EditToolbar />
+        </div>
       </div>
 
       {/* 학년/반 선택 + 단축키 */}

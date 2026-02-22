@@ -5,8 +5,9 @@ import type { ReplacementCandidate } from '../types'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
 import {
+  loadSnapshotsByWeek,
   saveImpactAnalysisReport,
-  updateTimetableSnapshot,
+  saveNextSnapshotVersion,
 } from '@/shared/persistence/indexeddb/repository'
 import { analyzeReplacementImpact } from '@/features/analyze-schedule-impact'
 
@@ -14,9 +15,11 @@ vi.mock('@/shared/persistence/indexeddb/repository', () => ({
   loadAcademicCalendarEventsByRange: vi.fn(),
   loadAllSetupData: vi.fn(),
   loadConstraintPolicy: vi.fn(),
-  loadLatestTimetableSnapshot: vi.fn(),
+  loadSnapshotBySelection: vi.fn(),
+  loadSnapshotWeeks: vi.fn(),
+  loadSnapshotsByWeek: vi.fn(),
   loadTeacherPolicies: vi.fn(),
-  updateTimetableSnapshot: vi.fn(),
+  saveNextSnapshotVersion: vi.fn(),
   saveImpactAnalysisReport: vi.fn(),
 }))
 
@@ -25,7 +28,8 @@ vi.mock('@/features/analyze-schedule-impact', () => ({
   analyzeMultiReplacementImpact: vi.fn(),
 }))
 
-const mockedUpdateTimetableSnapshot = vi.mocked(updateTimetableSnapshot)
+const mockedLoadSnapshotsByWeek = vi.mocked(loadSnapshotsByWeek)
+const mockedSaveNextSnapshotVersion = vi.mocked(saveNextSnapshotVersion)
 const mockedSaveImpactAnalysisReport = vi.mocked(saveImpactAnalysisReport)
 const mockedAnalyzeReplacementImpact = vi.mocked(analyzeReplacementImpact)
 
@@ -93,9 +97,11 @@ const impactReport: ImpactAnalysisReport = {
 }
 
 beforeEach(() => {
-  mockedUpdateTimetableSnapshot.mockReset()
+  mockedLoadSnapshotsByWeek.mockReset()
+  mockedSaveNextSnapshotVersion.mockReset()
   mockedSaveImpactAnalysisReport.mockReset()
   mockedAnalyzeReplacementImpact.mockReset()
+  mockedLoadSnapshotsByWeek.mockResolvedValue([snapshot])
   useReplacementStore.setState(useReplacementStore.getInitialState(), true)
 })
 
@@ -142,11 +148,16 @@ describe('replacement store impact integration', () => {
     })
 
     await useReplacementStore.getState().confirmReplacement()
-    expect(mockedUpdateTimetableSnapshot).not.toHaveBeenCalled()
+    expect(mockedSaveNextSnapshotVersion).not.toHaveBeenCalled()
   })
 
   it('리포트가 있으면 교체를 저장한다', async () => {
-    mockedUpdateTimetableSnapshot.mockResolvedValue()
+    mockedSaveNextSnapshotVersion.mockResolvedValue({
+      ...snapshot,
+      id: 'snapshot-2',
+      versionNo: 2,
+      baseVersionId: 'snapshot-1',
+    })
     useReplacementStore.setState({
       snapshot,
       cells: [sourceCell],
@@ -156,7 +167,7 @@ describe('replacement store impact integration', () => {
 
     await useReplacementStore.getState().confirmReplacement()
 
-    expect(mockedUpdateTimetableSnapshot).toHaveBeenCalledTimes(1)
+    expect(mockedSaveNextSnapshotVersion).toHaveBeenCalledTimes(1)
     expect(useReplacementStore.getState().selectedCandidate).toBeNull()
   })
 })

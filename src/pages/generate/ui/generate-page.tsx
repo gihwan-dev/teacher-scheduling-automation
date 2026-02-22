@@ -1,39 +1,92 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { PlayIcon } from '@hugeicons/core-free-icons'
 import { ConstraintConfigForm } from './constraint-config-form'
 import { GenerationResultPanel } from './generation-result-panel'
 import { TimetableView } from './timetable-view'
+import type { WeekTag } from '@/shared/lib/week-tag'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingState } from '@/components/ui/loading-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Spinner } from '@/components/ui/spinner'
+import { WeekVersionSelector } from '@/components/ui/week-version-selector'
 import { useGenerateStore } from '@/features/generate-timetable/model/store'
+import {
+  buildForwardWeekWindow,
+  computeWeekTagFromTimestamp,
+} from '@/shared/lib/week-tag'
 
 export function GeneratePage() {
+  const search = useSearch({ from: '/generate' })
+  const navigate = useNavigate({ from: '/generate' })
   const {
     schoolConfig,
     teachers,
     subjects,
     fixedEvents,
+    targetWeekTag,
+    availableWeekTags,
     result,
     isGenerating,
     isLoading,
     setupLoaded,
     loadSetupData,
+    setTargetWeekTag,
     generate,
   } = useGenerateStore()
+
+  const weekOptions = useMemo(() => {
+    const currentWeekTag = computeWeekTagFromTimestamp(Date.now())
+    const weeks = new Set(buildForwardWeekWindow(currentWeekTag, 3))
+    for (const week of availableWeekTags) {
+      weeks.add(week)
+    }
+    if (search.week) {
+      weeks.add(search.week)
+    }
+    return [...weeks]
+      .sort((a, b) => a.localeCompare(b))
+      .map((week) => ({ value: week, label: week }))
+  }, [availableWeekTags, search.week])
 
   useEffect(() => {
     loadSetupData()
   }, [loadSetupData])
 
+  useEffect(() => {
+    if (!search.week) return
+    if (search.week === targetWeekTag) return
+    setTargetWeekTag(search.week)
+  }, [search.week, setTargetWeekTag, targetWeekTag])
+
+  useEffect(() => {
+    if (search.week) return
+    navigate({
+      search: () => ({
+        week: targetWeekTag,
+      }),
+      replace: true,
+    })
+  }, [navigate, search.week, targetWeekTag])
+
   const handleGenerate = async () => {
     await generate()
-    toast.success('시간표 생성이 완료되었습니다')
+    toast.success(`${targetWeekTag} 시간표 생성이 완료되었습니다`)
+  }
+
+  const handleWeekChange = (week: WeekTag) => {
+    setTargetWeekTag(week)
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        week,
+      }),
+      replace: true,
+    })
   }
 
   if (isLoading || !setupLoaded) {
@@ -64,22 +117,31 @@ export function GeneratePage() {
         <div>
           <h1 className="text-2xl font-bold">시간표 생성</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            설정 데이터를 기반으로 시간표를 자동 생성합니다.
+            설정 데이터를 기반으로 선택 주차의 시간표를 생성합니다.
           </p>
         </div>
-        <Button onClick={handleGenerate} disabled={isGenerating}>
-          {isGenerating ? (
-            <>
-              <Spinner size="sm" />
-              생성 중...
-            </>
-          ) : (
-            <>
-              <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
-              생성
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <WeekVersionSelector
+            weekOptions={weekOptions}
+            selectedWeek={targetWeekTag}
+            onWeekChange={handleWeekChange}
+            versionOptions={[]}
+            disabled={isGenerating}
+          />
+          <Button onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? (
+              <>
+                <Spinner size="sm" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
+                생성
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* 설정 요약 */}
