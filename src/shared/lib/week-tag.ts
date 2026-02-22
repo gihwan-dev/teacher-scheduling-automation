@@ -116,6 +116,45 @@ export function shiftWeekTag(weekTag: WeekTag, offsetWeeks: number): WeekTag {
   return computeWeekTagFromTimestamp(shifted.getTime())
 }
 
+export function compareWeekTag(a: WeekTag, b: WeekTag): number {
+  const parsedA = WEEK_TAG_PARSE_REGEX.exec(a)
+  const parsedB = WEEK_TAG_PARSE_REGEX.exec(b)
+
+  if (!parsedA || !parsedB) {
+    throw new Error(`Invalid weekTag compare input: ${a}, ${b}`)
+  }
+
+  const yearA = Number(parsedA[1])
+  const weekA = Number(parsedA[2])
+  const yearB = Number(parsedB[1])
+  const weekB = Number(parsedB[2])
+
+  if (yearA !== yearB) {
+    return yearA - yearB
+  }
+  return weekA - weekB
+}
+
+export function listWeekTagsBetween(from: WeekTag, to: WeekTag): Array<WeekTag> {
+  if (compareWeekTag(from, to) > 0) {
+    throw new Error(`from must be before to: ${from} > ${to}`)
+  }
+
+  const weeks: Array<WeekTag> = []
+  let current = from
+
+  // Safety guard against unexpected infinite loops.
+  for (let i = 0; i < 1000; i += 1) {
+    weeks.push(current)
+    if (current === to) {
+      return weeks
+    }
+    current = shiftWeekTag(current, 1)
+  }
+
+  throw new Error(`week range exceeds safety guard: ${from} -> ${to}`)
+}
+
 export function buildForwardWeekWindow(
   baseWeekTag: WeekTag,
   futureCount: number,

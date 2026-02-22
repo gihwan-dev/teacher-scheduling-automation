@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildForwardWeekWindow,
+  compareWeekTag,
   computeWeekTagFromTimestamp,
   getIsoDateForWeekDay,
   getWeekDateRange,
   getWeekStartDate,
+  listWeekTagsBetween,
   shiftWeekTag,
 } from '../week-tag'
 
@@ -45,6 +47,21 @@ describe('week-tag utilities', () => {
 
   it('현재+미래 주차 윈도우를 생성한다', () => {
     expect(buildForwardWeekWindow('2026-W09', 3)).toEqual([
+      '2026-W09',
+      '2026-W10',
+      '2026-W11',
+      '2026-W12',
+    ])
+  })
+
+  it('주차 문자열을 연도/주차 기준으로 비교한다', () => {
+    expect(compareWeekTag('2026-W09', '2026-W09')).toBe(0)
+    expect(compareWeekTag('2026-W09', '2026-W10')).toBeLessThan(0)
+    expect(compareWeekTag('2027-W01', '2026-W52')).toBeGreaterThan(0)
+  })
+
+  it('포함 범위 주차 목록을 생성한다', () => {
+    expect(listWeekTagsBetween('2026-W09', '2026-W12')).toEqual([
       '2026-W09',
       '2026-W10',
       '2026-W11',

@@ -1,5 +1,7 @@
 import type { ValidationViolation } from '@/entities/schedule-transaction'
 import type { CellKey, TimetableCell } from '@/entities/timetable'
+import type { ImpactRiskLevel } from '@/entities/impact-analysis'
+import type { WeekTag } from '@/shared/lib/week-tag'
 
 export type ReplacementType = 'SWAP' | 'MOVE'
 
@@ -77,4 +79,44 @@ export interface MultiReplacementSearchResult {
     sourceKey: CellKey
     result: ReplacementSearchResult
   }>
+}
+
+export type ScopeBlockingReason =
+  | 'MISSING_SEMESTER_END'
+  | 'INVALID_RANGE'
+  | 'MISSING_WEEK_SNAPSHOT'
+  | 'SOURCE_CELL_NOT_FOUND'
+  | 'SOURCE_CELL_NOT_EDITABLE'
+  | 'TARGET_CELL_NOT_FOUND'
+  | 'TARGET_CELL_NOT_EDITABLE'
+  | 'TARGET_SLOT_OCCUPIED'
+  | 'VALIDATION_FAILED'
+
+export interface ScopedAlternativeCandidate {
+  id: string
+  weekTag: WeekTag
+  label: string
+  riskLevel: ImpactRiskLevel
+  scoreDelta: number
+  violationCount: number
+}
+
+export interface ScopeValidationIssue {
+  weekTag: WeekTag
+  reason: ScopeBlockingReason
+  message: string
+  violations: Array<ValidationViolation>
+  alternatives: Array<ScopedAlternativeCandidate>
+}
+
+export interface ScopeValidationSummary {
+  status: 'IDLE' | 'BLOCKED' | 'APPLIED'
+  targetWeeks: Array<WeekTag>
+  issues: Array<ScopeValidationIssue>
+}
+
+export interface ReplacementApplyScopeState {
+  type: 'THIS_WEEK' | 'FROM_NEXT_WEEK' | 'RANGE'
+  fromWeek: WeekTag | null
+  toWeek: WeekTag | null
 }

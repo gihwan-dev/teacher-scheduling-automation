@@ -56,12 +56,12 @@
 
 ## Phase 5. [PARALLEL:PG-2] 적용 범위 교체 플로우 구현
 
-- [ ] **적용 범위 선택형 교체 워크플로우 구현**
+- [x] **적용 범위 선택형 교체 워크플로우 구현**
   - 목표: 교체 시 `이번 주만`, `다음 주부터 학기말`, `특정 주차 범위` 선택을 지원한다.
   - 검증: 선택한 범위 외 주차는 변경되지 않는다.
   - 검증: 범위별 적용 결과가 UI에서 명확히 구분된다.
 
-- [ ] **범위 적용 후 재검증 및 대안 제시 구현**
+- [x] **범위 적용 후 재검증 및 대안 제시 구현**
   - 목표: 선택 범위 전체 재검증을 수행하고 충돌 발생 시 대안을 제공한다.
   - 검증: 충돌 발생 시 확정 이전 단계에서 차단된다.
   - 검증: 대안 후보가 영향도와 함께 제시된다.
@@ -217,3 +217,31 @@
     - `pnpm run test:unit src/shared/lib/__tests__/week-tag.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
     - `pnpm run test:unit src/features/find-replacement/model/__tests__/store-impact.test.ts src/entities/change-history/model/__tests__/schema.test.ts`: 통과
   - 다음 미완료 Phase: **Phase 5 (적용 범위 교체 플로우 구현)**
+- [2026-02-22] Phase 5 세션 요약:
+  - 완료: 적용 범위 교체 플로우 구현(범위 선택 + 범위 재검증 + 실패 주차 대안 제시)
+  - 구현 내용:
+    - `shared/lib/week-tag` 확장:
+      - `compareWeekTag`, `listWeekTagsBetween` 추가
+    - `features/find-replacement/lib/apply-replacement-scope` 신규 추가:
+      - `resolveReplacementScopeTargetWeeks`(THIS_WEEK/FROM_NEXT_WEEK/RANGE 계산)
+      - 슬롯 기반 단일/다중 재적용(`applySingleCandidateToWeekCells`, `applyMultiCandidateToWeekCells`)
+      - 주차별 학사일정 필터링/재검증/대안 후보 생성 유틸 추가
+    - `shared/persistence/indexeddb/repository` 확장:
+      - `saveNextSnapshotVersion`에 `appliedScopeOverride` 지원 추가
+    - 교체 스토어/페이지 반영:
+      - 범위 상태(`THIS_WEEK`, `FROM_NEXT_WEEK`, `RANGE`) 및 결과 요약 상태(`IDLE/BLOCKED/APPLIED`) 추가
+      - 확정 흐름을 `범위 검증 -> 전주차 통과 시 일괄 저장`으로 전환(원자성 보장)
+      - 범위 내 누락 스냅샷/전제조건 실패/검증 오류 발생 시 확정 차단 및 주차별 대안 Top3 노출
+      - `ReplacementScopePanel` 신규 추가(범위 선택, 대상 주차 미리보기, 차단 사유/대안 표시)
+      - 단일/다중 후보 확정 다이얼로그에 적용 범위/대상 주차 수 노출 및 차단 토스트 분리
+  - 테스트:
+    - `features/find-replacement/lib/__tests__/apply-replacement-scope.test.ts` 신규 추가
+    - `features/find-replacement/model/__tests__/store-impact.test.ts` 범위 적용 경로 갱신
+    - `shared/lib/__tests__/week-tag.test.ts` 비교/범위 생성 케이스 추가
+    - `shared/persistence/indexeddb/__tests__/repository.test.ts` `appliedScopeOverride` 반영 케이스 추가
+  - 검증 결과:
+    - `pnpm run typecheck`: 통과
+    - `pnpm run lint src/features/find-replacement src/pages/replacement src/shared/persistence/indexeddb src/shared/lib/week-tag.ts`: 통과
+    - `pnpm run test:unit src/features/find-replacement/lib/__tests__/apply-replacement-scope.test.ts src/features/find-replacement/model/__tests__/store-impact.test.ts src/shared/lib/__tests__/week-tag.test.ts src/shared/persistence/indexeddb/__tests__/repository.test.ts`: 통과
+    - `pnpm run test:unit`: 37 files, 306 tests 통과 (Vitest 종료 지연 경고는 기존과 동일)
+  - 다음 미완료 Phase: **Phase 6 (트랜잭션 커밋/롤백 및 감사 로그 완성)**

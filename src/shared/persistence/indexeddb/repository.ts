@@ -4,7 +4,11 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
-import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
+import type {
+  AppliedScope,
+  TimetableCell,
+  TimetableSnapshot,
+} from '@/entities/timetable'
 import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { ChangeEvent } from '@/entities/change-history'
@@ -183,24 +187,30 @@ export async function saveNextSnapshotVersion(params: {
   sourceSnapshot: TimetableSnapshot
   cells: Array<TimetableCell>
   overrideWeekTag?: WeekTag
+  appliedScopeOverride?: AppliedScope
 }): Promise<TimetableSnapshot> {
-  const { sourceSnapshot, cells, overrideWeekTag } = params
+  const { sourceSnapshot, cells, overrideWeekTag, appliedScopeOverride } = params
   const weekTag = overrideWeekTag ?? sourceSnapshot.weekTag
   const latest = await loadLatestSnapshotByWeek(weekTag)
   const nextVersionNo = (latest?.versionNo ?? 0) + 1
 
-  const appliedScope =
-    sourceSnapshot.appliedScope.type === 'RANGE'
-      ? {
-          ...sourceSnapshot.appliedScope,
-          fromWeek: weekTag,
-          toWeek: sourceSnapshot.appliedScope.toWeek ?? weekTag,
-        }
-      : {
-          ...sourceSnapshot.appliedScope,
-          fromWeek: weekTag,
-          toWeek: null,
-        }
+  const appliedScope = (() => {
+    if (appliedScopeOverride) {
+      return appliedScopeOverride
+    }
+    if (sourceSnapshot.appliedScope.type === 'RANGE') {
+      return {
+        ...sourceSnapshot.appliedScope,
+        fromWeek: weekTag,
+        toWeek: sourceSnapshot.appliedScope.toWeek ?? weekTag,
+      }
+    }
+    return {
+      ...sourceSnapshot.appliedScope,
+      fromWeek: weekTag,
+      toWeek: null,
+    }
+  })()
 
   const nextSnapshot: TimetableSnapshot = {
     ...sourceSnapshot,

@@ -5,6 +5,7 @@ import type { ReplacementCandidate } from '../types'
 import type { ImpactAnalysisReport } from '@/entities/impact-analysis'
 import type { TimetableCell, TimetableSnapshot } from '@/entities/timetable'
 import {
+  loadSnapshotWeeks,
   loadSnapshotsByWeek,
   saveImpactAnalysisReport,
   saveNextSnapshotVersion,
@@ -12,9 +13,10 @@ import {
 import { analyzeReplacementImpact } from '@/features/analyze-schedule-impact'
 
 vi.mock('@/shared/persistence/indexeddb/repository', () => ({
-  loadAcademicCalendarEventsByRange: vi.fn(),
+  loadAcademicCalendarEvents: vi.fn(),
   loadAllSetupData: vi.fn(),
   loadConstraintPolicy: vi.fn(),
+  loadLatestSnapshotByWeek: vi.fn(),
   loadSnapshotBySelection: vi.fn(),
   loadSnapshotWeeks: vi.fn(),
   loadSnapshotsByWeek: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock('@/features/analyze-schedule-impact', () => ({
 }))
 
 const mockedLoadSnapshotsByWeek = vi.mocked(loadSnapshotsByWeek)
+const mockedLoadSnapshotWeeks = vi.mocked(loadSnapshotWeeks)
 const mockedSaveNextSnapshotVersion = vi.mocked(saveNextSnapshotVersion)
 const mockedSaveImpactAnalysisReport = vi.mocked(saveImpactAnalysisReport)
 const mockedAnalyzeReplacementImpact = vi.mocked(analyzeReplacementImpact)
@@ -98,10 +101,12 @@ const impactReport: ImpactAnalysisReport = {
 
 beforeEach(() => {
   mockedLoadSnapshotsByWeek.mockReset()
+  mockedLoadSnapshotWeeks.mockReset()
   mockedSaveNextSnapshotVersion.mockReset()
   mockedSaveImpactAnalysisReport.mockReset()
   mockedAnalyzeReplacementImpact.mockReset()
   mockedLoadSnapshotsByWeek.mockResolvedValue([snapshot])
+  mockedLoadSnapshotWeeks.mockResolvedValue(['2026-W08'])
   useReplacementStore.setState(useReplacementStore.getInitialState(), true)
 })
 
@@ -113,6 +118,35 @@ describe('replacement store impact integration', () => {
     useReplacementStore.setState({
       snapshot,
       cells: [sourceCell],
+      schoolConfig: {
+        id: 'config-1',
+        gradeCount: 1,
+        classCountByGrade: { 1: 1 },
+        activeDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+        periodsPerDay: 7,
+        createdAt: '2026-02-22T00:00:00.000Z',
+        updatedAt: '2026-02-22T00:00:00.000Z',
+      },
+      subjects: [
+        {
+          id: 's-1',
+          name: '수학',
+          abbreviation: '수',
+          track: 'COMMON',
+          createdAt: '2026-02-22T00:00:00.000Z',
+          updatedAt: '2026-02-22T00:00:00.000Z',
+        },
+      ],
+      constraintPolicy: {
+        id: 'policy-1',
+        studentMaxConsecutiveSameSubject: 2,
+        teacherMaxConsecutiveHours: 4,
+        teacherMaxDailyHours: 6,
+        createdAt: '2026-02-22T00:00:00.000Z',
+        updatedAt: '2026-02-22T00:00:00.000Z',
+      },
+      teacherPolicies: [],
+      fixedEvents: [],
       teachers: [
         {
           id: 't-1',
@@ -143,11 +177,39 @@ describe('replacement store impact integration', () => {
     useReplacementStore.setState({
       snapshot,
       cells: [sourceCell],
+      schoolConfig: {
+        id: 'config-1',
+        gradeCount: 1,
+        classCountByGrade: { 1: 1 },
+        activeDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+        periodsPerDay: 7,
+        createdAt: '2026-02-22T00:00:00.000Z',
+        updatedAt: '2026-02-22T00:00:00.000Z',
+      },
+      subjects: [
+        {
+          id: 's-1',
+          name: '수학',
+          abbreviation: '수',
+          track: 'COMMON',
+          createdAt: '2026-02-22T00:00:00.000Z',
+          updatedAt: '2026-02-22T00:00:00.000Z',
+        },
+      ],
+      constraintPolicy: {
+        id: 'policy-1',
+        studentMaxConsecutiveSameSubject: 2,
+        teacherMaxConsecutiveHours: 4,
+        teacherMaxDailyHours: 6,
+        createdAt: '2026-02-22T00:00:00.000Z',
+        updatedAt: '2026-02-22T00:00:00.000Z',
+      },
       selectedCandidate: candidate,
       impactReport: null,
     })
 
-    await useReplacementStore.getState().confirmReplacement()
+    const result = await useReplacementStore.getState().confirmReplacement()
+    expect(result).toBe(false)
     expect(mockedSaveNextSnapshotVersion).not.toHaveBeenCalled()
   })
 
@@ -161,13 +223,63 @@ describe('replacement store impact integration', () => {
     useReplacementStore.setState({
       snapshot,
       cells: [sourceCell],
+      schoolConfig: {
+        id: 'config-1',
+        gradeCount: 1,
+        classCountByGrade: { 1: 1 },
+        activeDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+        periodsPerDay: 7,
+        createdAt: '2026-02-22T00:00:00.000Z',
+        updatedAt: '2026-02-22T00:00:00.000Z',
+      },
+      subjects: [
+        {
+          id: 's-1',
+          name: '수학',
+          abbreviation: '수',
+          track: 'COMMON',
+          createdAt: '2026-02-22T00:00:00.000Z',
+          updatedAt: '2026-02-22T00:00:00.000Z',
+        },
+      ],
+      teachers: [
+        {
+          id: 't-1',
+          name: '김교사',
+          subjectIds: ['s-1'],
+          baseHoursPerWeek: 10,
+          classAssignments: [{ grade: 1, classNumber: 1, hoursPerWeek: 10 }],
+          createdAt: '2026-02-22T00:00:00.000Z',
+          updatedAt: '2026-02-22T00:00:00.000Z',
+        },
+      ],
+      constraintPolicy: {
+        id: 'policy-1',
+        studentMaxConsecutiveSameSubject: 2,
+        teacherMaxConsecutiveHours: 4,
+        teacherMaxDailyHours: 6,
+        createdAt: '2026-02-22T00:00:00.000Z',
+        updatedAt: '2026-02-22T00:00:00.000Z',
+      },
+      teacherPolicies: [],
+      fixedEvents: [],
       selectedCandidate: candidate,
       impactReport,
     })
 
-    await useReplacementStore.getState().confirmReplacement()
+    const result = await useReplacementStore.getState().confirmReplacement()
 
+    expect(result).toBe(true)
     expect(mockedSaveNextSnapshotVersion).toHaveBeenCalledTimes(1)
+    expect(mockedSaveNextSnapshotVersion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appliedScopeOverride: {
+          type: 'THIS_WEEK',
+          fromWeek: '2026-W08',
+          toWeek: null,
+        },
+      }),
+    )
     expect(useReplacementStore.getState().selectedCandidate).toBeNull()
   })
 })

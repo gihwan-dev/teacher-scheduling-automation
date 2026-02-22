@@ -12,4 +12,9 @@ export type {
   MultiReplacementCandidate,
   MultiReplacementSearchResult,
   CombinedRanking,
+  ScopeBlockingReason,
+  ScopedAlternativeCandidate,
+  ScopeValidationIssue,
+  ScopeValidationSummary,
+  ReplacementApplyScopeState,
 } from './model/types'

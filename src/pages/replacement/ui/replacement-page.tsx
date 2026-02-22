@@ -9,6 +9,7 @@ import { RelaxationPanel } from './relaxation-panel'
 import { MultiCandidateListPanel } from './multi-candidate-list-panel'
 import { MultiReplacementPreview } from './multi-replacement-preview'
 import { ImpactAnalysisPanel } from './impact-analysis-panel'
+import { ReplacementScopePanel } from './replacement-scope-panel'
 import type { WeekTag } from '@/shared/lib/week-tag'
 import { useReplacementStore } from '@/features/find-replacement'
 import {
@@ -44,6 +45,7 @@ export function ReplacementPage() {
     viewClassNumber,
     isLoading,
     isSearching,
+    isApplyingScope,
     isMultiMode,
     multiTargetCellKeys,
     loadSnapshot,
@@ -195,7 +197,7 @@ export function ReplacementPage() {
           versionOptions={versionOptions}
           selectedVersion={selectedVersion}
           onVersionChange={handleVersionChange}
-          disabled={isSearching}
+          disabled={isSearching || isApplyingScope}
         />
 
         <Select
@@ -246,7 +248,7 @@ export function ReplacementPage() {
 
         <Button
           onClick={isMultiMode ? searchMulti : searchCandidates}
-          disabled={!canSearch || isSearching}
+          disabled={!canSearch || isSearching || isApplyingScope}
         >
           {isSearching ? (
             <>
@@ -261,6 +263,8 @@ export function ReplacementPage() {
           )}
         </Button>
       </div>
+
+      <ReplacementScopePanel weekOptions={weekOptions} />
 
       {/* 2컬럼 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">

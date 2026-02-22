@@ -366,6 +366,26 @@ describe('TimetableSnapshot persistence', () => {
     expect(next.versionNo).toBe(1)
     expect(next.baseVersionId).toBeNull()
   })
+
+  it('appliedScopeOverride를 우선 반영한다', async () => {
+    await saveTimetableSnapshot(sampleSnapshotV1)
+
+    const next = await saveNextSnapshotVersion({
+      sourceSnapshot: sampleSnapshotV1,
+      cells: [],
+      appliedScopeOverride: {
+        type: 'RANGE',
+        fromWeek: '2026-W08',
+        toWeek: '2026-W10',
+      },
+    })
+
+    expect(next.appliedScope).toEqual({
+      type: 'RANGE',
+      fromWeek: '2026-W08',
+      toWeek: '2026-W10',
+    })
+  })
 })
 
 describe('AcademicCalendarEvents persistence', () => {

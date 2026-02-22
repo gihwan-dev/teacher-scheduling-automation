@@ -4,10 +4,12 @@ import type { Teacher } from '@/entities/teacher'
 import type { Subject } from '@/entities/subject'
 import type { ReplacementCandidate } from '@/features/find-replacement'
 import { useReplacementStore } from '@/features/find-replacement'
+import { resolveReplacementScopeTargetWeeks } from '@/features/find-replacement/lib/apply-replacement-scope'
 import { parseCellKey } from '@/features/edit-timetable-cell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ValidationViolationList } from '@/components/ui/validation-violation-list'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,11 @@ export function CandidateListPanel({
     selectedCandidate,
     impactReport,
     impactReportLoading,
+    isApplyingScope,
+    snapshot,
+    applyScope,
+    academicCalendarEvents,
+    scopeValidationSummary,
     selectCandidate,
     confirmReplacement,
   } = useReplacementStore()
@@ -47,12 +54,25 @@ export function CandidateListPanel({
   if (!searchResult) return null
 
   const { candidates, stats } = searchResult
+  const resolvedScope =
+    snapshot === null
+      ? null
+      : resolveReplacementScopeTargetWeeks({
+          selectedWeek: snapshot.weekTag,
+          scopeState: applyScope,
+          academicCalendarEvents,
+        })
+  const targetWeeksCount = resolvedScope?.targetWeeks.length ?? 0
 
   const handleConfirm = async () => {
     setIsConfirming(true)
-    await confirmReplacement()
+    const success = await confirmReplacement()
     setIsConfirming(false)
-    toast.success('교체를 적용했습니다')
+    if (success) {
+      toast.success(`교체를 ${targetWeeksCount}개 주차에 적용했습니다`)
+      return
+    }
+    toast.error('범위 적용이 차단되었습니다. 적용 범위 섹션을 확인해 주세요.')
   }
 
   return (
@@ -100,7 +120,11 @@ export function CandidateListPanel({
                     <Button
                       className="w-full mt-3"
                       disabled={
-                        isConfirming || impactReportLoading || impactReport === null
+                        isConfirming ||
+                        isApplyingScope ||
+                        impactReportLoading ||
+                        impactReport === null ||
+                        !!resolvedScope?.issue
                       }
                     />
                   }
@@ -113,8 +137,16 @@ export function CandidateListPanel({
                       교체를 확정하시겠습니까?
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      선택한 후보로 시간표를 교체합니다. 이 작업은 즉시
-                      저장됩니다.
+                      선택한 후보를 범위에 맞게 교체합니다.
+                      <span className="block mt-1">
+                        적용 범위: <strong>{toScopeLabel(applyScope.type)}</strong> (
+                        {targetWeeksCount}개 주차)
+                      </span>
+                      {resolvedScope?.issue && (
+                        <span className="block mt-1 text-destructive">
+                          {resolvedScope.issue.message}
+                        </span>
+                      )}
                       {impactReport && (
                         <span className="block mt-2">
                           영향 리스크: <strong>{impactReport.riskLevel}</strong>
@@ -131,11 +163,55 @@ export function CandidateListPanel({
                 </AlertDialogContent>
               </AlertDialog>
             )}
+
+            {scopeValidationSummary.status === 'BLOCKED' && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+                <p className="text-xs font-medium text-destructive">
+                  범위 적용 차단 ({scopeValidationSummary.issues.length}개 주차)
+                </p>
+                {scopeValidationSummary.issues.map((issue, index) => (
+                  <div key={`${issue.weekTag}-${index}`} className="space-y-2">
+                    <p className="text-xs">
+                      <span className="font-medium">{issue.weekTag}</span>
+                      <span className="text-muted-foreground"> - {issue.message}</span>
+                    </p>
+                    {issue.violations.length > 0 && (
+                      <ValidationViolationList violations={issue.violations} />
+                    )}
+                    {issue.alternatives.length > 0 && (
+                      <ul className="space-y-1">
+                        {issue.alternatives.map((alternative) => (
+                          <li
+                            key={`${issue.weekTag}-${alternative.id}`}
+                            className="text-xs text-muted-foreground"
+                          >
+                            {alternative.label} · {alternative.riskLevel} · 점수{' '}
+                            {alternative.scoreDelta > 0 ? '+' : ''}
+                            {alternative.scoreDelta.toFixed(1)} · 위반{' '}
+                            {alternative.violationCount}건
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </CardContent>
     </Card>
   )
+}
+
+function toScopeLabel(type: 'THIS_WEEK' | 'FROM_NEXT_WEEK' | 'RANGE'): string {
+  if (type === 'THIS_WEEK') {
+    return '이번 주만'
+  }
+  if (type === 'FROM_NEXT_WEEK') {
+    return '다음 주부터 학기말'
+  }
+  return '특정 주차 범위'
 }
 
 function CandidateRow({
