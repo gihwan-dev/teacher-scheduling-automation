@@ -11,6 +11,7 @@ import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableCell } from '@/entities/timetable'
+import type { Teacher } from '@/entities/teacher'
 import type { DayOfWeek } from '@/shared/lib/types'
 import type {
   AssignmentUnit,
@@ -18,6 +19,7 @@ import type {
   GenerationResult,
   UnplacedAssignment,
 } from '../model/types'
+import { getTeacherAssignments } from '@/entities/teacher'
 import { computeWeekTagFromIso } from '@/shared/lib/week-tag'
 import { generateId } from '@/shared/lib/id'
 import {
@@ -145,15 +147,7 @@ export function runPlacementPipeline(
  * 잠긴 셀의 시수를 차감한 배정 단위 생성
  */
 export function buildAssignmentUnitsFromCells(
-  teachers: Array<{
-    id: string
-    subjectIds: Array<string>
-    classAssignments: Array<{
-      grade: number
-      classNumber: number
-      hoursPerWeek: number
-    }>
-  }>,
+  teachers: Array<Teacher>,
   subjectMap: Map<string, { id: string }>,
   prePlacedCells: Array<TimetableCell>,
 ): Array<AssignmentUnit> {
@@ -326,18 +320,10 @@ function placeFixedEvents(
 
 /**
  * 교사-과목-반 배정 단위 생성
- * ClassHoursAssignment에 subjectId가 없으므로 교사의 subjectIds로 추론
+ * TeachingAssignment 기준으로 CLASS 배정만 단위화한다.
  */
 function buildAssignmentUnits(
-  teachers: Array<{
-    id: string
-    subjectIds: Array<string>
-    classAssignments: Array<{
-      grade: number
-      classNumber: number
-      hoursPerWeek: number
-    }>
-  }>,
+  teachers: Array<Teacher>,
   subjectMap: Map<string, { id: string }>,
   fixedCells: Array<TimetableCell>,
 ): Array<AssignmentUnit> {
@@ -346,24 +332,32 @@ function buildAssignmentUnits(
   // 고정 셀에서 이미 배치된 시수 계산
   const fixedHoursMap = new Map<string, number>()
   for (const cell of fixedCells) {
-    const key = `${cell.teacherId}-${cell.grade}-${cell.classNumber}`
+    const key = `${cell.teacherId}-${cell.grade}-${cell.classNumber}-${cell.subjectId}`
     fixedHoursMap.set(key, (fixedHoursMap.get(key) ?? 0) + 1)
   }
 
   for (const teacher of teachers) {
-    // subjectId 결정: 단일 과목이면 자동 매핑, 다중이면 첫 번째 사용
-    const subjectId = teacher.subjectIds[0]
-    if (!subjectId || !subjectMap.has(subjectId)) continue
+    const assignments = getTeacherAssignments(teacher)
+    for (const assignment of assignments) {
+      if (
+        assignment.subjectType !== 'CLASS' ||
+        assignment.grade === null ||
+        assignment.classNumber === null
+      ) {
+        continue
+      }
+      if (!subjectMap.has(assignment.subjectId)) {
+        continue
+      }
 
-    for (const assignment of teacher.classAssignments) {
-      const fixedKey = `${teacher.id}-${assignment.grade}-${assignment.classNumber}`
+      const fixedKey = `${teacher.id}-${assignment.grade}-${assignment.classNumber}-${assignment.subjectId}`
       const fixedHours = fixedHoursMap.get(fixedKey) ?? 0
       const remaining = assignment.hoursPerWeek - fixedHours
 
       if (remaining > 0) {
         units.push({
           teacherId: teacher.id,
-          subjectId,
+          subjectId: assignment.subjectId,
           subjectType: 'CLASS',
           grade: assignment.grade,
           classNumber: assignment.classNumber,

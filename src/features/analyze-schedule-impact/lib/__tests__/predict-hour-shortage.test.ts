@@ -178,4 +178,56 @@ describe('predictHourShortageFromCalendarChange', () => {
 
     expect(report.recommendations[0].message).toContain('다음 주 보강')
   })
+
+  it('classAssignments가 비어도 assignments 기반으로 요구 시수를 계산한다', () => {
+    const teachersWithAssignmentsOnly: Array<Teacher> = [
+      {
+        id: 't-2',
+        name: '다과목교사',
+        subjectIds: ['s-1', 's-2'],
+        baseHoursPerWeek: 35,
+        assignments: [
+          {
+            id: 'a-1',
+            subjectId: 's-1',
+            subjectType: 'CLASS',
+            grade: 1,
+            classNumber: 1,
+            hoursPerWeek: 20,
+          },
+          {
+            id: 'a-2',
+            subjectId: 's-2',
+            subjectType: 'CLASS',
+            grade: 1,
+            classNumber: 1,
+            hoursPerWeek: 15,
+          },
+        ],
+        homeroom: null,
+        classAssignments: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]
+
+    const report = predictHourShortageFromCalendarChange({
+      beforeEvents: [],
+      afterEvents: [
+        makeEvent({
+          eventType: 'SHORTENED_DAY',
+          scopeType: 'SCHOOL',
+          scopeValue: null,
+          periodOverride: 6,
+        }),
+      ],
+      schoolConfig,
+      teachers: teachersWithAssignmentsOnly,
+      snapshot: makeSnapshot([]),
+    })
+
+    expect(report.shortageByClass).toHaveLength(1)
+    expect(report.shortageByClass[0].requiredHours).toBe(35)
+    expect(report.shortageByClass[0].deltaShortage).toBe(5)
+  })
 })

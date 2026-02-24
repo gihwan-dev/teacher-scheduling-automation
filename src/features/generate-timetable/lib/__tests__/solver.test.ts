@@ -55,6 +55,52 @@ function makeTeacher(
   }
 }
 
+function makeTeacherWithAssignments(
+  id: string,
+  name: string,
+  subjectIds: Array<string>,
+  assignments: Array<{
+    id: string
+    subjectId: string
+    subjectType: 'CLASS'
+    grade: number
+    classNumber: number
+    hoursPerWeek: number
+  }>,
+): Teacher {
+  const baseHours = assignments.reduce((sum, assignment) => {
+    return sum + assignment.hoursPerWeek
+  }, 0)
+
+  const classGrouped = new Map<string, number>()
+  for (const assignment of assignments) {
+    const key = `${assignment.grade}-${assignment.classNumber}`
+    classGrouped.set(
+      key,
+      (classGrouped.get(key) ?? 0) + assignment.hoursPerWeek,
+    )
+  }
+
+  return {
+    id,
+    name,
+    subjectIds,
+    baseHoursPerWeek: baseHours,
+    assignments,
+    homeroom: null,
+    classAssignments: [...classGrouped.entries()].map(([key, hoursPerWeek]) => {
+      const [grade, classNumber] = key.split('-').map(Number)
+      return {
+        grade,
+        classNumber,
+        hoursPerWeek,
+      }
+    }),
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  }
+}
+
 function makePolicy(
   overrides: Partial<ConstraintPolicy> = {},
 ): ConstraintPolicy {
@@ -291,6 +337,119 @@ describe('generateTimetable', () => {
       fromWeek: result.snapshot!.weekTag,
       toWeek: null,
     })
+  })
+
+  it('다과목 교사의 과목별 시수를 subjectId 기준으로 정확히 배정한다', () => {
+    const subjects = [
+      makeSubject('sub-math', '수학'),
+      makeSubject('sub-eng', '영어'),
+    ]
+
+    const teachers = [
+      makeTeacherWithAssignments(
+        't-multi',
+        '복수과목교사',
+        ['sub-math', 'sub-eng'],
+        [
+          {
+            id: 'a-math',
+            subjectId: 'sub-math',
+            subjectType: 'CLASS',
+            grade: 1,
+            classNumber: 1,
+            hoursPerWeek: 2,
+          },
+          {
+            id: 'a-eng',
+            subjectId: 'sub-eng',
+            subjectType: 'CLASS',
+            grade: 1,
+            classNumber: 1,
+            hoursPerWeek: 2,
+          },
+        ],
+      ),
+    ]
+
+    const input = makeInput({
+      schoolConfig: makeSchoolConfig({
+        classCountByGrade: { 1: 1 },
+      }),
+      subjects,
+      teachers,
+    })
+
+    const result = generateTimetable(input)
+
+    expect(result.success).toBe(true)
+    const cells = result.snapshot!.cells.filter((cell) => cell.teacherId === 't-multi')
+    expect(cells.filter((cell) => cell.subjectId === 'sub-math')).toHaveLength(2)
+    expect(cells.filter((cell) => cell.subjectId === 'sub-eng')).toHaveLength(2)
+  })
+
+  it('고정수업 차감은 같은 과목 배정에서만 차감한다', () => {
+    const subjects = [
+      makeSubject('sub-math', '수학'),
+      makeSubject('sub-eng', '영어'),
+    ]
+
+    const teachers = [
+      makeTeacherWithAssignments(
+        't-multi',
+        '복수과목교사',
+        ['sub-math', 'sub-eng'],
+        [
+          {
+            id: 'a-math',
+            subjectId: 'sub-math',
+            subjectType: 'CLASS',
+            grade: 1,
+            classNumber: 1,
+            hoursPerWeek: 2,
+          },
+          {
+            id: 'a-eng',
+            subjectId: 'sub-eng',
+            subjectType: 'CLASS',
+            grade: 1,
+            classNumber: 1,
+            hoursPerWeek: 2,
+          },
+        ],
+      ),
+    ]
+
+    const fixedEvents: Array<FixedEvent> = [
+      {
+        id: 'fe-eng-1',
+        type: 'FIXED_CLASS',
+        description: '영어 고정 수업',
+        teacherId: 't-multi',
+        subjectId: 'sub-eng',
+        grade: 1,
+        classNumber: 1,
+        day: 'MON',
+        period: 1,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      },
+    ]
+
+    const input = makeInput({
+      schoolConfig: makeSchoolConfig({
+        classCountByGrade: { 1: 1 },
+      }),
+      subjects,
+      teachers,
+      fixedEvents,
+    })
+
+    const result = generateTimetable(input)
+
+    expect(result.success).toBe(true)
+    const cells = result.snapshot!.cells.filter((cell) => cell.teacherId === 't-multi')
+    expect(cells.filter((cell) => cell.subjectId === 'sub-math')).toHaveLength(2)
+    expect(cells.filter((cell) => cell.subjectId === 'sub-eng')).toHaveLength(2)
   })
 
   it('3학년 5반 규모에서도 생성 성공한다', () => {

@@ -7,6 +7,7 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Teacher } from '@/entities/teacher'
 import type { TimetableSnapshot } from '@/entities/timetable'
 import type { DayOfWeek } from '@/shared/lib/types'
+import { getTeacherAssignments } from '@/entities/teacher'
 import { DAY_LABELS } from '@/shared/lib/constants'
 import { buildAcademicCalendarBlockedSlots } from '@/features/validate-schedule-change'
 
@@ -105,7 +106,14 @@ export function predictHourShortageFromCalendarChange(
 function buildRequiredHoursByClass(teachers: Array<Teacher>): Map<string, number> {
   const map = new Map<string, number>()
   for (const teacher of teachers) {
-    for (const assignment of teacher.classAssignments) {
+    for (const assignment of getTeacherAssignments(teacher)) {
+      if (
+        assignment.subjectType !== 'CLASS' ||
+        assignment.grade === null ||
+        assignment.classNumber === null
+      ) {
+        continue
+      }
       const key = `${assignment.grade}-${assignment.classNumber}`
       map.set(key, (map.get(key) ?? 0) + assignment.hoursPerWeek)
     }
