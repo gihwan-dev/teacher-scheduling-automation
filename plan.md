@@ -1,248 +1,189 @@
-# 학교 시간표 관리 시스템 구현 계획 (FSD 기반, Local-First)
+# 파일 SSOT 기반 Setup Import + Autosave 구현 계획
 
-## 참조 문서
+## 1. 문서 목적
+이 문서는 `setup` 중심 워크플로우에서 다음 기능을 구현하기 위한 결정 완료 사양이다.
 
-- `SPEC.md`
-- `survey.md`
-- `AGENTS.md`
+1. 최종 시간표 `.xlsx` 업로드 반영
+2. 교사 시수표 `.xls` 업로드 반영
+3. 수동 저장 버튼 제거 및 디바운스 자동 영구 저장
 
-## 기술 스택 확정표
+구현자는 본 문서만으로 추가 의사결정 없이 구현 가능해야 한다.
 
-| 항목            | 선택                                                                                 | 선정 이유                                                       | 대안                      | 도입 시점 |
-| --------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------------------- | --------- |
-| 프레임워크      | TanStack Start                                                                       | TanStack Router와 결합이 자연스럽고 Local-First CSR 시작에 적합 | Next.js App Router        | Phase 1   |
-| 라우팅          | TanStack Router (search + hash)                                                      | 공유 URL 상태와 화면 상태를 타입 안정적으로 관리 가능           | React Router + 수동 파싱  | Phase 1   |
-| UI 라이브러리   | shadcn/ui + `shared/ui` 재사용                                                       | AGENTS 공통 UI 우선 원칙 준수, 변형 관리 용이                   | Headless UI + 자체 스타일 | Phase 1   |
-| 스타일링        | Tailwind CSS + 시멘틱 토큰(`background`, `foreground`, `primary`, `muted`, `border`) | AGENTS 스타일 규칙 준수, 토큰 중심 확장성 확보                  | CSS Modules               | Phase 1   |
-| 상태관리        | Zustand(최소 전역) + 컴포넌트 로컬 상태                                              | Undo/Redo 포인터, 현재 작업 컨텍스트 등 최소 전역만 유지        | TanStack Store            | Phase 1   |
-| 데이터 저장소   | IndexedDB(Dexie) + `localStorage`(경량 설정 한정)                                    | 스냅샷/정책/이력 대용량 영속화와 브라우저 호환성 확보           | localStorage 단독         | Phase 1   |
-| 폼/검증         | Zod 스키마 기반 입력 검증 + `entities/*/lib` 도메인 검증기                           | 정책 입력(F2)과 공유 URL 복원 시 스키마 검증 통합 가능          | Yup, 수동 런타임 체크     | Phase 2   |
-| 테스트          | Vitest + RTL + Browser Mode(E2E 성격 핵심 시나리오)                                  | survey 결정사항과 일치, 검증/상태전이 회귀 방지에 적합          | Playwright 단독           | Phase 1   |
-| URL 압축/직렬화 | `lz-string` (`compressToEncodedURIComponent`)                                        | 공유 URL 길이 절감, URL-safe 직렬화                             | pako + base64url          | Phase 1   |
+---
 
-## 아키텍처 개요 (FSD)
+## 2. 고정 의사결정
+1. 자동 저장 적용 범위는 `setup` 페이지만 대상이다.
+2. 최종 시간표 입력 기능은 `setup` 탭 안에 추가한다.
+3. 업로드 반영 방식은 기본적으로 `대상 데이터 치환`이다.
+4. 교사 시수표 업로드 후 기존 시간표는 `즉시 자동 재생성`한다.
+5. 이름 불일치 정책은 `파일 SSOT`로 처리한다.
 
-### 레이어 역할
+---
 
-- `app`: 부트스트랩, 라우터, 전역 Provider, 에러 경계, 초기 hydrate
-- `pages`: 라우트 진입 화면, 위젯 조합
-- `widgets`: 시간표 그리드/교체 패널/이력 타임라인/공유 패널 같은 복합 UI
-- `features`: 생성, 편집, 잠금, 재계산, 교체 확정, URL 공유, Undo/Redo 같은 사용자 액션 유스케이스
-- `entities`: 시간표/정책/검증/이력 등 도메인 모델과 규칙
-- `shared`: URL codec, persistence adapter, 공통 UI, 공통 타입/유틸
+## 3. 현재 기준선
+- `setup` 데이터는 IndexedDB에 저장되지만, 현재는 저장 버튼(`saveToDB`) 의존 흐름이다.
+- `setup`의 변경 감지는 `isDirty` 기반이며 `useUnsavedWarning`으로 이탈 경고만 제공한다.
+- `.xls`/`.xlsx` 업로드 파서 및 Import 탭 UI는 없다.
 
-### 슬라이스 전략
+---
 
-- `school`: 학년/반/요일/교시 구조 모델
-- `teacher`: 교사 기본 정보(이름, 담당 과목, 기준 시수, 반별 배정 시수)
-- `subject`: 과목 정보(이름, 약칭, 계열)
-- `fixed-event`: 고정 수업, 출장/행사 일정
-- `timetable`: 셀 모델, 스냅샷, 상태 전이
-- `teacher-policy`: 교사 선호/회피/일일 시수 정책
-- `constraint-policy`: 학생/교사 연강 및 일일 제한 정책
-- `locking`: 잠금 상태
-- `replacement`: 교체 후보 탐색/정렬/확정
-- `change-history`: 이벤트 로그와 시각화용 상태
-- `share-state`: 공유 가능한 URL 상태 계약
+## 4. 구현 범위
 
-### Import 규칙 (허용/금지)
+### 4.1 Setup 자동 저장
+- 저장 버튼 의존을 제거한다.
+- `700ms` 디바운스로 IndexedDB 저장을 수행한다.
+- `pagehide`, `visibilitychange(hidden)` 이벤트에서 pending 저장을 즉시 flush한다.
+- 디바운스 구간 유실 방지를 위해 `localStorage` 키 `setup-draft-v1`에 최신 드래프트를 동기 저장한다.
+- 초기 로드 시 IndexedDB 데이터와 로컬 드래프트의 최신 시각을 비교해 더 최신 데이터를 복원한다.
+- 저장 상태 UI를 노출한다.
+  - `저장 중`
+  - `마지막 저장 시각`
+  - `저장 오류`
+- 이탈 경고 조건은 `isDirty || isAutoSaving`으로 확장한다.
 
-- 허용: `app -> pages/widgets/features/entities/shared`
-- 허용: `pages -> widgets/features/entities/shared`
-- 허용: `widgets -> features/entities/shared`
-- 허용: `features -> entities/shared`
-- 허용: `entities -> shared`
-- 금지: 하위 레이어에서 상위 레이어 import
-- 금지: 동일 레이어 슬라이스 직접 내부 참조(`index.ts` public API 경유)
-- 금지: `shared`에서 `entities/features/widgets/pages/app` import
+### 4.2 교사 시수표 `.xls` 업로드
+- 템플릿 시트명: `교사별시수표`.
+- 필수 헤더 검증:
+  - `정식과목명`
+  - `단축과목명`
+  - `교사명`
+  - 학년/반 시수 컬럼 + `계`
+- 파싱 결과를 `subjects`, `teachers`, `assignments`로 정규화한다.
+- 파일 SSOT 규칙으로 교사/배정/기준 시수를 치환 반영한다.
+- orphan 정리를 수행한다.
+  - `fixedEvents`의 `teacherId`, `subjectId` 참조 무효 항목 제거 또는 정정
+  - `teacherPolicies`의 미존재 교사 정책 제거
+- 저장 성공 직후 현재 선택 주차에 대해 자동 재생성 파이프라인을 실행한다.
+- 자동 재생성 실패 시:
+  - 시수표 반영 자체는 유지
+  - 실패 원인과 경고를 `importReport`에 기록
 
-## 요구사항 매핑 표 (SPEC -> 구현)
+### 4.3 최종 시간표 `.xlsx` 업로드
+- 템플릿 시트명: `1학기 시간표`.
+- 클래스 영역과 교사 영역을 동시에 파싱한다.
+- 요일/교시 컬럼 매핑은 템플릿 고정 규칙(월~금 블록)으로 처리한다.
+- `schoolConfig`는 파일 구조로 재계산한다.
+  - `activeDays`
+  - `periodsByDay`
+  - `gradeCount`
+  - `classCountByGrade`
+- 슬롯별 과목/교사 연결은 이름 정규화 기반으로 수행한다.
+- 필수 충돌은 `blocking error`로 간주하여 전체 반영 중단한다.
+  - 동일 클래스 슬롯 다중 교사 매칭
+  - 교사-클래스 매칭 불능
+  - 필수 헤더/구조 누락
+- 성공 시:
+  - setup 데이터 저장
+  - 대상 주차 snapshot 새 버전 저장
+  - `/edit`에서 즉시 조회 가능 상태 보장
 
-| 요구사항                 | 대상 레이어                                                                                  | 핵심 유스케이스                                           | 완료 기준                                                      | 테스트 포인트                                                   |
-| ------------------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
-| F0 학교 운영 데이터 관리 | `features/manage-school-setup`, `entities/school`, `entities/teacher`, `entities/subject`    | 학교 구조/교사/과목/시수/고정 수업 UI 입력 및 검증·영속화 | 데이터 저장/복원 round-trip, 시수 정합성 검증                  | 시수 합계 unit, 데이터 무결성 integration, 입력 폼 browser test |
-| F1 기초 시간표 자동 생성 | `features/generate-timetable`, `entities/timetable`, `entities/constraint-policy`            | 필수 제약 우선 충족 + 선호 점수 기반 배치                 | 필수 제약 위반 0건, 생성 실패 시 원인/완화안 표시              | 제약 위반 0건 검증 unit, 생성 실패 사유 노출 integration        |
-| F2 교사 배치 조건 관리   | `features/manage-teacher-policy`, `entities/teacher-policy`                                  | 회피/선호/연강 허용 범위 저장 및 검증                     | 상충 정책 저장 차단, 수정 가이드 제공                          | 정책 스키마 unit, 상충 입력 차단 UI test                        |
-| F3 수동 수정 및 잠금     | `features/edit-slot`, `features/toggle-lock`, `entities/locking`                             | 셀 편집/이동, 즉시 충돌 검사, 잠금 반영                   | 충돌 시 거부 사유 노출, 잠금 태그 동기화                       | 셀 수정/잠금 keyboard browser test                              |
-| F4 부분 재계산           | `features/recompute-unlocked`, `entities/timetable`                                          | 잠금 유지 + 비잠금 범위 재배치                            | 잠금 셀 불변, 실패 시 최선안/원인 제공                         | 잠금 불변 property test, 실패 메시지 integration                |
-| F5 교체 후보 탐색        | `features/find-replacement-candidates`, `entities/replacement`, `entities/constraint-policy` | 후보 필터/정렬/확정                                       | 유효 후보만 노출, 후보 0개 시 완화 시뮬레이션 제공             | 후보 정렬 규칙 unit, 후보 0개 UX integration                    |
-| F6 연강/일일 제한 검증   | `features/validate-constraints`, `entities/constraint-policy`                                | 생성/수정/교체 전후 검증                                  | 위반 위치/유형/심각도 표준 출력                                | 위반 리포트 snapshot test                                       |
-| F7 변경 이력 시각화      | `features/track-change-history`, `entities/change-history`, `widgets/history-timeline`       | 이벤트 기록과 상태 전이 반영                              | `BASE -> TEMP_MODIFIED -> CONFIRMED_MODIFIED`, `LOCKED` 일관성 | 상태 전이 unit, 타임라인 렌더 browser test                      |
-| F8 되돌리기/앞으로 가기  | `features/undo-redo`, `entities/change-history`                                              | 커맨드 스택 기반 복원/재적용                              | 복원 시 검증 재실행 및 UI 동기화                               | undo/redo 연속 동작 integration                                 |
-| F9 다중 교체 탐색        | `features/find-multi-replacements`, `entities/replacement`                                   | 복수 슬롯 연계 후보 탐색                                  | 시간 상한 내 상위 후보 제시                                    | 탐색 시간 상한 benchmark test                                   |
-| 공유 URL 조회            | `features/share-by-url`, `features/load-from-url`, `entities/share-state`                    | 상태 직렬화/압축/복원                                     | 다른 기기에서도 동일 시간표 조회 가능                          | URL round-trip unit, 링크 공유 integration                      |
+---
 
-## 라우팅/상태/데이터 계약
+## 5. Public API / 인터페이스 변경
 
-### 라우트 목록
+### 5.1 `SetupTab`
+- `'import'` 추가
 
-| Path           | 페이지 목적                                                    |
-| -------------- | -------------------------------------------------------------- |
-| `/`            | 최근 작업 복원/초기 진입                                       |
-| `/setup`       | 학교 운영 데이터 관리 — 학교 구조/교사/과목/시수/고정 수업(F0) |
-| `/generate`    | 기초 시간표 생성(F1)                                           |
-| `/edit`        | 수동 편집/잠금/부분 재계산(F3/F4/F6)                           |
-| `/replacement` | 교체 후보 탐색/확정(F5/F9)                                     |
-| `/policy`      | 교사/제약 정책 관리(F2/F6)                                     |
-| `/history`     | 변경 이력 조회/확정(F7/F8)                                     |
-| `/share`       | 공유 링크 생성/복제                                            |
+### 5.2 `useSetupStore` state
+- `isAutoSaving: boolean`
+- `lastAutoSavedAt: string | null`
+- `autoSaveError: string | null`
+- `importReport: ImportReport | null`
+- `targetWeekTagForImport: WeekTag`
 
-### URL(search/hash) 스키마
+### 5.3 `useSetupStore` actions
+- `importTeacherHoursFromFile(file: File): Promise<void>`
+- `importFinalTimetableFromFile(file: File): Promise<void>`
+- `scheduleAutoSave(): void`
+- `flushAutoSave(reason: 'debounce' | 'pagehide' | 'manual'): Promise<void>`
 
-- Search 파라미터
-- `view`: `grade | class | teacher`
-- `grade`: `1 | 2 | 3`
-- `class`: 반 번호
-- `teacher`: 교사 식별자
-- `week`: 주차 기준 키(월요일 00:00 기준)
-- `panel`: `violations | candidates | history`
-- Hash(payload, lz-string 압축 대상)
-- `v`: 스키마 버전
-- `grid`: 시간표 배치 데이터
-- `locks`: 잠금 셀 집합
-- `policy`: 교사/제약 정책 스냅샷
-- `meta`: 생성 시드, 생성 시각
+### 5.4 신규 타입
+- `ImportIssue`
+- `ImportReport`
+- `TeacherHoursImportPayload`
+- `FinalTimetableImportPayload`
 
-### 전역 상태/로컬 상태 경계
+### 5.5 신규 유틸
+- `teacher-hours-xls parser`
+- `final-timetable-xlsx parser`
+- `name-normalizer`
 
-- 전역(Zustand)
-- 현재 스냅샷 포인터, Undo/Redo 스택 포인터, 작업 컨텍스트
-- 로컬(컴포넌트)
-- 셀 편집 모드, 패널 열림 상태, 드래그 선택 상태
-- URL 제외 상태
-- 임시 UI 플래그, 마우스 오버 상태, 토스트 표시 상태
+### 5.6 저장소 계약
+- IndexedDB 스키마 마이그레이션은 수행하지 않는다.
+- 로컬 임시 저장은 `localStorage: setup-draft-v1` 키를 사용한다.
 
-### 저장소 전략
+---
 
-- IndexedDB: 스냅샷, 정책, 변경 이력, Undo/Redo 백업
-- localStorage: 테마, 최근 선택 필터, 키보드 사용자 설정
-- URL: 공유에 필요한 최소 상태(`grid`, `locks`, `policy`, `meta`)만 포함
+## 6. 파일 SSOT 정규화 규칙
+1. 이름 정규화 순서
+   - trim
+   - 연속 공백 축약
+   - 괄호 표기 제거
+   - 줄바꿈 첫 줄 우선
+2. 동일 정규화 키 중복 시
+   - 파일 내 등장 순서 우선
+   - 중복 경고를 리포트에 기록
+3. 반영 단위
+   - 파일별 트랜잭션 단위 반영
+   - blocking error 존재 시 전체 롤백
+4. 리포트
+   - `error`/`warning`를 `importReport`로 사용자에게 제공
 
-## 핵심 UI 구현 전략
+---
 
-### 구현 방식
+## 7. 반영 트랜잭션 순서
 
-- 외부 대형 그리드 라이브러리 대신 `widgets/timetable-grid` 커스텀 구현을 사용한다.
-- 기본 입력/버튼/다이얼로그는 `shared/ui` 컴포넌트를 조합한다.
-- 반복되는 스타일 값은 토큰으로 승격하고 컴포넌트에 raw 값 하드코딩을 금지한다.
+### 7.1 교사 시수표 업로드
+1. 파일 파싱 + 헤더 검증
+2. payload 정규화
+3. setup 데이터 치환 반영
+4. orphan 정리
+5. IndexedDB 저장
+6. 자동 재생성 실행
+7. 결과 리포트 저장
 
-### 셀 상태 모델
+### 7.2 최종 시간표 업로드
+1. 파일 파싱 + 구조 검증
+2. payload 정규화
+3. setup 데이터 치환 반영
+4. orphan 정리
+5. snapshot append-only 저장
+6. 결과 리포트 저장
 
-- 기본 상태: `BASE`, `TEMP_MODIFIED`, `CONFIRMED_MODIFIED`, `LOCKED`
-- 파생 상태: `VIOLATION`(검증 결과 오버레이), `CANDIDATE`(교체 후보 프리뷰)
-- 상태 표현 규칙: 색상 + 아이콘 + 텍스트 배지를 동시에 제공한다.
+---
 
-### 키보드 조작 계약
+## 8. 테스트 전략
 
-- `Arrow`: 셀 이동
-- `Enter`: 편집 시작/확정
-- `Esc`: 편집 취소
-- `Space`: 셀 선택 토글
-- `Ctrl/Cmd+L`: 잠금 토글
-- `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`: Undo/Redo
+### 8.1 파서 단위 테스트
+1. 교사 시수표 정상 파일 파싱 성공
+2. 교사 시수표 헤더 불일치 시 blocking error
+3. 최종 시간표 정상 파일 파싱 성공
+4. 최종 시간표 교사 다중 충돌 시 blocking error
 
-### 성능 전략
+### 8.2 스토어/저장 테스트
+1. `setup` 변경 후 700ms 내 자동 저장 수행
+2. `pagehide` 시 flush 저장 수행
+3. 로컬 드래프트가 DB보다 최신이면 복원
+4. 저장 실패 시 `autoSaveError` 설정
 
-- 첫 단계는 메모이제이션 + 선택적 렌더링으로 대응한다.
-- 표시 셀이 1200개를 넘으면 가상화(`@tanstack/react-virtual`)를 활성화한다.
-- 교체 후보 계산(F5/F9)은 Web Worker로 비동기 처리해 메인 스레드 블로킹을 방지한다.
+### 8.3 통합 시나리오
+1. 시수표 업로드 후 setup 반영 + 자동 재생성 + snapshot 생성
+2. 재생성 실패 시 setup 반영 유지 + 리포트 표시
+3. 최종 시간표 업로드 성공 후 `/edit`에서 즉시 조회 가능
+4. 기존 핵심 기능(`/generate`, `/edit`, `/policy`, `/history`) 회귀 없음
 
-### 접근성 기준
+---
 
-- 그리드는 `role="grid"`, 행/열 헤더는 `rowheader`/`columnheader`를 적용한다.
-- 셀의 ARIA 라벨에 학년/반/요일/교시/교사/과목/잠금 여부를 포함한다.
-- 색상만으로 상태를 전달하지 않고 아이콘/텍스트를 항상 병행한다.
+## 9. 완료 기준 (DoD)
+1. `setup` 페이지에서 저장 버튼 없이 데이터 유실 없이 복원된다.
+2. 두 엑셀 파일 업로드가 템플릿 기준으로 동작한다.
+3. 업로드 실패/부분성공/성공 상태가 리포트로 구분된다.
+4. 시수표 업로드 후 자동 재생성 결과가 snapshot 버전으로 남는다.
+5. `pnpm run typecheck`, `pnpm run lint src`, 핵심 테스트가 통과한다.
 
-## 디렉토리 구조 + 파일 책임
+---
 
-```text
-src/
-  app/
-    providers/store-provider.tsx
-    router/index.tsx
-    bootstrap/hydrate.ts
-  pages/
-    setup/index.tsx
-    generate/index.tsx
-    edit/index.tsx
-    replacement/index.tsx
-    policy/index.tsx
-    history/index.tsx
-  widgets/
-    timetable-grid/ui/timetable-grid.tsx
-    candidate-list/ui/candidate-list.tsx
-    history-timeline/ui/history-timeline.tsx
-    share-link-panel/ui/share-link-panel.tsx
-  features/
-    manage-school-setup/model/usecase.ts
-    generate-timetable/model/usecase.ts
-    edit-slot/model/usecase.ts
-    recompute-unlocked/model/usecase.ts
-    find-replacement-candidates/model/usecase.ts
-    undo-redo/model/usecase.ts
-    share-by-url/model/usecase.ts
-    load-from-url/model/usecase.ts
-  entities/
-    school/model/types.ts
-    school/lib/validator.ts
-    teacher/model/types.ts
-    subject/model/types.ts
-    fixed-event/model/types.ts
-    timetable/model/types.ts
-    timetable/lib/transition.ts
-    constraint-policy/lib/validator.ts
-    teacher-policy/lib/policy-schema.ts
-    replacement/lib/ranker.ts
-    change-history/lib/event-log.ts
-    share-state/lib/share-schema.ts
-  shared/
-    ui/
-    url/codec.ts
-    persistence/indexeddb/repository.ts
-    persistence/local-storage/settings.ts
-```
-
-- `shared/ui`는 페이지/피처에서 재사용 가능한 기본 UI만 제공한다.
-- 페이지/피처에서 동일 패턴 UI가 반복되면 `shared/ui`로 승격한다.
-- 각 슬라이스는 `index.ts`를 public API로 사용한다.
-
-## 단계별 구현 로드맵
-
-| Phase               | 우선순위 | 작업                                                                                                                                             | 산출물                                                                                                          | 완료 기준(DoD)                                                                                                 |
-| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Phase 1 기반 구축   | Must     | TanStack Start 초기화, FSD 구조, Router/Store Provider, URL codec, Dexie 스키마, 토큰/공통 UI 베이스, **학교 운영 데이터 관리(F0) UI 및 저장소** | 실행 가능한 앱 셸, 기본 라우트, 저장소 어댑터, 토큰 정의 문서, **`/setup` 화면에서 데이터 입력·저장·복원 동작** | `pnpm lint`, `pnpm typecheck` 통과 + URL round-trip unit test 통과 + **데이터 저장/복원 round-trip test 통과** |
-| Phase 2 핵심 기능   | Must     | F1/F2/F3/F4/F5/F6 + 공유 URL 구현                                                                                                                | 생성/편집/재계산/교체/공유 기능 동작, 정책 관리 화면                                                            | 핵심 시나리오 integration 통과, 필수 제약 위반 0건 검증 테스트 통과                                            |
-| Phase 3 운영 안정화 | Should   | F7/F8 구현, 이력 타임라인/확정 플로우                                                                                                            | 이력 시각화, Undo/Redo                                                                                          | 상태 전이 테스트 통과, Browser keyboard 시나리오 통과                                                          |
-| Phase 4 고급 탐색   | Could    | F9 다중 교체 탐색, 탐색 시간 상한/휴리스틱 튜닝                                                                                                  | 다중 교체 후보 화면 및 랭킹 결과                                                                                | 지정 데이터셋에서 시간 상한(예: 2초) 내 상위 후보 반환                                                         |
-
-## 테스트/품질 게이트
-
-### 테스트 범위
-
-- 단위(Unit)
-- 제약 검증기, 후보 정렬기, 상태 전이, URL codec, 정책 스키마, **시수 정합성 검증기**
-- 통합(Integration)
-- **데이터 입력 -> 저장 -> 복원** -> 생성 -> 수정 -> 잠금 -> 부분 재계산 -> 교체 확정 -> URL 공유 복원
-- 브라우저(Browser)
-- 키보드 편집, 접근성 라벨, 이력 타임라인 상호작용
-
-### 품질 게이트
-
-- 정적 검사: ESLint, TypeScript
-- 아키텍처 검사: FSD import 규칙 위반 검사
-- 회귀 검사: `BASE/TEMP_MODIFIED/CONFIRMED_MODIFIED/LOCKED` 상태 전이 스냅샷 테스트
-- CI 실패 기준: 핵심 Must 시나리오 중 1개라도 실패 시 머지 차단
-
-## 리스크 및 대응
-
-| 리스크                    | 감지 방법                                              | 대응 전략                                                                                   |
-| ------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| URL 길이 초과로 공유 실패 | 링크 생성 시 길이 임계치(브라우저 호환 기준) 자동 검사 | 공유 대상 필드 최소화 + 압축 재시도 + 초과 시 링크 생성 차단 및 축약 안내(이력/뷰옵션 제외) |
-| 링크 변조/손상            | URL 복원 시 `v` 스키마/필수 키/Zod 검증 실패 로그      | 복원 중단 후 오류 안내, 최근 로컬 정상 스냅샷 제안                                          |
-| IndexedDB 데이터 손상     | 앱 시작 시 스냅샷 무결성 검사 실패 카운트              | 마지막 정상 스냅샷 롤백 + JSON 내보내기/가져오기 복구 경로 제공                             |
-| 잠금 과다로 재계산 실패   | 재계산 실패 시 제약 충돌 리포트에 잠금 원인 비율 표시  | 최소 해제 필요 셀 추천 기능 제공                                                            |
-| F9 탐색 비용 급증         | 후보 탐색 실행 시간/중단율 메트릭 수집                 | 시간 상한 + 빔서치 + 조기 중단 정책 적용                                                    |
-
-## 오픈 이슈
-
-- URL 길이 임계치(브라우저별)를 QA 단계에서 확정해 링크 생성 정책의 수치를 고정해야 한다.
+## 10. 비목표
+1. `/policy`, `/edit`, `/exam`의 자동 저장 확장
+2. 신규 IndexedDB 버전 마이그레이션
+3. 템플릿 외 임의 포맷 자동 추론 지원
