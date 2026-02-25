@@ -53,13 +53,13 @@
 - Owner Role: implementer
 - Write Scope: `src/features/manage-school-setup/model/store.ts`, `src/features/manage-school-setup/index.ts`, repository 연동 코드
 - Depends On: Phase 2, Phase 3
-- [ ] **파일 SSOT 치환 반영 구현**
+- [x] **파일 SSOT 치환 반영 구현**
   - 목표: 업로드 payload 기반으로 setup 데이터 치환 저장
   - 검증: DB round-trip 후 반영 데이터 동일
-- [ ] **orphan 정리 구현**
+- [x] **orphan 정리 구현**
   - 목표: `fixedEvents`, `teacherPolicies` 참조 무효 항목 정리
   - 검증: 무효 참조 0건 유지
-- [ ] **importReport 상태 모델 반영**
+- [x] **importReport 상태 모델 반영**
   - 목표: 성공/부분/실패 리포트 표준화
   - 검증: 각 상태별 UI 소비 가능 구조 제공
 
@@ -128,3 +128,4 @@
 - 문서 계약 상세화 + manage-school-setup 공용 타입 계약 파일/exports 추가
 - Phase 2: `교사별시수표` xls parser/normalizer 및 6개 단위 테스트 추가, jsdom 26.1.0 고정으로 테스트 게이트 복구.
 - Phase 3: final timetable xlsx parser + conflict rules + unit tests
+- Phase 4 완료: SSOT 치환/orphan 삭제/importReport/store import actions

@@ -144,6 +144,54 @@ export async function loadAllSetupData(): Promise<{
   return { schoolConfig, subjects, teachers, fixedEvents }
 }
 
+export interface SetupImportBundle {
+  schoolConfig: SchoolConfig
+  subjects: Array<Subject>
+  teachers: Array<Teacher>
+  fixedEvents: Array<FixedEvent>
+  teacherPolicies: Array<TeacherPolicy>
+  timetableSnapshots?: Array<TimetableSnapshot>
+}
+
+export async function saveSetupImportBundle(
+  bundle: SetupImportBundle,
+): Promise<void> {
+  await db.transaction(
+    'rw',
+    [
+      db.schoolConfigs,
+      db.subjects,
+      db.teachers,
+      db.fixedEvents,
+      db.teacherPolicies,
+      db.timetableSnapshots,
+    ],
+    async () => {
+      await db.schoolConfigs.clear()
+      await db.schoolConfigs.put(bundle.schoolConfig)
+      await db.subjects.clear()
+      if (bundle.subjects.length > 0) {
+        await db.subjects.bulkPut(bundle.subjects)
+      }
+      await db.teachers.clear()
+      if (bundle.teachers.length > 0) {
+        await db.teachers.bulkPut(bundle.teachers)
+      }
+      await db.fixedEvents.clear()
+      if (bundle.fixedEvents.length > 0) {
+        await db.fixedEvents.bulkPut(bundle.fixedEvents)
+      }
+      await db.teacherPolicies.clear()
+      if (bundle.teacherPolicies.length > 0) {
+        await db.teacherPolicies.bulkPut(bundle.teacherPolicies)
+      }
+      if (bundle.timetableSnapshots && bundle.timetableSnapshots.length > 0) {
+        await db.timetableSnapshots.bulkPut(bundle.timetableSnapshots)
+      }
+    },
+  )
+}
+
 // TimetableSnapshot
 export async function saveTimetableSnapshot(
   snapshot: TimetableSnapshot,
