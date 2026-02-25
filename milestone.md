@@ -25,13 +25,13 @@
 - Owner Role: implementer
 - Write Scope: `src/features/manage-school-setup/model/teacher-hours-xls-parser.ts`, 관련 타입/테스트 파일
 - Depends On: Phase 1
-- [ ] **템플릿 헤더/구조 검증 구현**
+- [x] **템플릿 헤더/구조 검증 구현**
   - 목표: `교사별시수표` + 필수 헤더 + 학년/반 컬럼 구조 강제
   - 검증: 헤더 불일치 시 blocking error
-- [ ] **정규화 payload 생성 구현**
+- [x] **정규화 payload 생성 구현**
   - 목표: `subjects`, `teachers`, `assignments`로 변환
   - 검증: 샘플 파일 기준 시수 합계/배정 일관성 확보
-- [ ] **파서 단위 테스트 작성**
+- [x] **파서 단위 테스트 작성**
   - 목표: 정상/헤더오류/행 스킵 시나리오 보장
   - 검증: parser test 전체 통과
 
@@ -126,3 +126,4 @@
 
 ## Session Notes
 - 문서 계약 상세화 + manage-school-setup 공용 타입 계약 파일/exports 추가
+- Phase 2: `교사별시수표` xls parser/normalizer 및 6개 단위 테스트 추가, jsdom 26.1.0 고정으로 테스트 게이트 복구.
