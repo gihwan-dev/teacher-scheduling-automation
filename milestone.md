@@ -39,13 +39,13 @@
 - Owner Role: implementer
 - Write Scope: `src/features/manage-school-setup/model/final-timetable-xlsx-parser.ts`, 관련 타입/테스트 파일
 - Depends On: Phase 1
-- [ ] **클래스+교사 영역 동시 파싱 구현**
+- [x] **클래스+교사 영역 동시 파싱 구현**
   - 목표: `1학기 시간표` 시트에서 슬롯/교사/과목 정보 추출
   - 검증: 샘플 파일 기준 슬롯 누락 없이 payload 생성
-- [ ] **충돌 판정 규칙 구현**
+- [x] **충돌 판정 규칙 구현**
   - 목표: 다중 교사/매칭 불능/헤더 누락을 blocking error 처리
   - 검증: 충돌 fixture에서 전체 반영 중단 확인
-- [ ] **파서 단위 테스트 작성**
+- [x] **파서 단위 테스트 작성**
   - 목표: 정상/충돌/헤더오류 시나리오 보장
   - 검증: parser test 전체 통과
 
@@ -127,3 +127,4 @@
 ## Session Notes
 - 문서 계약 상세화 + manage-school-setup 공용 타입 계약 파일/exports 추가
 - Phase 2: `교사별시수표` xls parser/normalizer 및 6개 단위 테스트 추가, jsdom 26.1.0 고정으로 테스트 게이트 복구.
+- Phase 3: final timetable xlsx parser + conflict rules + unit tests

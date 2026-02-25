@@ -342,7 +342,7 @@ describe('parseTeacherHoursXls', () => {
       (issue) =>
         issue.code === 'INVALID_ROW' &&
         issue.location?.row === 3 &&
-        issue.location?.field === '계',
+        issue.location.field === '계',
     )
 
     expect(invalidTotalIssue).toBeDefined()
