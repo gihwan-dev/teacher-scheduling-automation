@@ -46,6 +46,7 @@ export type SetupTab =
   | 'teachers'
   | 'fixedEvents'
   | 'academicCalendar'
+  | 'import'
 
 interface SetupState {
   schoolConfig: SchoolConfig | null

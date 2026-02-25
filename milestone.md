@@ -67,10 +67,10 @@
 - Owner Role: implementer
 - Write Scope: `src/pages/setup/ui/setup-page.tsx`, `src/pages/setup/ui/setup-import-panel.tsx`(신규)
 - Depends On: Phase 4
-- [ ] **Import 탭 추가**
+- [x] **Import 탭 추가**
   - 목표: `.xls`, `.xlsx` 업로드 진입점 통합 제공
   - 검증: 탭 전환/파일 선택/업로드 호출 정상 동작
-- [ ] **리포트 UX 구현**
+- [x] **리포트 UX 구현**
   - 목표: 에러/경고/성공 결과를 사용자에게 명확히 표시
   - 검증: blocking error 메시지와 warning 목록 확인 가능
 
@@ -129,3 +129,4 @@
 - Phase 2: `교사별시수표` xls parser/normalizer 및 6개 단위 테스트 추가, jsdom 26.1.0 고정으로 테스트 게이트 복구.
 - Phase 3: final timetable xlsx parser + conflict rules + unit tests
 - Phase 4 완료: SSOT 치환/orphan 삭제/importReport/store import actions
+- Phase 5 완료: Setup import 탭/패널 및 import report UX, import 관련 UI 테스트 2종 추가
