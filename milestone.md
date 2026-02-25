@@ -14,10 +14,10 @@
 - Owner Role: orchestrator
 - Write Scope: `plan.md`, `milestone.md`, `src/features/manage-school-setup/model/**`(계약 타입 정의)
 - Depends On: none
-- [ ] **신규 요구사항 기준 문서 확정**
+- [x] **신규 요구사항 기준 문서 확정**
   - 목표: 기존 계획 문서를 제거하고 SSOT/자동저장 기준으로 재작성
   - 검증: plan/milestone 내 미결정 사항 0건
-- [ ] **Import/Autosave 공용 타입 계약 확정**
+- [x] **Import/Autosave 공용 타입 계약 확정**
   - 목표: `ImportIssue`, `ImportReport`, payload 타입 정의
   - 검증: 이후 Phase에서 타입 재해석 없이 구현 가능
 
@@ -123,3 +123,6 @@
 - [ ] 시수표 업로드 후 자동 재생성 실행
 - [ ] 자동 재생성 실패 시 setup 반영 유지 + 리포트 노출
 - [ ] `/generate`, `/edit`, `/policy`, `/history` 기존 흐름 회귀 없음
+
+## Session Notes
+- 문서 계약 상세화 + manage-school-setup 공용 타입 계약 파일/exports 추가
