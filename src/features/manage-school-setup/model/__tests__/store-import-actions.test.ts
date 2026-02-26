@@ -354,11 +354,39 @@ describe('setup store import actions', () => {
       ],
       issues: [],
     })
+    const baselineBeforeImport = clone({
+      schoolConfig: useSetupStore.getState().schoolConfig,
+      subjects: useSetupStore.getState().subjects,
+      teachers: useSetupStore.getState().teachers,
+      fixedEvents: useSetupStore.getState().fixedEvents,
+      latestSnapshot: useSetupStore.getState().latestSnapshot,
+    })
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
     expect(recomputeMocks.recomputeUnlocked).toHaveBeenCalledTimes(1)
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
     expect(repositoryMocks.saveNextSnapshotVersion).not.toHaveBeenCalled()
+    const savedBundle =
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mock.calls[0][0]
+        .bundle
+    const baseline = clone({
+      schoolConfig: savedBundle.schoolConfig,
+      subjects: savedBundle.subjects,
+      teachers: savedBundle.teachers,
+      fixedEvents: savedBundle.fixedEvents,
+      latestSnapshot: baselineBeforeImport.latestSnapshot,
+    })
+    const postImportSubset = {
+      schoolConfig: useSetupStore.getState().schoolConfig,
+      subjects: useSetupStore.getState().subjects,
+      teachers: useSetupStore.getState().teachers,
+      fixedEvents: useSetupStore.getState().fixedEvents,
+      latestSnapshot: useSetupStore.getState().latestSnapshot,
+    }
+    expect(postImportSubset).toEqual(baseline)
     const importReport = useSetupStore.getState().importReport
     expect(importReport?.status).toBe('PARTIAL_SUCCESS')
     expect(
@@ -388,11 +416,39 @@ describe('setup store import actions', () => {
       ],
       issues: [],
     })
+    const baselineBeforeImport = clone({
+      schoolConfig: useSetupStore.getState().schoolConfig,
+      subjects: useSetupStore.getState().subjects,
+      teachers: useSetupStore.getState().teachers,
+      fixedEvents: useSetupStore.getState().fixedEvents,
+      latestSnapshot: useSetupStore.getState().latestSnapshot,
+    })
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
     expect(recomputeMocks.recomputeUnlocked).toHaveBeenCalledTimes(1)
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
     expect(repositoryMocks.saveNextSnapshotVersion).not.toHaveBeenCalled()
+    const savedBundle =
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mock.calls[0][0]
+        .bundle
+    const baseline = clone({
+      schoolConfig: savedBundle.schoolConfig,
+      subjects: savedBundle.subjects,
+      teachers: savedBundle.teachers,
+      fixedEvents: savedBundle.fixedEvents,
+      latestSnapshot: baselineBeforeImport.latestSnapshot,
+    })
+    const postImportSubset = {
+      schoolConfig: useSetupStore.getState().schoolConfig,
+      subjects: useSetupStore.getState().subjects,
+      teachers: useSetupStore.getState().teachers,
+      fixedEvents: useSetupStore.getState().fixedEvents,
+      latestSnapshot: useSetupStore.getState().latestSnapshot,
+    }
+    expect(postImportSubset).toEqual(baseline)
     const importReport = useSetupStore.getState().importReport
     expect(importReport?.status).toBe('PARTIAL_SUCCESS')
     expect(

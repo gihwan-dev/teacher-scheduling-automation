@@ -103,26 +103,26 @@
 - Owner Role: verification-worker
 - Write Scope: `src/features/manage-school-setup/model/__tests__/**`, `src/pages/setup/ui/__tests__/**`, 문서 업데이트
 - Depends On: Phase 5, Phase 6, Phase 7
-- [ ] **핵심 통합 시나리오 테스트 추가**
+- [x] **핵심 통합 시나리오 테스트 추가**
   - 목표: 업로드/자동저장/재생성 종단 시나리오 회귀 방지
   - 검증: 핵심 10개 시나리오 자동화
-- [ ] **품질 게이트 실행**
+- [x] **품질 게이트 실행**
   - 목표: 릴리스 전 정적/동적 검증 통과
   - 검증: `pnpm run typecheck`, `pnpm run lint src`, 핵심 test 통과
 
 ---
 
 ## 인수 테스트 체크리스트
-- [ ] 교사 시수표 정상 업로드 시 교사/과목/배정/기준시수 반영
-- [ ] 교사 시수표 헤더 오류 시 반영 중단 + blocking error 표시
-- [ ] 최종 시간표 업로드 시 snapshot 새 버전 생성
-- [ ] 최종 시간표 교사 충돌 시 전체 반영 중단
-- [ ] 이름 불일치 항목 파일 SSOT 규칙으로 정규화 반영
-- [ ] setup 입력 후 700ms 내 자동 저장 수행
-- [ ] 입력 직후 창 종료 후 재진입 시 데이터 복원
-- [ ] 시수표 업로드 후 자동 재생성 실행
-- [ ] 자동 재생성 실패 시 setup 반영 유지 + 리포트 노출
-- [ ] `/generate`, `/edit`, `/policy`, `/history` 기존 흐름 회귀 없음
+- [x] 교사 시수표 정상 업로드 시 교사/과목/배정/기준시수 반영
+- [x] 교사 시수표 헤더 오류 시 반영 중단 + blocking error 표시
+- [x] 최종 시간표 업로드 시 snapshot 새 버전 생성
+- [x] 최종 시간표 교사 충돌 시 전체 반영 중단
+- [x] 이름 불일치 항목 파일 SSOT 규칙으로 정규화 반영
+- [x] setup 입력 후 700ms 내 자동 저장 수행
+- [x] 입력 직후 창 종료 후 재진입 시 데이터 복원
+- [x] 시수표 업로드 후 자동 재생성 실행
+- [x] 자동 재생성 실패 시 setup 반영 유지 + 리포트 노출
+- [x] `/generate`, `/edit`, `/policy`, `/history` 기존 흐름 회귀 없음
 
 ## Session Notes
 - 문서 계약 상세화 + manage-school-setup 공용 타입 계약 파일/exports 추가
@@ -132,3 +132,4 @@
 - Phase 5 완료: Setup import 탭/패널 및 import report UX, import 관련 UI 테스트 2종 추가
 - Phase 6 완료: setup autosave(700ms debounce/flush/pagehide), `setup-draft-v1` 복원 + DB 최신성 비교, import-자동저장 충돌 가드, store/setup-page autosave 테스트 추가
 - Phase 7 완료: teacher-hours import 직후 자동 재생성(runTeacherHoursAutoRecompute) 연결, snapshot 부재/실패 warning 분리, append-only snapshot 저장 및 관련 store 테스트 보강
+- Phase 8 완료: non-setup 4개 경로 store load 스모크 및 recompute 실패 시 setup 반영 유지 단언 보강, 게이트 재통과

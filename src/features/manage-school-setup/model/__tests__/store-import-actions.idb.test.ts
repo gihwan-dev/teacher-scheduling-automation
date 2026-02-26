@@ -82,6 +82,22 @@ async function loadStoreModule() {
   return import('../store')
 }
 
+async function loadGenerateStoreModule() {
+  return import('@/features/generate-timetable/model/store')
+}
+
+async function loadEditStoreModule() {
+  return import('@/features/edit-timetable-cell/model/store')
+}
+
+async function loadTeacherPolicyStoreModule() {
+  return import('@/features/manage-teacher-policy/model/store')
+}
+
+async function loadChangeHistoryStoreModule() {
+  return import('@/features/track-change-history/model/store')
+}
+
 async function loadDatabaseModule() {
   return import('@/shared/persistence/indexeddb/database')
 }
@@ -91,93 +107,128 @@ async function loadRepositoryModule() {
 }
 
 type StoreModule = Awaited<ReturnType<typeof loadStoreModule>>
+type GenerateStoreModule = Awaited<ReturnType<typeof loadGenerateStoreModule>>
+type EditStoreModule = Awaited<ReturnType<typeof loadEditStoreModule>>
+type TeacherPolicyStoreModule = Awaited<
+  ReturnType<typeof loadTeacherPolicyStoreModule>
+>
+type ChangeHistoryStoreModule = Awaited<
+  ReturnType<typeof loadChangeHistoryStoreModule>
+>
 type DatabaseModule = Awaited<ReturnType<typeof loadDatabaseModule>>
 type RepositoryModule = Awaited<ReturnType<typeof loadRepositoryModule>>
 
 let useSetupStore: StoreModule['useSetupStore']
+let SETUP_DRAFT_KEY: StoreModule['SETUP_DRAFT_KEY']
+let useGenerateStore: GenerateStoreModule['useGenerateStore']
+let useEditStore: EditStoreModule['useEditStore']
+let useTeacherPolicyStore: TeacherPolicyStoreModule['useTeacherPolicyStore']
+let useChangeHistoryStore: ChangeHistoryStoreModule['useChangeHistoryStore']
 let db: DatabaseModule['db']
 let repository: RepositoryModule
+
+function createFinalTimetableFile(): File {
+  return {
+    name: 'final-timetable.xlsx',
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+  } as File
+}
+
+async function importFinalTimetableForWeek15(): Promise<void> {
+  await repository.saveAllSetupData({
+    schoolConfig: initialSchoolConfig,
+    subjects: initialSubjects,
+    teachers: initialTeachers,
+    fixedEvents: [],
+  })
+  await repository.saveTeacherPolicies([
+    {
+      id: 'policy-valid',
+      teacherId: 'teacher-legacy',
+      avoidanceSlots: [],
+      timePreference: 'NONE',
+      maxConsecutiveHoursOverride: null,
+      maxDailyHoursOverride: null,
+      createdAt: ts,
+      updatedAt: ts,
+    },
+    {
+      id: 'policy-invalid',
+      teacherId: 'ghost-teacher',
+      avoidanceSlots: [],
+      timePreference: 'NONE',
+      maxConsecutiveHoursOverride: null,
+      maxDailyHoursOverride: null,
+      createdAt: ts,
+      updatedAt: ts,
+    },
+  ])
+  await repository.saveTimetableSnapshot(initialSnapshot)
+  await useSetupStore.getState().loadFromDB()
+  useSetupStore.getState().setTargetWeekTagForImport('2026-W15')
+
+  parserMocks.parseFinalTimetableXlsx.mockReturnValue({
+    sheetName: '1학기 시간표',
+    schoolConfig: {
+      gradeCount: 1,
+      classCountByGrade: { 1: 1 },
+      activeDays: ['MON'],
+      periodsByDay: { MON: 1 },
+    },
+    slots: [
+      {
+        grade: 1,
+        classNumber: 1,
+        day: 'MON',
+        period: 1,
+        subjectName: '수학',
+        teacherName: '김교사',
+      },
+    ],
+    issues: [],
+  })
+
+  await useSetupStore
+    .getState()
+    .importFinalTimetableFromFile(createFinalTimetableFile())
+}
 
 beforeEach(async () => {
   vi.resetModules()
   parserMocks.parseFinalTimetableXlsx.mockReset()
   const storeModule = await loadStoreModule()
   useSetupStore = storeModule.useSetupStore
+  SETUP_DRAFT_KEY = storeModule.SETUP_DRAFT_KEY
+  const generateStoreModule = await loadGenerateStoreModule()
+  useGenerateStore = generateStoreModule.useGenerateStore
+  const editStoreModule = await loadEditStoreModule()
+  useEditStore = editStoreModule.useEditStore
+  const teacherPolicyStoreModule = await loadTeacherPolicyStoreModule()
+  useTeacherPolicyStore = teacherPolicyStoreModule.useTeacherPolicyStore
+  const changeHistoryStoreModule = await loadChangeHistoryStoreModule()
+  useChangeHistoryStore = changeHistoryStoreModule.useChangeHistoryStore
   const databaseModule = await loadDatabaseModule()
   db = databaseModule.db
   repository = await loadRepositoryModule()
   useSetupStore.setState(useSetupStore.getInitialState(), true)
+  useGenerateStore.setState(useGenerateStore.getInitialState(), true)
+  useEditStore.setState(useEditStore.getInitialState(), true)
+  useTeacherPolicyStore.setState(useTeacherPolicyStore.getInitialState(), true)
+  useChangeHistoryStore.setState(useChangeHistoryStore.getInitialState(), true)
+  window.localStorage.removeItem(SETUP_DRAFT_KEY)
   await db.schoolConfigs.clear()
   await db.subjects.clear()
   await db.teachers.clear()
   await db.fixedEvents.clear()
   await db.teacherPolicies.clear()
   await db.timetableSnapshots.clear()
+  await db.changeEvents.clear()
+  await db.academicCalendarEvents.clear()
 })
 
 describe('setup import actions idb round-trip', () => {
   it('final-timetable import 후 setup/policy/snapshot이 실제 repository에 반영된다', async () => {
-    await repository.saveAllSetupData({
-      schoolConfig: initialSchoolConfig,
-      subjects: initialSubjects,
-      teachers: initialTeachers,
-      fixedEvents: [],
-    })
-    await repository.saveTeacherPolicies([
-      {
-        id: 'policy-valid',
-        teacherId: 'teacher-legacy',
-        avoidanceSlots: [],
-        timePreference: 'NONE',
-        maxConsecutiveHoursOverride: null,
-        maxDailyHoursOverride: null,
-        createdAt: ts,
-        updatedAt: ts,
-      },
-      {
-        id: 'policy-invalid',
-        teacherId: 'ghost-teacher',
-        avoidanceSlots: [],
-        timePreference: 'NONE',
-        maxConsecutiveHoursOverride: null,
-        maxDailyHoursOverride: null,
-        createdAt: ts,
-        updatedAt: ts,
-      },
-    ])
-    await repository.saveTimetableSnapshot(initialSnapshot)
-    await useSetupStore.getState().loadFromDB()
-    useSetupStore.getState().setTargetWeekTagForImport('2026-W15')
-
-    parserMocks.parseFinalTimetableXlsx.mockReturnValue({
-      sheetName: '1학기 시간표',
-      schoolConfig: {
-        gradeCount: 1,
-        classCountByGrade: { 1: 1 },
-        activeDays: ['MON'],
-        periodsByDay: { MON: 1 },
-      },
-      slots: [
-        {
-          grade: 1,
-          classNumber: 1,
-          day: 'MON',
-          period: 1,
-          subjectName: '수학',
-          teacherName: '김교사',
-        },
-      ],
-      issues: [],
-    })
-
-    await useSetupStore
-      .getState()
-      .importFinalTimetableFromFile(
-        {
-          name: 'final-timetable.xlsx',
-          arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
-        } as File,
-      )
+    await importFinalTimetableForWeek15()
 
     const setup = await repository.loadAllSetupData()
     const policies = await repository.loadTeacherPolicies()
@@ -200,5 +251,34 @@ describe('setup import actions idb round-trip', () => {
       }),
     )
     expect(useSetupStore.getState().importReport?.status).toBe('PARTIAL_SUCCESS')
+  })
+
+  it('final-timetable import 후 /generate,/edit,/policy,/history store load smoke', async () => {
+    await importFinalTimetableForWeek15()
+
+    await useGenerateStore.getState().loadSetupData()
+    expect(useGenerateStore.getState().setupLoaded).toBe(true)
+
+    await useEditStore.getState().loadSnapshot({ weekTag: '2026-W15' })
+    const editState = useEditStore.getState()
+    expect(editState.snapshot).not.toBeNull()
+    expect(editState.availableVersionNos.length).toBeGreaterThan(0)
+
+    await useTeacherPolicyStore.getState().loadFromDB()
+    expect(useTeacherPolicyStore.getState().selectedTeacherId).not.toBeNull()
+
+    await useChangeHistoryStore.getState().loadEventsByWeek('2026-W15')
+    expect(Array.isArray(useChangeHistoryStore.getState().events)).toBe(true)
+  })
+
+  it('snapshot 없는 주차에서 /edit,/history 빈 상태 안전 동작', async () => {
+    await importFinalTimetableForWeek15()
+
+    await useEditStore.getState().loadSnapshot({ weekTag: '2026-W16' })
+    expect(useEditStore.getState().snapshot).toBeNull()
+    expect(useEditStore.getState().availableVersionNos).toHaveLength(0)
+
+    await useChangeHistoryStore.getState().loadEventsByWeek('2026-W16')
+    expect(useChangeHistoryStore.getState().events).toHaveLength(0)
   })
 })
