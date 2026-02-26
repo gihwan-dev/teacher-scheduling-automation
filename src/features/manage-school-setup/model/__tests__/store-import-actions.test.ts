@@ -7,6 +7,7 @@ import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { FixedEvent } from '@/entities/fixed-event'
+import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableSnapshot } from '@/entities/timetable'
 import type { SetupImportBundle } from '@/shared/persistence/indexeddb/repository'
@@ -33,9 +34,17 @@ const repositoryMocks = vi.hoisted(() => ({
   loadLatestSnapshotByWeek: vi.fn<() => Promise<TimetableSnapshot | undefined>>(),
   loadLatestTimetableSnapshot: vi.fn<() => Promise<TimetableSnapshot | undefined>>(),
   loadTeacherPolicies: vi.fn<() => Promise<Array<TeacherPolicy>>>(),
-  saveAcademicCalendarEvents: vi.fn<() => Promise<void>>(),
+  saveAcademicCalendarEvents: vi.fn<
+    (events: Array<AcademicCalendarEvent>) => Promise<void>
+  >(),
   saveAllSetupData: vi.fn<() => Promise<void>>(),
   saveSetupImportBundle: vi.fn<(bundle: SetupImportBundle) => Promise<void>>(),
+  saveSetupImportBundleWithAcademicCalendar: vi.fn<
+    (input: {
+      bundle: SetupImportBundle
+      academicCalendarEvents: Array<AcademicCalendarEvent>
+    }) => Promise<void>
+  >(),
 }))
 
 vi.mock('../teacher-hours-xls-parser', () => ({
@@ -175,8 +184,12 @@ beforeEach(async () => {
   repositoryMocks.saveAcademicCalendarEvents.mockReset()
   repositoryMocks.saveAllSetupData.mockReset()
   repositoryMocks.saveSetupImportBundle.mockReset()
+  repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockReset()
 
   repositoryMocks.saveSetupImportBundle.mockResolvedValue(undefined)
+  repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockResolvedValue(
+    undefined,
+  )
   repositoryMocks.loadTeacherPolicies.mockResolvedValue([])
   repositoryMocks.loadLatestSnapshotByWeek.mockResolvedValue(undefined)
 
@@ -206,8 +219,12 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).toHaveBeenCalledTimes(1)
-    const bundle = repositoryMocks.saveSetupImportBundle.mock.calls[0][0]
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
+    const bundle =
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mock.calls[0]?.[0]
+        ?.bundle
     expect(bundle.subjects[0]?.id).toBe('subject-legacy')
     expect(bundle.teachers[0]?.id).toBe('teacher-legacy')
     expect(bundle.teachers[0]?.assignments?.[0]?.subjectType).toBe('CLASS')
@@ -245,8 +262,54 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).toHaveBeenCalledTimes(1)
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
     expect(useSetupStore.getState().importReport?.status).toBe('PARTIAL_SUCCESS')
+  })
+
+  it('teacher-hours atomic save 실패: FAILED + 상태 불변', async () => {
+    seedBaseState()
+    parserMocks.parseTeacherHoursXls.mockReturnValue({
+      sheetName: '교사별시수표',
+      subjects: [{ name: '국어', abbreviation: '국' }],
+      teachers: [{ name: '김교사', baseHoursPerWeek: 5 }],
+      assignments: [
+        {
+          teacherName: '김교사',
+          subjectName: '국어',
+          grade: 1,
+          classNumber: 1,
+          hoursPerWeek: 5,
+        },
+      ],
+      issues: [],
+    })
+    repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockRejectedValueOnce(
+      new Error('atomic import save failed'),
+    )
+
+    const before = clone({
+      schoolConfig: useSetupStore.getState().schoolConfig,
+      subjects: useSetupStore.getState().subjects,
+      teachers: useSetupStore.getState().teachers,
+      fixedEvents: useSetupStore.getState().fixedEvents,
+      latestSnapshot: useSetupStore.getState().latestSnapshot,
+    })
+
+    await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
+
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
+    expect(useSetupStore.getState().importReport?.status).toBe('FAILED')
+    expect({
+      schoolConfig: useSetupStore.getState().schoolConfig,
+      subjects: useSetupStore.getState().subjects,
+      teachers: useSetupStore.getState().teachers,
+      fixedEvents: useSetupStore.getState().fixedEvents,
+      latestSnapshot: useSetupStore.getState().latestSnapshot,
+    }).toEqual(before)
   })
 
   it('teacher-hours blocking: 저장 미수행 + FAILED + 상태 불변', async () => {
@@ -276,7 +339,9 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).not.toHaveBeenCalled()
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).not.toHaveBeenCalled()
     expect(useSetupStore.getState().importReport?.status).toBe('FAILED')
     expect({
       schoolConfig: useSetupStore.getState().schoolConfig,
@@ -299,7 +364,9 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).not.toHaveBeenCalled()
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).not.toHaveBeenCalled()
     const importReport = useSetupStore.getState().importReport
     expect(importReport?.status).toBe('FAILED')
     expect(importReport?.issues.some((issue) => issue.blocking)).toBe(true)
@@ -366,7 +433,9 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
-    const bundle = repositoryMocks.saveSetupImportBundle.mock.calls[0][0]
+    const bundle =
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mock.calls[0]?.[0]
+        ?.bundle
     expect(bundle.fixedEvents.map((event) => event.id)).toEqual(['fixed-valid'])
     expect(bundle.teacherPolicies.map((policy) => policy.id)).toEqual([
       'policy-valid',
@@ -378,7 +447,7 @@ describe('setup store import actions', () => {
     expect(useSetupStore.getState().importReport?.status).toBe('PARTIAL_SUCCESS')
   })
 
-  it('academicCalendar dirty=true 상태에서 import 성공 후에도 dirty 유지', async () => {
+  it('academicCalendar dirty=true 상태에서도 import 성공 후 save-state를 초기화한다', async () => {
     seedBaseState()
     useSetupStore.getState().addAcademicCalendarEvent({
       eventType: 'HOLIDAY',
@@ -408,9 +477,14 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).toHaveBeenCalledTimes(1)
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
     expect(useSetupStore.getState().importReport?.status).toBe('SUCCESS')
-    expect(useSetupStore.getState().isDirty).toBe(true)
+    expect(useSetupStore.getState().isDirty).toBe(false)
+    expect(useSetupStore.getState().autoSaveError).toBeNull()
+    expect(useSetupStore.getState().isAutoSaving).toBe(false)
+    expect(useSetupStore.getState().lastAutoSavedAt).not.toBeNull()
   })
 
   it('final-timetable SUCCESS: snapshot version 증가', async () => {
@@ -453,8 +527,12 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importFinalTimetableFromFile(createFinalTimetableFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).toHaveBeenCalledTimes(1)
-    const bundle = repositoryMocks.saveSetupImportBundle.mock.calls[0][0]
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).toHaveBeenCalledTimes(1)
+    const bundle =
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mock.calls[0]?.[0]
+        ?.bundle
     const snapshot = bundle.timetableSnapshots?.[0]
     expect(snapshot?.weekTag).toBe('2026-W12')
     expect(snapshot?.versionNo).toBe(4)
@@ -497,7 +575,9 @@ describe('setup store import actions', () => {
 
     await useSetupStore.getState().importFinalTimetableFromFile(createFinalTimetableFile())
 
-    expect(repositoryMocks.saveSetupImportBundle).not.toHaveBeenCalled()
+    expect(
+      repositoryMocks.saveSetupImportBundleWithAcademicCalendar,
+    ).not.toHaveBeenCalled()
     expect(useSetupStore.getState().importReport?.status).toBe('FAILED')
     expect({
       schoolConfig: useSetupStore.getState().schoolConfig,

@@ -153,6 +153,41 @@ export interface SetupImportBundle {
   timetableSnapshots?: Array<TimetableSnapshot>
 }
 
+async function writeSetupImportBundleInTransaction(
+  bundle: SetupImportBundle,
+): Promise<void> {
+  await db.schoolConfigs.clear()
+  await db.schoolConfigs.put(bundle.schoolConfig)
+  await db.subjects.clear()
+  if (bundle.subjects.length > 0) {
+    await db.subjects.bulkPut(bundle.subjects)
+  }
+  await db.teachers.clear()
+  if (bundle.teachers.length > 0) {
+    await db.teachers.bulkPut(bundle.teachers)
+  }
+  await db.fixedEvents.clear()
+  if (bundle.fixedEvents.length > 0) {
+    await db.fixedEvents.bulkPut(bundle.fixedEvents)
+  }
+  await db.teacherPolicies.clear()
+  if (bundle.teacherPolicies.length > 0) {
+    await db.teacherPolicies.bulkPut(bundle.teacherPolicies)
+  }
+  if (bundle.timetableSnapshots && bundle.timetableSnapshots.length > 0) {
+    await db.timetableSnapshots.bulkPut(bundle.timetableSnapshots)
+  }
+}
+
+async function writeAcademicCalendarEventsInTransaction(
+  events: Array<AcademicCalendarEvent>,
+): Promise<void> {
+  await db.academicCalendarEvents.clear()
+  if (events.length > 0) {
+    await db.academicCalendarEvents.bulkPut(events)
+  }
+}
+
 export async function saveSetupImportBundle(
   bundle: SetupImportBundle,
 ): Promise<void> {
@@ -166,28 +201,28 @@ export async function saveSetupImportBundle(
       db.teacherPolicies,
       db.timetableSnapshots,
     ],
+    async () => writeSetupImportBundleInTransaction(bundle),
+  )
+}
+
+export async function saveSetupImportBundleWithAcademicCalendar(input: {
+  bundle: SetupImportBundle
+  academicCalendarEvents: Array<AcademicCalendarEvent>
+}): Promise<void> {
+  await db.transaction(
+    'rw',
+    [
+      db.schoolConfigs,
+      db.subjects,
+      db.teachers,
+      db.fixedEvents,
+      db.teacherPolicies,
+      db.timetableSnapshots,
+      db.academicCalendarEvents,
+    ],
     async () => {
-      await db.schoolConfigs.clear()
-      await db.schoolConfigs.put(bundle.schoolConfig)
-      await db.subjects.clear()
-      if (bundle.subjects.length > 0) {
-        await db.subjects.bulkPut(bundle.subjects)
-      }
-      await db.teachers.clear()
-      if (bundle.teachers.length > 0) {
-        await db.teachers.bulkPut(bundle.teachers)
-      }
-      await db.fixedEvents.clear()
-      if (bundle.fixedEvents.length > 0) {
-        await db.fixedEvents.bulkPut(bundle.fixedEvents)
-      }
-      await db.teacherPolicies.clear()
-      if (bundle.teacherPolicies.length > 0) {
-        await db.teacherPolicies.bulkPut(bundle.teacherPolicies)
-      }
-      if (bundle.timetableSnapshots && bundle.timetableSnapshots.length > 0) {
-        await db.timetableSnapshots.bulkPut(bundle.timetableSnapshots)
-      }
+      await writeSetupImportBundleInTransaction(input.bundle)
+      await writeAcademicCalendarEventsInTransaction(input.academicCalendarEvents)
     },
   )
 }
@@ -421,10 +456,11 @@ export async function deleteChangeEventsBySnapshot(
 export async function saveAcademicCalendarEvents(
   events: Array<AcademicCalendarEvent>,
 ): Promise<void> {
-  await db.transaction('rw', db.academicCalendarEvents, async () => {
-    await db.academicCalendarEvents.clear()
-    await db.academicCalendarEvents.bulkPut(events)
-  })
+  await db.transaction(
+    'rw',
+    db.academicCalendarEvents,
+    async () => writeAcademicCalendarEventsInTransaction(events),
+  )
 }
 
 export async function loadAcademicCalendarEventsByRange(

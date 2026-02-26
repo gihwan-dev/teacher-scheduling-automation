@@ -1,7 +1,4 @@
 import { useEffect } from 'react'
-import { toast } from 'sonner'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { FloppyDiskIcon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { SchoolConfigForm } from './school-config-form'
 import { SubjectTable } from './subject-table'
 import { TeacherTable } from './teacher-table'
@@ -23,10 +20,13 @@ export function SetupPage() {
     activeTab,
     setActiveTab,
     isDirty,
+    isAutoSaving,
+    lastAutoSavedAt,
+    autoSaveError,
     isLoading,
     validationMessages,
     loadFromDB,
-    saveToDB,
+    flushAutoSave,
     runValidation,
   } = useSetupStore()
 
@@ -34,7 +34,24 @@ export function SetupPage() {
     loadFromDB()
   }, [loadFromDB])
 
-  useUnsavedWarning(isDirty)
+  useEffect(() => {
+    const handlePageHide = () => {
+      void flushAutoSave('pagehide')
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        void flushAutoSave('pagehide')
+      }
+    }
+    window.addEventListener('pagehide', handlePageHide)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [flushAutoSave])
+
+  useUnsavedWarning(isDirty || isAutoSaving)
 
   const errorCount = validationMessages.filter(
     (m) => m.severity === 'error',
@@ -42,12 +59,6 @@ export function SetupPage() {
   const warningCount = validationMessages.filter(
     (m) => m.severity === 'warning',
   ).length
-
-  const handleSave = async () => {
-    runValidation()
-    await saveToDB()
-    toast.success('설정을 저장했습니다')
-  }
 
   if (isLoading) {
     return <LoadingState />
@@ -64,13 +75,26 @@ export function SetupPage() {
         </div>
         <div className="flex items-center gap-3">
           {isDirty && <Badge variant="outline">변경사항 있음</Badge>}
+          {isAutoSaving && <Badge variant="secondary">저장 중</Badge>}
+          {!isAutoSaving && autoSaveError && (
+            <div className="flex items-center gap-2">
+              <Badge variant="destructive">자동 저장 실패: {autoSaveError}</Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void flushAutoSave('manual')}
+              >
+                다시 시도
+              </Button>
+            </div>
+          )}
+          {!isAutoSaving && !autoSaveError && lastAutoSavedAt && (
+            <p className="text-muted-foreground text-xs">
+              마지막 저장: {lastAutoSavedAt}
+            </p>
+          )}
           <Button variant="outline" onClick={runValidation}>
-            <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} />
             검증
-          </Button>
-          <Button onClick={handleSave}>
-            <HugeiconsIcon icon={FloppyDiskIcon} strokeWidth={2} />
-            저장
           </Button>
         </div>
       </div>

@@ -78,13 +78,13 @@
 - Owner Role: implementer
 - Write Scope: `src/features/manage-school-setup/model/store.ts`, `src/pages/setup/ui/setup-page.tsx`, `src/shared/lib/hooks/use-unsaved-warning.ts` 사용부
 - Depends On: Phase 4
-- [ ] **700ms 디바운스 자동 저장 구현**
+- [x] **700ms 디바운스 자동 저장 구현**
   - 목표: 입력 후 자동으로 IndexedDB 영구 저장
   - 검증: 저장 버튼 없이 새로고침/재진입 시 데이터 유지
-- [ ] **페이지 종료 flush 구현**
+- [x] **페이지 종료 flush 구현**
   - 목표: `pagehide`/`visibilitychange`에서 즉시 저장
   - 검증: 탭 닫기 직전 입력도 유실 없음
-- [ ] **로컬 드래프트 복원 구현**
+- [x] **로컬 드래프트 복원 구현**
   - 목표: `setup-draft-v1` 기반 최신 데이터 복원
   - 검증: debounce 대기 구간 종료 전 종료 시 복원 성공
 
@@ -130,3 +130,4 @@
 - Phase 3: final timetable xlsx parser + conflict rules + unit tests
 - Phase 4 완료: SSOT 치환/orphan 삭제/importReport/store import actions
 - Phase 5 완료: Setup import 탭/패널 및 import report UX, import 관련 UI 테스트 2종 추가
+- Phase 6 완료: setup autosave(700ms debounce/flush/pagehide), `setup-draft-v1` 복원 + DB 최신성 비교, import-자동저장 충돌 가드, store/setup-page autosave 테스트 추가

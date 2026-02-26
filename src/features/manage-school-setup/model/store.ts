@@ -4,6 +4,7 @@ import { normalizeImportName } from './name-normalizer'
 import { parseTeacherHoursXls } from './teacher-hours-xls-parser'
 import { runFullValidation } from './validation'
 import type {
+  AutoSaveFlushReason,
   FinalTimetableImportPayload,
   ImportIssue,
   ImportReport,
@@ -35,7 +36,7 @@ import {
   loadTeacherPolicies,
   saveAcademicCalendarEvents,
   saveAllSetupData,
-  saveSetupImportBundle,
+  saveSetupImportBundleWithAcademicCalendar,
 } from '@/shared/persistence/indexeddb/repository'
 import { generateId } from '@/shared/lib/id'
 import { computeWeekTagFromTimestamp } from '@/shared/lib/week-tag'
@@ -47,6 +48,9 @@ export type SetupTab =
   | 'fixedEvents'
   | 'academicCalendar'
   | 'import'
+
+export const AUTO_SAVE_DEBOUNCE_MS = 700
+export const SETUP_DRAFT_KEY = 'setup-draft-v1'
 
 interface SetupState {
   schoolConfig: SchoolConfig | null
@@ -60,6 +64,9 @@ interface SetupState {
   latestSnapshot: TimetableSnapshot | null
   activeTab: SetupTab
   isDirty: boolean
+  isAutoSaving: boolean
+  lastAutoSavedAt: string | null
+  autoSaveError: string | null
   validationMessages: Array<ValidationMessage>
   isLoading: boolean
 
@@ -102,6 +109,8 @@ interface SetupState {
   // Persistence
   loadFromDB: () => Promise<void>
   saveToDB: () => Promise<void>
+  scheduleAutoSave: () => void
+  flushAutoSave: (reason: AutoSaveFlushReason) => Promise<void>
 
   // Validation
   runValidation: () => void
@@ -109,6 +118,125 @@ interface SetupState {
 
 function now(): string {
   return new Date().toISOString()
+}
+
+interface SetupDraftPayload {
+  schoolConfig: SchoolConfig | null
+  subjects: Array<Subject>
+  teachers: Array<Teacher>
+  fixedEvents: Array<FixedEvent>
+  academicCalendarEvents: Array<AcademicCalendarEvent>
+  updatedAt: string
+}
+
+function canUseBrowserStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+}
+
+function toTimestamp(value: string | null | undefined): number {
+  if (!value) return Number.NEGATIVE_INFINITY
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
+}
+
+function resolveLatestUpdatedAt(input: {
+  schoolConfig: SchoolConfig | null | undefined
+  subjects: Array<Subject>
+  teachers: Array<Teacher>
+  fixedEvents: Array<FixedEvent>
+  academicCalendarEvents: Array<AcademicCalendarEvent>
+}): string | null {
+  const updatedAtCandidates: Array<string> = []
+  if (input.schoolConfig?.updatedAt) {
+    updatedAtCandidates.push(input.schoolConfig.updatedAt)
+  }
+  for (const subject of input.subjects) {
+    updatedAtCandidates.push(subject.updatedAt)
+  }
+  for (const teacher of input.teachers) {
+    updatedAtCandidates.push(teacher.updatedAt)
+  }
+  for (const fixedEvent of input.fixedEvents) {
+    updatedAtCandidates.push(fixedEvent.updatedAt)
+  }
+  for (const event of input.academicCalendarEvents) {
+    updatedAtCandidates.push(event.updatedAt)
+  }
+  let latest: string | null = null
+  let latestTimestamp = Number.NEGATIVE_INFINITY
+  for (const candidate of updatedAtCandidates) {
+    const timestamp = toTimestamp(candidate)
+    if (timestamp > latestTimestamp) {
+      latest = candidate
+      latestTimestamp = timestamp
+    }
+  }
+  return latest
+}
+
+function isSetupDraftPayload(value: unknown): value is SetupDraftPayload {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as {
+    schoolConfig?: unknown
+    subjects?: unknown
+    teachers?: unknown
+    fixedEvents?: unknown
+    academicCalendarEvents?: unknown
+    updatedAt?: unknown
+  }
+  if (candidate.schoolConfig !== null && typeof candidate.schoolConfig !== 'object') {
+    return false
+  }
+  if (!Array.isArray(candidate.subjects)) return false
+  if (!Array.isArray(candidate.teachers)) return false
+  if (!Array.isArray(candidate.fixedEvents)) return false
+  if (!Array.isArray(candidate.academicCalendarEvents)) return false
+  return typeof candidate.updatedAt === 'string'
+}
+
+function readSetupDraft(): SetupDraftPayload | null {
+  if (!canUseBrowserStorage()) return null
+  const raw = window.localStorage.getItem(SETUP_DRAFT_KEY)
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isSetupDraftPayload(parsed)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeSetupDraft(input: {
+  schoolConfig: SchoolConfig | null
+  subjects: Array<Subject>
+  teachers: Array<Teacher>
+  fixedEvents: Array<FixedEvent>
+  academicCalendarEvents: Array<AcademicCalendarEvent>
+}): void {
+  if (!canUseBrowserStorage()) return
+  const draft: SetupDraftPayload = {
+    schoolConfig: input.schoolConfig,
+    subjects: input.subjects,
+    teachers: input.teachers,
+    fixedEvents: input.fixedEvents,
+    academicCalendarEvents: input.academicCalendarEvents,
+    updatedAt: now(),
+  }
+  try {
+    window.localStorage.setItem(SETUP_DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // ignore localStorage quota and unavailable storage errors
+  }
+}
+
+function clearSetupDraft(): void {
+  if (!canUseBrowserStorage()) return
+  try {
+    window.localStorage.removeItem(SETUP_DRAFT_KEY)
+  } catch {
+    // ignore unavailable storage errors
+  }
 }
 
 const DAY_ORDER: Array<DayOfWeek> = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -339,125 +467,194 @@ interface ImportPipelineInput<TPayload> {
 }
 
 export const useSetupStore = create<SetupState>((set, get) => {
+  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+  let flushInFlight: Promise<void> | null = null
+  let importInFlight = false
+  let pendingFlushReason: AutoSaveFlushReason | null = null
+  let setupRevision = 0
+
+  const clearPendingAutoSave = (): void => {
+    if (!autoSaveTimer) return
+    clearTimeout(autoSaveTimer)
+    autoSaveTimer = null
+  }
+
+  const queueFollowUpFlush = (reason: AutoSaveFlushReason): void => {
+    pendingFlushReason = reason
+  }
+
+  const takePendingFlushReason = (): AutoSaveFlushReason | null => {
+    const queuedReason = pendingFlushReason
+    pendingFlushReason = null
+    return queuedReason
+  }
+
+  const markSetupMutation = (): void => {
+    setupRevision += 1
+  }
+
+  const isImportInFlight = (): boolean => importInFlight
+
   const runImportPipeline = async <TPayload>(
     input: ImportPipelineInput<TPayload>,
   ): Promise<void> => {
-    const targetWeekTag = get().targetWeekTagForImport
-    const createdAt = now()
-    const issues: Array<ImportIssue> = []
-
-    let payload: TPayload | null = null
-    try {
-      const fileBuffer = await input.file.arrayBuffer()
-      payload = input.parser(fileBuffer)
-      issues.push(...input.extractIssues(payload))
-    } catch {
-      issues.push(
-        createImportIssue({
-          message: '파일 읽기 또는 파싱에 실패했습니다.',
-          severity: 'error',
-          blocking: true,
-        }),
-      )
-    }
-
-    if (!payload || hasBlockingIssue(issues)) {
-      set({
-        importReport: createImportReport({
-          source: input.source,
-          targetWeekTag,
-          createdAt,
-          issues,
-        }),
-      })
-      return
-    }
-
-    let transformed: ImportPipelineTransformResult | null = null
-    try {
-      transformed = await input.transform({
-        payload,
-        state: get(),
-        createdAt,
-        targetWeekTag,
-        issues,
-      })
-    } catch {
-      issues.push(
-        createImportIssue({
-          message: '파싱 결과를 엔티티로 변환하는 중 오류가 발생했습니다.',
-          severity: 'error',
-          blocking: true,
-        }),
-      )
-    }
-
-    if (!transformed || hasBlockingIssue(issues)) {
-      set({
-        importReport: createImportReport({
-          source: input.source,
-          targetWeekTag,
-          createdAt,
-          issues,
-        }),
-      })
-      return
-    }
-
-    try {
-      const teacherPolicies = await loadTeacherPolicies()
-      const pruned = pruneOrphans({
-        fixedEvents: transformed.fixedEvents,
-        teacherPolicies,
-        teachers: transformed.teachers,
-        subjects: transformed.subjects,
-        issues,
-      })
-      const bundle: SetupImportBundle = {
-        schoolConfig: transformed.schoolConfig,
-        subjects: transformed.subjects,
-        teachers: transformed.teachers,
-        fixedEvents: pruned.fixedEvents,
-        teacherPolicies: pruned.teacherPolicies,
-        timetableSnapshots: transformed.timetableSnapshots,
+    const reScheduleAutoSaveIfDirty = (): void => {
+      if (get().isDirty) {
+        get().scheduleAutoSave()
       }
-      await saveSetupImportBundle(bundle)
-      const importReport = createImportReport({
-        source: input.source,
-        targetWeekTag,
-        createdAt,
-        issues,
-      })
-      set({
-        schoolConfig: bundle.schoolConfig,
-        subjects: bundle.subjects,
-        teachers: bundle.teachers,
-        fixedEvents: bundle.fixedEvents,
-        latestSnapshot: transformed.latestSnapshot,
-        validationMessages: runFullValidation(
-          bundle.schoolConfig,
-          bundle.subjects,
-          bundle.teachers,
-          bundle.fixedEvents,
-        ),
-        importReport,
-      })
-    } catch {
-      issues.push(
-        createImportIssue({
-          message: '반영 데이터 저장 중 오류가 발생했습니다.',
-          severity: 'error',
-          blocking: true,
-        }),
-      )
-      set({
-        importReport: createImportReport({
+    }
+    importInFlight = true
+    try {
+      clearPendingAutoSave()
+      pendingFlushReason = null
+      if (flushInFlight) {
+        await flushInFlight
+      }
+      clearPendingAutoSave()
+      pendingFlushReason = null
+
+      const importStartRevision = setupRevision
+      const targetWeekTag = get().targetWeekTagForImport
+      const createdAt = now()
+      const issues: Array<ImportIssue> = []
+
+      let payload: TPayload | null = null
+      try {
+        const fileBuffer = await input.file.arrayBuffer()
+        payload = input.parser(fileBuffer)
+        issues.push(...input.extractIssues(payload))
+      } catch {
+        issues.push(
+          createImportIssue({
+            message: '파일 읽기 또는 파싱에 실패했습니다.',
+            severity: 'error',
+            blocking: true,
+          }),
+        )
+      }
+
+      if (!payload || hasBlockingIssue(issues)) {
+        set({
+          importReport: createImportReport({
+            source: input.source,
+            targetWeekTag,
+            createdAt,
+            issues,
+          }),
+        })
+        reScheduleAutoSaveIfDirty()
+        return
+      }
+
+      let transformed: ImportPipelineTransformResult | null = null
+      try {
+        transformed = await input.transform({
+          payload,
+          state: get(),
+          createdAt,
+          targetWeekTag,
+          issues,
+        })
+      } catch {
+        issues.push(
+          createImportIssue({
+            message: '파싱 결과를 엔티티로 변환하는 중 오류가 발생했습니다.',
+            severity: 'error',
+            blocking: true,
+          }),
+        )
+      }
+
+      if (!transformed || hasBlockingIssue(issues)) {
+        set({
+          importReport: createImportReport({
+            source: input.source,
+            targetWeekTag,
+            createdAt,
+            issues,
+          }),
+        })
+        reScheduleAutoSaveIfDirty()
+        return
+      }
+
+      try {
+        const teacherPolicies = await loadTeacherPolicies()
+        const pruned = pruneOrphans({
+          fixedEvents: transformed.fixedEvents,
+          teacherPolicies,
+          teachers: transformed.teachers,
+          subjects: transformed.subjects,
+          issues,
+        })
+        const bundle: SetupImportBundle = {
+          schoolConfig: transformed.schoolConfig,
+          subjects: transformed.subjects,
+          teachers: transformed.teachers,
+          fixedEvents: pruned.fixedEvents,
+          teacherPolicies: pruned.teacherPolicies,
+          timetableSnapshots: transformed.timetableSnapshots,
+        }
+        const { academicCalendarEvents } = get()
+        await saveSetupImportBundleWithAcademicCalendar({
+          bundle,
+          academicCalendarEvents,
+        })
+        const importReport = createImportReport({
           source: input.source,
           targetWeekTag,
           createdAt,
           issues,
-        }),
-      })
+        })
+        const hasNewerChanges = importStartRevision !== setupRevision
+        if (hasNewerChanges) {
+          queueFollowUpFlush('debounce')
+        } else {
+          clearSetupDraft()
+        }
+        set({
+          schoolConfig: bundle.schoolConfig,
+          subjects: bundle.subjects,
+          teachers: bundle.teachers,
+          fixedEvents: bundle.fixedEvents,
+          baselineAcademicCalendarEvents: academicCalendarEvents,
+          latestSnapshot: transformed.latestSnapshot,
+          isDirty: hasNewerChanges,
+          isAutoSaving: false,
+          lastAutoSavedAt: createdAt,
+          autoSaveError: null,
+          validationMessages: runFullValidation(
+            bundle.schoolConfig,
+            bundle.subjects,
+            bundle.teachers,
+            bundle.fixedEvents,
+          ),
+          importReport,
+        })
+      } catch {
+        issues.push(
+          createImportIssue({
+            message: '반영 데이터 저장 중 오류가 발생했습니다.',
+            severity: 'error',
+            blocking: true,
+          }),
+        )
+        set({
+          importReport: createImportReport({
+            source: input.source,
+            targetWeekTag,
+            createdAt,
+            issues,
+          }),
+        })
+        reScheduleAutoSaveIfDirty()
+      }
+    } finally {
+      importInFlight = false
+      const queuedReason = takePendingFlushReason()
+      if (queuedReason) {
+        await get().flushAutoSave(queuedReason)
+      }
     }
   }
 
@@ -473,14 +670,124 @@ export const useSetupStore = create<SetupState>((set, get) => {
     latestSnapshot: null,
     activeTab: 'school',
     isDirty: false,
+    isAutoSaving: false,
+    lastAutoSavedAt: null,
+    autoSaveError: null,
     validationMessages: [],
     isLoading: false,
+
+    scheduleAutoSave: () => {
+      const { schoolConfig, subjects, teachers, fixedEvents, academicCalendarEvents } =
+        get()
+      writeSetupDraft({
+        schoolConfig,
+        subjects,
+        teachers,
+        fixedEvents,
+        academicCalendarEvents,
+      })
+      if (isImportInFlight()) {
+        queueFollowUpFlush('debounce')
+        return
+      }
+      if (flushInFlight || get().isAutoSaving) {
+        queueFollowUpFlush('debounce')
+        return
+      }
+      clearPendingAutoSave()
+      autoSaveTimer = setTimeout(() => {
+        void get().flushAutoSave('debounce')
+      }, AUTO_SAVE_DEBOUNCE_MS)
+    },
+
+    flushAutoSave: async (reason) => {
+      clearPendingAutoSave()
+      if (isImportInFlight()) {
+        queueFollowUpFlush(reason)
+        return
+      }
+      if (flushInFlight) {
+        queueFollowUpFlush(reason)
+        await flushInFlight
+        return
+      }
+
+      flushInFlight = (async () => {
+        let nextReason: AutoSaveFlushReason | null = reason
+        while (nextReason !== null) {
+          const currentReason = nextReason
+          pendingFlushReason = null
+          nextReason = null
+
+          const {
+            schoolConfig,
+            subjects,
+            teachers,
+            fixedEvents,
+            academicCalendarEvents,
+            isDirty,
+          } = get()
+          if (currentReason !== 'manual' && !isDirty) {
+            nextReason = takePendingFlushReason()
+            continue
+          }
+          const snapshotRevision = setupRevision
+          set({ isAutoSaving: true })
+
+          if (!schoolConfig) {
+            set({ isAutoSaving: false })
+          } else {
+            try {
+              await Promise.all([
+                saveAllSetupData({ schoolConfig, subjects, teachers, fixedEvents }),
+                saveAcademicCalendarEvents(academicCalendarEvents),
+              ])
+              const resolvedLastAutoSavedAt = now()
+              const hasNewerChanges = snapshotRevision !== setupRevision
+              if (!hasNewerChanges) {
+                clearSetupDraft()
+              }
+              set({
+                baselineAcademicCalendarEvents: academicCalendarEvents,
+                isDirty: hasNewerChanges,
+                lastAutoSavedAt: resolvedLastAutoSavedAt,
+                autoSaveError: null,
+              })
+            } catch (error) {
+              const message =
+                error instanceof Error && error.message.trim().length > 0
+                  ? error.message
+                  : '자동 저장에 실패했습니다.'
+              set({
+                autoSaveError: message,
+                isDirty: true,
+              })
+            } finally {
+              set({ isAutoSaving: false })
+            }
+          }
+
+          nextReason = takePendingFlushReason()
+          if (isImportInFlight() && nextReason !== null) {
+            queueFollowUpFlush(nextReason)
+            break
+          }
+        }
+      })().finally(() => {
+        flushInFlight = null
+      })
+
+      await flushInFlight
+    },
 
     setActiveTab: (tab) => set({ activeTab: tab }),
 
     // SchoolConfig
-    setSchoolConfig: (config) =>
-      set({ schoolConfig: { ...config, updatedAt: now() }, isDirty: true }),
+    setSchoolConfig: (config) => {
+      set({ schoolConfig: { ...config, updatedAt: now() }, isDirty: true })
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
     // Subjects
     addSubject: (data) => {
@@ -492,21 +799,29 @@ export const useSetupStore = create<SetupState>((set, get) => {
         updatedAt: timestamp,
       }
       set((s) => ({ subjects: [...s.subjects, subject], isDirty: true }))
+      markSetupMutation()
+      get().scheduleAutoSave()
     },
 
-    updateSubject: (id, updates) =>
+    updateSubject: (id, updates) => {
       set((s) => ({
         subjects: s.subjects.map((sub) =>
           sub.id === id ? { ...sub, ...updates, updatedAt: now() } : sub,
         ),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
-    removeSubject: (id) =>
+    removeSubject: (id) => {
       set((s) => ({
         subjects: s.subjects.filter((sub) => sub.id !== id),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
     // Teachers
     addTeacher: (data) => {
@@ -518,21 +833,29 @@ export const useSetupStore = create<SetupState>((set, get) => {
         updatedAt: timestamp,
       }
       set((s) => ({ teachers: [...s.teachers, teacher], isDirty: true }))
+      markSetupMutation()
+      get().scheduleAutoSave()
     },
 
-    updateTeacher: (id, updates) =>
+    updateTeacher: (id, updates) => {
       set((s) => ({
         teachers: s.teachers.map((t) =>
           t.id === id ? { ...t, ...updates, updatedAt: now() } : t,
         ),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
-    removeTeacher: (id) =>
+    removeTeacher: (id) => {
       set((s) => ({
         teachers: s.teachers.filter((t) => t.id !== id),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
     // FixedEvents
     addFixedEvent: (data) => {
@@ -544,21 +867,29 @@ export const useSetupStore = create<SetupState>((set, get) => {
         updatedAt: timestamp,
       }
       set((s) => ({ fixedEvents: [...s.fixedEvents, event], isDirty: true }))
+      markSetupMutation()
+      get().scheduleAutoSave()
     },
 
-    updateFixedEvent: (id, updates) =>
+    updateFixedEvent: (id, updates) => {
       set((s) => ({
         fixedEvents: s.fixedEvents.map((e) =>
           e.id === id ? { ...e, ...updates, updatedAt: now() } : e,
         ),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
-    removeFixedEvent: (id) =>
+    removeFixedEvent: (id) => {
       set((s) => ({
         fixedEvents: s.fixedEvents.filter((e) => e.id !== id),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
     // AcademicCalendarEvents
     addAcademicCalendarEvent: (data) => {
@@ -573,23 +904,31 @@ export const useSetupStore = create<SetupState>((set, get) => {
         academicCalendarEvents: [...s.academicCalendarEvents, event],
         isDirty: true,
       }))
+      markSetupMutation()
+      get().scheduleAutoSave()
     },
 
-    updateAcademicCalendarEvent: (id, updates) =>
+    updateAcademicCalendarEvent: (id, updates) => {
       set((s) => ({
         academicCalendarEvents: s.academicCalendarEvents.map((event) =>
           event.id === id ? { ...event, ...updates, updatedAt: now() } : event,
         ),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
-    removeAcademicCalendarEvent: (id) =>
+    removeAcademicCalendarEvent: (id) => {
       set((s) => ({
         academicCalendarEvents: s.academicCalendarEvents.filter(
           (event) => event.id !== id,
         ),
         isDirty: true,
-      })),
+      }))
+      markSetupMutation()
+      get().scheduleAutoSave()
+    },
 
     setTargetWeekTagForImport: (weekTag) =>
       set({ targetWeekTagForImport: weekTag }),
@@ -956,6 +1295,35 @@ export const useSetupStore = create<SetupState>((set, get) => {
         loadAcademicCalendarEvents(),
         loadLatestTimetableSnapshot(),
       ])
+      const dbLastUpdatedAt = resolveLatestUpdatedAt({
+        schoolConfig: data.schoolConfig ?? null,
+        subjects: data.subjects,
+        teachers: data.teachers,
+        fixedEvents: data.fixedEvents,
+        academicCalendarEvents,
+      })
+      const draft = readSetupDraft()
+      if (
+        draft &&
+        toTimestamp(draft.updatedAt) > (dbLastUpdatedAt ? toTimestamp(dbLastUpdatedAt) : Number.NEGATIVE_INFINITY)
+      ) {
+        set({
+          schoolConfig: draft.schoolConfig,
+          subjects: draft.subjects,
+          teachers: draft.teachers,
+          fixedEvents: draft.fixedEvents,
+          academicCalendarEvents: draft.academicCalendarEvents,
+          baselineAcademicCalendarEvents: academicCalendarEvents,
+          latestSnapshot: latestSnapshot ?? null,
+          isDirty: true,
+          isAutoSaving: false,
+          lastAutoSavedAt: dbLastUpdatedAt,
+          autoSaveError: null,
+          isLoading: false,
+        })
+        get().scheduleAutoSave()
+        return
+      }
       set({
         schoolConfig: data.schoolConfig ?? null,
         subjects: data.subjects,
@@ -965,28 +1333,14 @@ export const useSetupStore = create<SetupState>((set, get) => {
         baselineAcademicCalendarEvents: academicCalendarEvents,
         latestSnapshot: latestSnapshot ?? null,
         isDirty: false,
+        isAutoSaving: false,
+        lastAutoSavedAt: dbLastUpdatedAt,
+        autoSaveError: null,
         isLoading: false,
       })
     },
 
-    saveToDB: async () => {
-      const {
-        schoolConfig,
-        subjects,
-        teachers,
-        fixedEvents,
-        academicCalendarEvents,
-      } = get()
-      if (!schoolConfig) return
-      await Promise.all([
-        saveAllSetupData({ schoolConfig, subjects, teachers, fixedEvents }),
-        saveAcademicCalendarEvents(academicCalendarEvents),
-      ])
-      set({
-        baselineAcademicCalendarEvents: academicCalendarEvents,
-        isDirty: false,
-      })
-    },
+    saveToDB: async () => get().flushAutoSave('manual'),
 
     // Validation
     runValidation: () => {
