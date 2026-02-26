@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
 import type { TimetableSnapshot } from '@/entities/timetable'
+import type {
+  RecomputeInput,
+  RecomputeResult,
+} from '@/features/recompute-timetable'
 
 const parserMocks = vi.hoisted(() => ({
   parseTeacherHoursXls: vi.fn(),
@@ -23,6 +28,7 @@ const repositoryMocks = vi.hoisted(() => ({
       fixedEvents: Array<FixedEvent>
     }>
   >(),
+  loadConstraintPolicy: vi.fn<() => Promise<ConstraintPolicy | undefined>>(),
   loadLatestSnapshotByWeek: vi.fn<
     (weekTag: string) => Promise<TimetableSnapshot | undefined>
   >(),
@@ -40,6 +46,13 @@ const repositoryMocks = vi.hoisted(() => ({
       teachers: Array<Teacher>
       fixedEvents: Array<FixedEvent>
     }) => Promise<void>
+  >(),
+  saveNextSnapshotVersion: vi.fn<
+    (params: {
+      sourceSnapshot: TimetableSnapshot
+      cells: TimetableSnapshot['cells']
+      overrideWeekTag?: TimetableSnapshot['weekTag']
+    }) => Promise<TimetableSnapshot>
   >(),
   saveSetupImportBundle: vi.fn<
     (bundle: {
@@ -66,12 +79,20 @@ const repositoryMocks = vi.hoisted(() => ({
   >(),
 }))
 
+const recomputeMocks = vi.hoisted(() => ({
+  recomputeUnlocked: vi.fn<(input: RecomputeInput) => RecomputeResult>(),
+}))
+
 vi.mock('../teacher-hours-xls-parser', () => ({
   parseTeacherHoursXls: parserMocks.parseTeacherHoursXls,
 }))
 
 vi.mock('../final-timetable-xlsx-parser', () => ({
   parseFinalTimetableXlsx: parserMocks.parseFinalTimetableXlsx,
+}))
+
+vi.mock('@/features/recompute-timetable', () => ({
+  recomputeUnlocked: recomputeMocks.recomputeUnlocked,
 }))
 
 vi.mock('@/shared/persistence/indexeddb/repository', () => repositoryMocks)
@@ -125,13 +146,16 @@ beforeEach(async () => {
   parserMocks.parseFinalTimetableXlsx.mockReset()
   repositoryMocks.loadAcademicCalendarEvents.mockReset()
   repositoryMocks.loadAllSetupData.mockReset()
+  repositoryMocks.loadConstraintPolicy.mockReset()
   repositoryMocks.loadLatestSnapshotByWeek.mockReset()
   repositoryMocks.loadLatestTimetableSnapshot.mockReset()
   repositoryMocks.loadTeacherPolicies.mockReset()
   repositoryMocks.saveAcademicCalendarEvents.mockReset()
   repositoryMocks.saveAllSetupData.mockReset()
+  repositoryMocks.saveNextSnapshotVersion.mockReset()
   repositoryMocks.saveSetupImportBundle.mockReset()
   repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockReset()
+  recomputeMocks.recomputeUnlocked.mockReset()
 
   repositoryMocks.loadAllSetupData.mockResolvedValue({
     schoolConfig: clone(baseSchoolConfig),
@@ -141,14 +165,34 @@ beforeEach(async () => {
   })
   repositoryMocks.loadAcademicCalendarEvents.mockResolvedValue([])
   repositoryMocks.loadLatestTimetableSnapshot.mockResolvedValue(undefined)
+  repositoryMocks.loadConstraintPolicy.mockResolvedValue(undefined)
   repositoryMocks.loadLatestSnapshotByWeek.mockResolvedValue(undefined)
   repositoryMocks.loadTeacherPolicies.mockResolvedValue([])
   repositoryMocks.saveAcademicCalendarEvents.mockResolvedValue(undefined)
   repositoryMocks.saveAllSetupData.mockResolvedValue(undefined)
+  repositoryMocks.saveNextSnapshotVersion.mockImplementation((params) =>
+    Promise.resolve({
+      ...params.sourceSnapshot,
+      id: 'snapshot-next',
+      weekTag: params.overrideWeekTag ?? params.sourceSnapshot.weekTag,
+      versionNo: params.sourceSnapshot.versionNo + 1,
+      baseVersionId: params.sourceSnapshot.id,
+      cells: params.cells,
+    }),
+  )
   repositoryMocks.saveSetupImportBundle.mockResolvedValue(undefined)
   repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockResolvedValue(
     undefined,
   )
+  recomputeMocks.recomputeUnlocked.mockImplementation((input) => ({
+    success: true,
+    cells: input.cells,
+    score: 0,
+    violations: [],
+    unplacedAssignments: [],
+    suggestions: [],
+    recomputeTimeMs: 1,
+  }))
 
   const storeModule = await loadStoreModule()
   useSetupStore = storeModule.useSetupStore
@@ -415,6 +459,7 @@ describe('setup store autosave', () => {
   it('import in-flight + mutation keeps dirty until follow-up autosave persists', async () => {
     const importSave = createDeferred<void>()
     const importSaveStarted = createDeferred<void>()
+    const followUpSaveStarted = createDeferred<void>()
     const followUpSave = createDeferred<void>()
     repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockImplementationOnce(
       () => {
@@ -422,7 +467,10 @@ describe('setup store autosave', () => {
         return importSave.promise
       },
     )
-    repositoryMocks.saveAllSetupData.mockImplementationOnce(() => followUpSave.promise)
+    repositoryMocks.saveAllSetupData.mockImplementationOnce(() => {
+      followUpSaveStarted.resolve(undefined)
+      return followUpSave.promise
+    })
     useSetupStore.setState({ schoolConfig: clone(baseSchoolConfig) })
     parserMocks.parseTeacherHoursXls.mockReturnValue({
       sheetName: '교사별시수표',
@@ -458,7 +506,7 @@ describe('setup store autosave', () => {
     })
 
     importSave.resolve(undefined)
-    await Promise.resolve()
+    await followUpSaveStarted.promise
 
     expect(repositoryMocks.saveAllSetupData).toHaveBeenCalledTimes(1)
     expect(useSetupStore.getState().isDirty).toBe(true)

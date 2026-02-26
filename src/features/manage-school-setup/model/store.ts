@@ -13,6 +13,7 @@ import type {
 } from './types'
 import type { ValidationMessage } from './validation'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { FixedEvent } from '@/entities/fixed-event'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
@@ -31,13 +32,16 @@ import type { SetupImportBundle } from '@/shared/persistence/indexeddb/repositor
 import {
   loadAcademicCalendarEvents,
   loadAllSetupData,
+  loadConstraintPolicy,
   loadLatestSnapshotByWeek,
   loadLatestTimetableSnapshot,
   loadTeacherPolicies,
   saveAcademicCalendarEvents,
   saveAllSetupData,
+  saveNextSnapshotVersion,
   saveSetupImportBundleWithAcademicCalendar,
 } from '@/shared/persistence/indexeddb/repository'
+import { recomputeUnlocked } from '@/features/recompute-timetable'
 import { generateId } from '@/shared/lib/id'
 import { computeWeekTagFromTimestamp } from '@/shared/lib/week-tag'
 
@@ -118,6 +122,18 @@ interface SetupState {
 
 function now(): string {
   return new Date().toISOString()
+}
+
+function createDefaultConstraintPolicy(): ConstraintPolicy {
+  const timestamp = now()
+  return {
+    id: generateId(),
+    studentMaxConsecutiveSameSubject: 2,
+    teacherMaxConsecutiveHours: 4,
+    teacherMaxDailyHours: 6,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
 }
 
 interface SetupDraftPayload {
@@ -495,6 +511,87 @@ export const useSetupStore = create<SetupState>((set, get) => {
 
   const isImportInFlight = (): boolean => importInFlight
 
+  const runTeacherHoursAutoRecompute = async (input: {
+    importReport: ImportReport
+    targetWeekTag: WeekTag
+    schoolConfig: SchoolConfig
+    subjects: Array<Subject>
+    teachers: Array<Teacher>
+    fixedEvents: Array<FixedEvent>
+    teacherPolicies: Array<TeacherPolicy>
+    academicCalendarEvents: Array<AcademicCalendarEvent>
+    latestSnapshot: TimetableSnapshot | null
+  }): Promise<{
+    issues: Array<ImportIssue>
+    latestSnapshot: TimetableSnapshot | null
+  }> => {
+    if (
+      input.importReport.source !== 'TEACHER_HOURS_XLS' ||
+      input.importReport.status === 'FAILED'
+    ) {
+      return { issues: [], latestSnapshot: input.latestSnapshot }
+    }
+
+    const followUpIssues: Array<ImportIssue> = []
+    try {
+      const sourceSnapshot = await loadLatestSnapshotByWeek(input.targetWeekTag)
+      if (!sourceSnapshot) {
+        followUpIssues.push(
+          createImportIssue({
+            message:
+              '대상 주차 스냅샷이 없어 교사 시수표 반영 후 자동 재생성을 건너뛰었습니다.',
+            severity: 'warning',
+            blocking: false,
+          }),
+        )
+        return { issues: followUpIssues, latestSnapshot: input.latestSnapshot }
+      }
+
+      const constraintPolicy =
+        (await loadConstraintPolicy()) ?? createDefaultConstraintPolicy()
+      const recomputeResult = recomputeUnlocked({
+        cells: sourceSnapshot.cells,
+        schoolConfig: input.schoolConfig,
+        teachers: input.teachers,
+        subjects: input.subjects,
+        fixedEvents: input.fixedEvents,
+        constraintPolicy,
+        teacherPolicies: input.teacherPolicies,
+        weekTag: input.targetWeekTag,
+        academicCalendarEvents: input.academicCalendarEvents,
+      })
+
+      if (!recomputeResult.success) {
+        followUpIssues.push(
+          createImportIssue({
+            message:
+              '교사 시수표 반영 후 자동 재생성에 실패해 스냅샷 저장을 건너뛰었습니다.',
+            severity: 'warning',
+            blocking: false,
+          }),
+        )
+        return { issues: followUpIssues, latestSnapshot: input.latestSnapshot }
+      }
+
+      const savedSnapshot = await saveNextSnapshotVersion({
+        sourceSnapshot,
+        cells: recomputeResult.cells,
+        overrideWeekTag: input.targetWeekTag,
+      })
+      return { issues: followUpIssues, latestSnapshot: savedSnapshot }
+    } catch {
+      followUpIssues.push(
+        createImportIssue({
+          message:
+            '교사 시수표 반영 후 자동 재생성 중 오류가 발생해 스냅샷 저장을 건너뛰었습니다.',
+          severity: 'warning',
+          blocking: false,
+        }),
+      )
+      return { issues: followUpIssues, latestSnapshot: input.latestSnapshot }
+    }
+  }
+
   const runImportPipeline = async <TPayload>(
     input: ImportPipelineInput<TPayload>,
   ): Promise<void> => {
@@ -600,11 +697,28 @@ export const useSetupStore = create<SetupState>((set, get) => {
           bundle,
           academicCalendarEvents,
         })
-        const importReport = createImportReport({
+        const baseImportReport = createImportReport({
           source: input.source,
           targetWeekTag,
           createdAt,
           issues,
+        })
+        const followUpResult = await runTeacherHoursAutoRecompute({
+          importReport: baseImportReport,
+          targetWeekTag,
+          schoolConfig: bundle.schoolConfig,
+          subjects: bundle.subjects,
+          teachers: bundle.teachers,
+          fixedEvents: bundle.fixedEvents,
+          teacherPolicies: bundle.teacherPolicies,
+          academicCalendarEvents,
+          latestSnapshot: transformed.latestSnapshot,
+        })
+        const importReport = createImportReport({
+          source: input.source,
+          targetWeekTag,
+          createdAt,
+          issues: [...issues, ...followUpResult.issues],
         })
         const hasNewerChanges = importStartRevision !== setupRevision
         if (hasNewerChanges) {
@@ -618,7 +732,7 @@ export const useSetupStore = create<SetupState>((set, get) => {
           teachers: bundle.teachers,
           fixedEvents: bundle.fixedEvents,
           baselineAcademicCalendarEvents: academicCalendarEvents,
-          latestSnapshot: transformed.latestSnapshot,
+          latestSnapshot: followUpResult.latestSnapshot,
           isDirty: hasNewerChanges,
           isAutoSaving: false,
           lastAutoSavedAt: createdAt,

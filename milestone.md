@@ -92,10 +92,10 @@
 - Owner Role: implementer
 - Write Scope: `src/features/manage-school-setup/model/store.ts`, generate/repository 호출 경계
 - Depends On: Phase 4
-- [ ] **자동 재생성 실행 구현**
+- [x] **자동 재생성 실행 구현**
   - 목표: 시수표 반영 직후 대상 주차 snapshot 자동 갱신
   - 검증: 새 버전 저장(`append-only`) 확인
-- [ ] **재생성 실패 분리 처리 구현**
+- [x] **재생성 실패 분리 처리 구현**
   - 목표: setup 반영은 유지하고 실패만 리포트
   - 검증: 실패 시 데이터 롤백 없이 경고/오류 노출
 
@@ -131,3 +131,4 @@
 - Phase 4 완료: SSOT 치환/orphan 삭제/importReport/store import actions
 - Phase 5 완료: Setup import 탭/패널 및 import report UX, import 관련 UI 테스트 2종 추가
 - Phase 6 완료: setup autosave(700ms debounce/flush/pagehide), `setup-draft-v1` 복원 + DB 최신성 비교, import-자동저장 충돌 가드, store/setup-page autosave 테스트 추가
+- Phase 7 완료: teacher-hours import 직후 자동 재생성(runTeacherHoursAutoRecompute) 연결, snapshot 부재/실패 warning 분리, append-only snapshot 저장 및 관련 store 테스트 보강

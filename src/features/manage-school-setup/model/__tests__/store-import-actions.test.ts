@@ -3,6 +3,7 @@ import type {
   FinalTimetableImportPayload,
   TeacherHoursImportPayload,
 } from '../types'
+import type { ConstraintPolicy } from '@/entities/constraint-policy'
 import type { SchoolConfig } from '@/entities/school'
 import type { Subject } from '@/entities/subject'
 import type { Teacher } from '@/entities/teacher'
@@ -10,6 +11,10 @@ import type { FixedEvent } from '@/entities/fixed-event'
 import type { AcademicCalendarEvent } from '@/entities/academic-calendar'
 import type { TeacherPolicy } from '@/entities/teacher-policy'
 import type { TimetableSnapshot } from '@/entities/timetable'
+import type {
+  RecomputeInput,
+  RecomputeResult,
+} from '@/features/recompute-timetable'
 import type { SetupImportBundle } from '@/shared/persistence/indexeddb/repository'
 
 const parserMocks = vi.hoisted(() => ({
@@ -31,13 +36,23 @@ const repositoryMocks = vi.hoisted(() => ({
       fixedEvents: Array<FixedEvent>
     }>
   >(),
-  loadLatestSnapshotByWeek: vi.fn<() => Promise<TimetableSnapshot | undefined>>(),
+  loadConstraintPolicy: vi.fn<() => Promise<ConstraintPolicy | undefined>>(),
+  loadLatestSnapshotByWeek: vi.fn<
+    (weekTag: string) => Promise<TimetableSnapshot | undefined>
+  >(),
   loadLatestTimetableSnapshot: vi.fn<() => Promise<TimetableSnapshot | undefined>>(),
   loadTeacherPolicies: vi.fn<() => Promise<Array<TeacherPolicy>>>(),
   saveAcademicCalendarEvents: vi.fn<
     (events: Array<AcademicCalendarEvent>) => Promise<void>
   >(),
   saveAllSetupData: vi.fn<() => Promise<void>>(),
+  saveNextSnapshotVersion: vi.fn<
+    (params: {
+      sourceSnapshot: TimetableSnapshot
+      cells: TimetableSnapshot['cells']
+      overrideWeekTag?: TimetableSnapshot['weekTag']
+    }) => Promise<TimetableSnapshot>
+  >(),
   saveSetupImportBundle: vi.fn<(bundle: SetupImportBundle) => Promise<void>>(),
   saveSetupImportBundleWithAcademicCalendar: vi.fn<
     (input: {
@@ -47,12 +62,20 @@ const repositoryMocks = vi.hoisted(() => ({
   >(),
 }))
 
+const recomputeMocks = vi.hoisted(() => ({
+  recomputeUnlocked: vi.fn<(input: RecomputeInput) => RecomputeResult>(),
+}))
+
 vi.mock('../teacher-hours-xls-parser', () => ({
   parseTeacherHoursXls: parserMocks.parseTeacherHoursXls,
 }))
 
 vi.mock('../final-timetable-xlsx-parser', () => ({
   parseFinalTimetableXlsx: parserMocks.parseFinalTimetableXlsx,
+}))
+
+vi.mock('@/features/recompute-timetable', () => ({
+  recomputeUnlocked: recomputeMocks.recomputeUnlocked,
 }))
 
 vi.mock('@/shared/persistence/indexeddb/repository', () => repositoryMocks)
@@ -178,20 +201,43 @@ beforeEach(async () => {
   parserMocks.parseFinalTimetableXlsx.mockReset()
   repositoryMocks.loadAcademicCalendarEvents.mockReset()
   repositoryMocks.loadAllSetupData.mockReset()
+  repositoryMocks.loadConstraintPolicy.mockReset()
   repositoryMocks.loadLatestSnapshotByWeek.mockReset()
   repositoryMocks.loadLatestTimetableSnapshot.mockReset()
   repositoryMocks.loadTeacherPolicies.mockReset()
   repositoryMocks.saveAcademicCalendarEvents.mockReset()
   repositoryMocks.saveAllSetupData.mockReset()
+  repositoryMocks.saveNextSnapshotVersion.mockReset()
   repositoryMocks.saveSetupImportBundle.mockReset()
   repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockReset()
+  recomputeMocks.recomputeUnlocked.mockReset()
 
   repositoryMocks.saveSetupImportBundle.mockResolvedValue(undefined)
   repositoryMocks.saveSetupImportBundleWithAcademicCalendar.mockResolvedValue(
     undefined,
   )
+  repositoryMocks.loadConstraintPolicy.mockResolvedValue(undefined)
   repositoryMocks.loadTeacherPolicies.mockResolvedValue([])
-  repositoryMocks.loadLatestSnapshotByWeek.mockResolvedValue(undefined)
+  repositoryMocks.loadLatestSnapshotByWeek.mockResolvedValue(clone(latestSnapshot))
+  repositoryMocks.saveNextSnapshotVersion.mockImplementation((params) =>
+    Promise.resolve({
+      ...params.sourceSnapshot,
+      id: 'snapshot-next',
+      weekTag: params.overrideWeekTag ?? params.sourceSnapshot.weekTag,
+      versionNo: params.sourceSnapshot.versionNo + 1,
+      baseVersionId: params.sourceSnapshot.id,
+      cells: params.cells,
+    }),
+  )
+  recomputeMocks.recomputeUnlocked.mockImplementation((input) => ({
+    success: true,
+    cells: input.cells,
+    score: 0,
+    violations: [],
+    unplacedAssignments: [],
+    suggestions: [],
+    recomputeTimeMs: 1,
+  }))
 
   const storeModule = await import('../store')
   useSetupStore = storeModule.useSetupStore
@@ -199,8 +245,13 @@ beforeEach(async () => {
 })
 
 describe('setup store import actions', () => {
-  it('teacher-hours SUCCESS: 치환 저장 + importReport SUCCESS', async () => {
+  it('teacher-hours snapshot 존재 + recompute 성공 + 기본 정책 fallback + SUCCESS', async () => {
     seedBaseState()
+    useSetupStore.getState().setTargetWeekTagForImport('2026-W10')
+    repositoryMocks.loadLatestSnapshotByWeek.mockResolvedValueOnce({
+      ...latestSnapshot,
+      weekTag: '2026-W10',
+    })
     parserMocks.parseTeacherHoursXls.mockReturnValue({
       sheetName: '교사별시수표',
       subjects: [{ name: '국어', abbreviation: '국' }],
@@ -232,7 +283,123 @@ describe('setup store import actions', () => {
     expect(bundle.teachers[0]?.classAssignments).toEqual([
       { grade: 1, classNumber: 1, hoursPerWeek: 5 },
     ])
+    expect(repositoryMocks.loadConstraintPolicy).toHaveBeenCalledTimes(1)
+    expect(recomputeMocks.recomputeUnlocked).toHaveBeenCalledTimes(1)
+    const recomputeInput = recomputeMocks.recomputeUnlocked.mock.calls[0]?.[0]
+    expect(recomputeInput.constraintPolicy).toMatchObject({
+      studentMaxConsecutiveSameSubject: 2,
+      teacherMaxConsecutiveHours: 4,
+      teacherMaxDailyHours: 6,
+    })
+    expect(repositoryMocks.saveNextSnapshotVersion).toHaveBeenCalledTimes(1)
+    expect(useSetupStore.getState().latestSnapshot?.id).toBe('snapshot-next')
     expect(useSetupStore.getState().importReport?.status).toBe('SUCCESS')
+  })
+
+  it('teacher-hours 대상 snapshot 없음: PARTIAL_SUCCESS + warning', async () => {
+    seedBaseState()
+    repositoryMocks.loadLatestSnapshotByWeek.mockResolvedValueOnce(undefined)
+    parserMocks.parseTeacherHoursXls.mockReturnValue({
+      sheetName: '교사별시수표',
+      subjects: [{ name: '국어', abbreviation: '국' }],
+      teachers: [{ name: '김교사', baseHoursPerWeek: 5 }],
+      assignments: [
+        {
+          teacherName: '김교사',
+          subjectName: '국어',
+          grade: 1,
+          classNumber: 1,
+          hoursPerWeek: 5,
+        },
+      ],
+      issues: [],
+    })
+
+    await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
+
+    expect(recomputeMocks.recomputeUnlocked).not.toHaveBeenCalled()
+    expect(repositoryMocks.saveNextSnapshotVersion).not.toHaveBeenCalled()
+    const importReport = useSetupStore.getState().importReport
+    expect(importReport?.status).toBe('PARTIAL_SUCCESS')
+    expect(
+      importReport?.issues.some(
+        (issue) => issue.code === 'UNKNOWN' && issue.severity === 'warning',
+      ),
+    ).toBe(true)
+  })
+
+  it('teacher-hours recompute success=false: PARTIAL_SUCCESS + warning', async () => {
+    seedBaseState()
+    recomputeMocks.recomputeUnlocked.mockReturnValueOnce({
+      success: false,
+      cells: [],
+      score: 0,
+      violations: [],
+      unplacedAssignments: [],
+      suggestions: [],
+      recomputeTimeMs: 1,
+    })
+    parserMocks.parseTeacherHoursXls.mockReturnValue({
+      sheetName: '교사별시수표',
+      subjects: [{ name: '국어', abbreviation: '국' }],
+      teachers: [{ name: '김교사', baseHoursPerWeek: 5 }],
+      assignments: [
+        {
+          teacherName: '김교사',
+          subjectName: '국어',
+          grade: 1,
+          classNumber: 1,
+          hoursPerWeek: 5,
+        },
+      ],
+      issues: [],
+    })
+
+    await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
+
+    expect(recomputeMocks.recomputeUnlocked).toHaveBeenCalledTimes(1)
+    expect(repositoryMocks.saveNextSnapshotVersion).not.toHaveBeenCalled()
+    const importReport = useSetupStore.getState().importReport
+    expect(importReport?.status).toBe('PARTIAL_SUCCESS')
+    expect(
+      importReport?.issues.some(
+        (issue) => issue.code === 'UNKNOWN' && issue.severity === 'warning',
+      ),
+    ).toBe(true)
+  })
+
+  it('teacher-hours recompute throw: PARTIAL_SUCCESS + warning', async () => {
+    seedBaseState()
+    recomputeMocks.recomputeUnlocked.mockImplementationOnce(() => {
+      throw new Error('recompute exploded')
+    })
+    parserMocks.parseTeacherHoursXls.mockReturnValue({
+      sheetName: '교사별시수표',
+      subjects: [{ name: '국어', abbreviation: '국' }],
+      teachers: [{ name: '김교사', baseHoursPerWeek: 5 }],
+      assignments: [
+        {
+          teacherName: '김교사',
+          subjectName: '국어',
+          grade: 1,
+          classNumber: 1,
+          hoursPerWeek: 5,
+        },
+      ],
+      issues: [],
+    })
+
+    await useSetupStore.getState().importTeacherHoursFromFile(createTeacherHoursFile())
+
+    expect(recomputeMocks.recomputeUnlocked).toHaveBeenCalledTimes(1)
+    expect(repositoryMocks.saveNextSnapshotVersion).not.toHaveBeenCalled()
+    const importReport = useSetupStore.getState().importReport
+    expect(importReport?.status).toBe('PARTIAL_SUCCESS')
+    expect(
+      importReport?.issues.some(
+        (issue) => issue.code === 'UNKNOWN' && issue.severity === 'warning',
+      ),
+    ).toBe(true)
   })
 
   it('teacher-hours warning-only: PARTIAL_SUCCESS', async () => {
